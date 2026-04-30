@@ -31,8 +31,6 @@ author:
     email: public@karlmcguinness.com
 
 normative:
-  RFC2119:
-  RFC8174:
   RFC9110:
   RFC9457:
   RFC3339:
@@ -75,7 +73,6 @@ normative:
     date: 2026-04-29
 
 informative:
-  I-D.ietf-httpapi-idempotency-key-header:
   XACML:
     title: "eXtensible Access Control Markup Language (XACML) Version 3.0"
     target: "https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html"
@@ -145,7 +142,7 @@ Approval Result:
 
 # Protocol Overview
 
-~~~ aasvg
+~~~ ascii-art
 +---------+                         +---------+                    +----------------+
 |   PEP   |                         |   PDP   |                    | Access Request |
 |         |                         |         |                    |    Service     |
