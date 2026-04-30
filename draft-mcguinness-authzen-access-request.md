@@ -788,7 +788,7 @@ A deployment MAY support the per-task callback ({{callback-completion}}), the SS
 * Receivers MUST NOT assume ordering between callback delivery and SET delivery.
 * A `result` member that is enforceable under {{completion-semantics}} MAY appear in the per-task callback.  An equivalent `result` carried in a SET is a notification only and MUST NOT be enforced by the receiver.
 
-## Discovery
+## SSF Binding Discovery
 
 A PDP supporting the SSF binding SHOULD include the following capability URN in PDP metadata:
 
@@ -1060,7 +1060,7 @@ Content-Type: application/json
 }
 ~~~
 
-### Access Request Submission
+### Submitting the Access Request
 
 ~~~ http
 POST /access/v1/requests HTTP/1.1
