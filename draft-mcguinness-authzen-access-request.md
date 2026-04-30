@@ -9,8 +9,8 @@ number:
 date:
 consensus: false
 v: 3
-area: "Security"
-workgroup: "OpenID AuthZEN Working Group"
+# area: "Security"
+# workgroup: "OpenID AuthZEN Working Group"
 keyword:
   - authorization
   - access request
@@ -19,10 +19,10 @@ keyword:
   - policy enforcement point
 
 venue:
-  group: "OpenID AuthZEN Working Group"
-  type: "Working Group"
-  mail: "openid-specs-authzen@lists.openid.net"
-  arch: "https://lists.openid.net/pipermail/openid-specs-authzen/"
+#  group: "OpenID AuthZEN Working Group"
+#  type: "Working Group"
+#  mail: "openid-specs-authzen@lists.openid.net"
+#  arch: "https://lists.openid.net/pipermail/openid-specs-authzen/"
 
 author:
   -
