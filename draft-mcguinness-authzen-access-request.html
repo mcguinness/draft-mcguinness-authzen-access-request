@@ -1,0 +1,3137 @@
+<!DOCTYPE html>
+<html lang="en" class="Internet-Draft">
+<head>
+<meta charset="utf-8">
+<meta content="Common,Latin" name="scripts">
+<meta content="initial-scale=1.0" name="viewport">
+<title>AuthZEN Access Request and Approval Profile</title>
+<meta content="Karl McGuinness" name="author">
+<meta content="
+       This specification defines an extension profile for the OpenID AuthZEN Authorization API that allows a Policy Enforcement Point (PEP) to submit an access request when an authorization decision is denied but requestable.  The profile preserves the AuthZEN decision model: a denied decision remains a denial and  MUST NOT  be treated as access.  It adds a requestable denial context, an access request endpoint, a task handle for asynchronous approval workflows, and completion semantics that allow a PEP to re-evaluate or consume a final authorization result after approval. 
+    " name="description">
+<meta content="xml2rfc 3.33.0" name="generator">
+<meta content="authorization" name="keyword">
+<meta content="access request" name="keyword">
+<meta content="approval workflow" name="keyword">
+<meta content="policy decision point" name="keyword">
+<meta content="policy enforcement point" name="keyword">
+<meta content="draft-mcguinness-authzen-access-request-latest" name="ietf.draft">
+<!-- Generator version information:
+  xml2rfc 3.33.0
+    Python 3.12.13
+    ConfigArgParse 1.7
+    google-i18n-address 3.1.1
+    intervaltree 3.2.1
+    Jinja2 3.1.6
+    lxml 6.0.2
+    platformdirs 4.9.6
+    pycountry 24.6.1
+    PyYAML 6.0.3
+    requests 2.32.5
+    wcwidth 0.6.0
+-->
+<link href="draft-mcguinness-authzen-access-request.xml" rel="alternate" type="application/rfc+xml">
+<link href="#copyright" rel="license">
+<style type="text/css">@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Lora';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Italic'), local('Lora-Italic'), url('https://martinthomson.github.io/rfc-css/fonts/lora-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-cyrillic.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Lora Regular'), local('Lora-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/lora-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-cyrillic.woff2') format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-024F, U+0259, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20CF, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: local('Lora Bold'), local('Lora-Bold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-bold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Lora';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local('Lora SemiBold'), local('Lora-SemiBold'), url('https://martinthomson.github.io/rfc-css/fonts/lora-semibold-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Oxygen Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Oxygen Mono'), local('OxygenMono-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/oxygenmono-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Oxygen Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local('Oxygen Mono'), local('OxygenMono-Regular'), url('https://martinthomson.github.io/rfc-css/fonts/oxygenmono-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+}
+
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: italic;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-italic-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Sofia Sans Semi Condensed';
+  font-style: normal;
+  font-weight: 1 1000;
+  src: url('https://martinthomson.github.io/rfc-css/fonts/sofiasanssemicondensed-regular-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  color-scheme: light dark;
+  --background-color: #fff;
+  --text-color: #222;
+  --title-color: #191919;
+  --link-color: #2a6496;
+  --highlight-color: #f9f9f9;
+  --line-color: #eee;
+  --pilcrow-weak: #ddd;
+  --pilcrow-strong: #bbb;
+  --small-font-size: 14.5px;
+  --font-mono: 'Oxygen Mono', monospace;
+  --font-title: "Sofia Sans Semi Condensed", sans-serif;
+  scrollbar-color: #bbb #eee;
+}
+body {
+  max-width: 600px;
+  margin: 75px auto;
+  padding: 0 5px;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  font: 16px/22px "Lora", serif;
+  scroll-behavior: smooth;
+}
+
+.ears {
+  display: none;
+}
+
+/* headings */
+section {
+  clear: both;
+}
+.section-number {
+  padding-right: 0.5em;
+}
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-title);
+  font-weight: 680;
+  margin: 0.8em 0 0.3em;
+  font-size-adjust: 0.5;
+  color: var(--title-color);
+}
+h1#title {
+  font-size: 32px;
+  line-height: 40px;
+  clear: both;
+}
+h1#title, h1#rfcnum {
+  margin: 1.5em 0 0.2em;
+}
+h1#rfcnum + h1#title {
+  margin: 0.2em 0;
+}
+
+h1, h2, h3 {
+  font-size: 22px;
+  line-height: 27px;
+}
+h4, h5, h6 {
+  font-size: 20px;
+  line-height: 24px;
+}
+
+/* general structure */
+.author {
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+#abstract+p {
+  font-size: 18px;
+  line-height: 24px;
+}
+#abstract+p code, #abstract+p samp, #abstract+p tt {
+  font-size: 16px;
+  line-height: 0;
+}
+
+p {
+  padding: 0;
+  margin: 0.5em 0;
+  text-align: left;
+}
+div {
+  margin: 0;
+}
+.alignRight.art-text {
+  background-color: var(--highlight-color);
+  border: 1px solid var(--line-color);
+  border-radius: 3px;
+  padding: 0.5em 1em 0;
+  margin-bottom: 0.5em;
+}
+.alignRight.art-text pre {
+  padding: 0;
+  width: auto;
+}
+.alignRight {
+  margin: 1em 0;
+}
+.alignRight > *:first-child {
+  border: none;
+  margin: 0;
+  float: right;
+  clear: both;
+}
+.alignRight > *:nth-child(2) {
+  clear: both;
+  display: block;
+  border: none;
+}
+svg {
+  display: block;
+}
+/* font-family isn't space-separated, but =~ will have to do */
+svg[font-family~="monospace" i], svg [font-family~="monospace" i] {
+  font-family: var(--font-mono);
+}
+.alignCenter.art-text {
+  background-color: var(--highlight-color);
+  border: 1px solid var(--line-color);
+  border-radius: 3px;
+  padding: 0.5em 1em 0;
+  margin-bottom: 0.5em;
+}
+.alignCenter.art-text pre {
+  padding: 0;
+  width: auto;
+}
+.alignCenter {
+  margin: 1em 0;
+}
+.alignCenter > *:first-child {
+  border: none;
+  /* this isn't optimal, but it's an existence proof.  PrinceXML doesn't
+     support flexbox yet.
+  */
+  display: table;
+  margin: 0 auto;
+}
+
+/* lists */
+ol, ul {
+  padding: 0;
+  margin: 0 0 0.5em 2em;
+  & :is(ol, ul) {
+    margin-left: 1em;
+  }
+}
+li {
+  margin: 0 0 0.25em 0;
+}
+ul.empty, .ulEmpty {
+  list-style-type: none;
+  & li {
+    margin-top: 0.5em;
+  }
+}
+:is(ul, ol).compact, .ulCompact, .olCompact {
+  margin: 0 0 0 2em;
+  & li {
+    margin: 0;
+    & :first-child { margin-top: 0; }
+    & :last-child { margin-bottom: 0; }
+  }
+}
+
+/* definition lists */
+dl {
+  clear: left;
+  --indent: 3ch;
+  /* --indent: attr(indent ch); not supported in any browser, but we can dream */
+  &.olPercent {
+    --indent: 5ch;
+    & > dt {
+      min-width: calc(var(--indent) - 2ch);
+    }
+  }
+  &.olPercent > dt {
+    float: none;
+  }
+
+  dl > dd > & {
+    margin-top: 0.5em;
+    margin-bottom: 0;
+  }
+}
+dl:not(.dlNewline) > dt {
+  float: left;
+  margin-right: 2ch;
+  min-width: 8ch;
+}
+dl > dd {
+  margin-bottom: .8em;
+  margin-left: var(--indent) !important; /* stupid element overrides */
+  min-height: 2ex;
+}
+:is(dl.compact, .dlCompact) > dd {
+  margin-bottom: 0;
+  & > :is(:first-child, .break:first-child + *) {
+    margin-top: 0;
+  }
+  & > :is(:last-child) {
+    margin-bottom: 0;
+  }
+}
+:is(dd, span).break {
+  display: none;
+}
+
+/* links */
+a, a[href].selfRef:hover {
+  text-decoration: none;
+}
+a[href] {
+  color: var(--link-color);
+}
+a[href].selfRef, .iref + a[href].internal {
+  color: var(--text-color);
+}
+a[href]:hover {
+  text-decoration: underline;
+}
+a[href].selfRef:hover {
+  background-color: var(--highlight-color);
+}
+a.xref:is(.cite, .auto), :is(#status-of-memo, #copyright) a {
+  white-space: nowrap;
+}
+
+/* Figures */
+tt, code, pre {
+  background-color: var(--highlight-color);
+  font: 14px/22px var(--font-mono);
+}
+tt, code {
+  /* changing the font for inline elements leads to different ascender
+     and descender heights; as we want to retain baseline alignment,
+     remove leading to avoid altering the final height of lines
+     note: this fails if these blocks take an entire line,
+     a different solution would be great */
+  line-height: 0;
+}
+:is(h1, h2, h3, h4, h5, h6) :is(tt, code) {
+  font-size: 84%;
+}
+pre {
+  border: 1px solid var(--line-color);
+  font-size: 13.5px;
+  line-height: 16px;
+  letter-spacing: -0.2px;
+  margin: 5px;
+  padding: 5px;
+}
+img {
+  max-width: 100%;
+}
+figure {
+  margin: 0.5em 0;
+  padding: 0;
+}
+figure blockquote {
+  margin: 0.8em 0.4em 0.4em;
+}
+figcaption, caption {
+  font-style: italic;
+  margin: 0.5em 1.5em;
+  text-align: left;
+  caption-side: bottom;
+}
+@media screen {
+  /* Auto-collapse boilerplate. */
+  :is(#status-of-memo, #copyright) p {
+    margin: -2px 0;
+    max-height: 0;
+    transition: max-height 2s ease, margin 0.5s ease 0.5s;
+    overflow: hidden;
+  }
+  :is(#status-of-memo, #copyright):hover p,
+  :is(#status-of-memo, #copyright) h2:target ~ p {
+    margin: 0.5em 0;
+    max-height: 500px;
+    overflow: auto;
+  }
+  pre, svg {
+    display: inline-block;
+    /* In the horizontal direction, sometimes people make over-sized figures.
+       Scrollbars for those is therefore necessary: auto adds them as necessary..
+       In the vertical direction, the line-height can combine with the font
+       asender/descender height to produce scrollbars: hidden avoids that. */
+    overflow: auto hidden;
+  }
+  pre {
+    max-width: 100%;
+    width: calc(100% - 22px - 1em);
+  }
+  svg {
+    max-width: calc(100% - 22px - 1em);
+  }
+  figure pre {
+    display: block;
+    width: calc(100% - 25px);
+  }
+  :is(pre, svg) + .pilcrow {
+    display: inline-block;
+    vertical-align: text-bottom;
+    padding-bottom: 8px;
+  }
+}
+
+/* aside, blockquote */
+aside, blockquote {
+  margin-left: 0;
+  padding: 0 2em;
+  font-style: italic;
+}
+blockquote {
+  margin: 1em 0;
+  border-left: 2px var(--pilcrow-strong) solid;
+}
+cite {
+  display: block;
+  text-align: right;
+  font-style: italic;
+}
+
+/* tables */
+table {
+  width: auto;
+  max-width: 100%;
+  margin: 0 0 1em;
+  border-collapse: collapse;
+}
+table.right {
+  margin-left: auto;
+}
+table.center {
+  margin-left: auto;
+  margin-right: auto;
+}
+table.left {
+  margin-right: auto;
+}
+table .text-left {
+  text-align: left;
+}
+table .text-center {
+  text-align: center;
+}
+table .text-right {
+  text-align: right;
+}
+
+thead, tbody {
+  border: 1px solid var(--line-color);
+}
+th, td {
+  text-align: left;
+  vertical-align: top;
+  padding: 5px 10px;
+}
+th {
+  background-color: var(--line-color);
+}
+:is(tr:nth-child(2n), thead+tbody > tr:nth-child(2n+1)) > td {
+  background-color: var(--background-color);
+}
+:is(tr:nth-child(2n+1), thead+tbody > tr:nth-child(2n)) > td {
+  background-color: var(--highlight-color);
+}
+table caption {
+  margin: 0;
+  padding: 3px 0 3px 1em;
+}
+table p {
+  margin: 0;
+}
+
+/* pilcrow */
+a.pilcrow {
+  margin-left: 3px;
+  opacity: 0.2;
+  user-select: none;
+  &[href] {
+    color: var(--pilcrow-weak);
+    &:hover { text-decoration: none; }
+  }
+}
+@media not print {
+  :hover > a.pilcrow, a.pilcrow:focus {
+    opacity: 1;
+  }
+  a.pilcrow[href]:hover {
+    color: var(--pilcrow-strong);
+    background-color: transparent;
+  }
+}
+@media print {
+  a.pilcrow {
+    display: none;
+  }
+}
+
+/* misc */
+hr {
+  border: 0;
+  border-top: 1px solid var(--line-color);
+}
+.bcp14 {
+  font-variant: small-caps;
+  font-weight: 600;
+  font-size: var(--small-font-size);
+}
+.role {
+  font-variant: all-small-caps;
+}
+sub, sup {
+  line-height: 1;
+  font-size: 80%;
+}
+
+/* info block */
+#identifiers {
+  margin: 0;
+  font-size: var(--small-font-size);
+  line-height: 18px;
+  --identifier-width: 15ch;
+  & dt {
+    width: var(--identifier-width);
+    min-width: var(--identifier-width);
+    clear: left;
+    float: left;
+    text-align: right;
+    margin-right: 1ch;
+  }
+  & dd {
+    margin: 0;
+    margin-left: calc(1em + var(--identifier-width)) !important;
+    min-width: 5em;
+  }
+  & .authors {
+    & .author {
+      display: inline-block;
+      margin-right: 1.5em;
+    }
+    & .org {
+      font-style: italic;
+    }
+  }
+}
+
+/* The prepared/rendered info at the very bottom of the page */
+.docInfo {
+  color: #999;
+  font-size: 0.9em;
+  font-style: italic;
+  margin-top: 2em;
+}
+.docInfo .prepared {
+  float: right;
+}
+
+/* table of contents */
+#toc {
+  padding: 0.75em 0 2em 0;
+  margin-bottom: 1em;
+
+  & nav {
+    & ul {
+      margin: 0 0.5em 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    & li {
+      line-height: 1.3em;
+      margin: 2px 0;
+      padding-left: 1.2em;
+      text-indent: -1.2em;
+    }
+  }
+  & a.xref {
+    white-space: normal;
+  }
+}
+
+.references {
+  & > dt {
+    text-align: right;
+    font-weight: bold;
+    min-width: 10ch;
+    margin-right: 1.5ch;
+    &:target::before {
+      content: "⇒";
+      margin: 0 10px 0 -25px;
+    }
+  }
+  & > dd {
+    margin-left: 12ch !important;
+    overflow: visible;
+    & .refInstance {
+      margin-bottom: 0.8em;
+    }
+    & .ascii {
+      margin-bottom: 0.25em;
+    }
+  }
+}
+
+#rfc\.index\.index + ul {
+  margin-left: 0;
+}
+
+/* authors */
+address.vcard {
+  font-style: normal;
+  max-width: 20em;
+  margin: 1em auto 1em 0;
+
+  & .nameRole {
+    font-weight: 700;
+    margin-left: 0;
+  }
+  & .label {
+    margin: 0.5em 0;
+  }
+  & .type {
+    display: none;
+  }
+  & .alternative-contact {
+    margin: 0.5em 0 0.25em 0;
+  }
+  & .non-ascii {
+    margin: 0 0 0 2em;
+  }
+  & div.left {
+    text-align: left;
+  }
+  & div.right {
+    text-align: right;
+  }
+}
+
+hr.addr {
+  border-top: 1px dashed;
+  margin: 0;
+  color: #ddd;
+  max-width: calc(100% - 16px);
+}
+@media (min-width: 500px) {
+  #authors-addresses > section {
+    column-count: 2;
+    column-gap: 20px;
+  }
+  #authors-addresses > section > h2 {
+    column-span: all;
+  }
+  /* hack for break-inside: avoid-column */
+  #authors-addresses address {
+    display: inline-block;
+    break-inside: avoid-column;
+  }
+}
+
+/* Comments */
+.rfcEditorRemove p:first-of-type {
+  font-style: italic;
+}
+.cref {
+  background-color: rgba(249, 232, 105, 0.3);
+  padding: 2px 4px;
+}
+.crefSource {
+  font-style: italic;
+}
+
+@media screen {
+  #toc nav {
+    font-family: var(--font-title);
+    font-weight: 360;
+    & > ul { margin-bottom: 2em; }
+    & ul {
+      margin: 0 0 0 4px;
+      & :is(p, li) {
+        margin: 2px 0;
+      }
+    }
+  }
+  #toc a.toplink {
+    float: right;
+  }
+}
+@media not screen {
+  #toc a.toplink {
+    display: none;
+  }
+}
+
+
+/* TOC layout for smaller screens */
+@media screen and (max-width: 929px) {
+  #toc {
+    position: fixed;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    padding: 1px 0 0 0;
+    margin: 0;
+    border-bottom: 1px solid #ccc;
+    opacity: 0.6;
+  }
+  #toc h2 {
+    margin: 0;
+    padding: 2px 0 2px 6px;
+    padding-right: 1em;
+    font-size: 18px;
+    line-height: 24px;
+    min-width: 190px;
+    text-align: right;
+    background-color: #444;
+    color: white;
+    cursor: pointer;
+    &::before { /* css hamburger */
+      float: right;
+      position: relative;
+      width: 1em;
+      height: 1px;
+      left: -164px;
+      margin: 8px 0 0 0;
+      background: white none repeat scroll 0 0;
+      box-shadow: 0 4px 0 0 white, 0 8px 0 0 white;
+      content: "";
+    }
+  }
+  #toc nav {
+    display: none;
+    background-color: var(--background-color);
+    padding: 0.5em 1em 1em;
+    overflow: auto;
+    overscroll-behavior: contain;
+    height: calc(100vh - 48px);
+    border-left: 1px solid #ddd;
+  }
+  #toc.active {
+    opacity: 1;
+    & nav { display: block; }
+  }
+  /* Make the collapsed ToC header render white on gray also when it's a link */
+  #toc h2 a,
+  #toc h2 a:is(:link, :focus, :hover),
+  #toc a.toplink,
+  #toc a.toplink:hover {
+    color: white;
+    background-color: #444;
+    text-decoration: none;
+  }
+  #toc a.toplink {
+    margin: 2px 0.5em 0;
+  }
+}
+
+/* TOC layout for wide screens */
+@media screen and (min-width: 930px) {
+  body {
+    padding-right: 360px;
+    padding-right: calc(min(180px + 20%, 500px));
+  }
+  #toc {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    right: calc(50vw - 480px);
+    width: 312px;
+    margin: 0;
+    padding: 0;
+    z-index: 1;
+  }
+  #toc h2 {
+    margin: 0;
+    padding: 0.25em 1em 1em 0;
+  }
+  #toc nav {
+    display: block;
+    height: calc(90vh - 84px);
+    bottom: 0;
+    padding: 0.5em 0 2em;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  img { /* future proofing */
+    max-width: 100%;
+    height: auto;
+  }
+  #toc a.toplink {
+    margin: 8px 0.5em 0;
+  }
+}
+
+/* pagination */
+@media print {
+  body {
+    width: 100%;
+  }
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+  #n-copyright-notice {
+    border-bottom: none;
+  }
+  #toc, #n-introduction {
+    page-break-before: always;
+  }
+  #toc {
+    border-top: none;
+    padding-top: 0;
+  }
+  figure, pre, .vcard {
+    page-break-inside: avoid;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+  }
+  :is(h2, h3, h4, h5, h6)+*, dd {
+    page-break-before: avoid;
+  }
+  pre {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 10pt;
+  }
+  table {
+    border: 1px solid #ddd;
+  }
+  td {
+    border-top: 1px solid #ddd;
+  }
+}
+
+@page :first {
+  padding-top: 0;
+  @top-left {
+    content: normal;
+    border: none;
+  }
+  @top-center {
+    content: normal;
+    border: none;
+  }
+  @top-right {
+    content: normal;
+    border: none;
+  }
+}
+
+@page {
+  size: A4;
+  margin-bottom: 45mm;
+  padding-top: 20px;
+}
+
+/* Dark mode. */
+@media (prefers-color-scheme: dark) {
+:root {
+  --background-color: #121212;
+  --text-color: #f0f0f0;
+  --title-color: #fff;
+  --link-color: #4da4f0;
+  --highlight-color: #282828;
+  --line-color: #444;
+  --pilcrow-weak: #444;
+  --pilcrow-strong: #666;
+  scrollbar-color: #777 #333;
+}
+}
+
+/* SVG Trick: a prefix match works because only black and white are allowed */
+svg :is([stroke="black"], [stroke^="#000"]) {
+  stroke: var(--text-color);
+}
+svg :is([stroke="white"], [stroke^="#fff"]) {
+  stroke: var(--background-color);
+}
+svg :is([fill="black"], [fill^="#000"], :not([fill])) {
+  fill: var(--text-color);
+}
+svg :is([fill="white"], [fill^="#fff"]) {
+  fill: var(--background-color);
+}
+</style>
+
+</head>
+<body class="xml2rfc">
+<table class="ears">
+<thead><tr>
+<td class="left">Internet-Draft</td>
+<td class="center">AuthZEN Access Request</td>
+<td class="right">April 2026</td>
+</tr></thead>
+<tfoot><tr>
+<td class="left">McGuinness</td>
+<td class="center">Expires 1 November 2026</td>
+<td class="right">[Page]</td>
+</tr></tfoot>
+</table>
+<div id="external-metadata" class="document-information"></div>
+<div id="internal-metadata" class="document-information">
+<dl id="identifiers">
+<dt class="label-workgroup">Workgroup:</dt>
+<dd class="workgroup">OpenID AuthZEN Working Group</dd>
+<dt class="label-internet-draft">Internet-Draft:</dt>
+<dd class="internet-draft">draft-mcguinness-authzen-access-request-latest</dd>
+<dt class="label-published">Published:</dt>
+<dd class="published">
+<time datetime="2026-04-30" class="published">30 April 2026</time>
+    </dd>
+<dt class="label-intended-status">Intended Status:</dt>
+<dd class="intended-status">Standards Track</dd>
+<dt class="label-expires">Expires:</dt>
+<dd class="expires"><time datetime="2026-11-01">1 November 2026</time></dd>
+<dt class="label-authors">Author:</dt>
+<dd class="authors">
+<div class="author">
+      <div class="author-name">K. McGuinness</div>
+<div class="org">Independent</div>
+</div>
+</dd>
+</dl>
+</div>
+<h1 id="title">AuthZEN Access Request and Approval Profile</h1>
+<section id="section-abstract">
+      <h2 id="abstract"><a href="#abstract" class="selfRef">Abstract</a></h2>
+<p id="section-abstract-1">This specification defines an extension profile for the OpenID AuthZEN Authorization API that allows a Policy Enforcement Point (PEP) to submit an access request when an authorization decision is denied but requestable.  The profile preserves the AuthZEN decision model: a denied decision remains a denial and <span class="bcp14">MUST NOT</span> be treated as access.  It adds a requestable denial context, an access request endpoint, a task handle for asynchronous approval workflows, and completion semantics that allow a PEP to re-evaluate or consume a final authorization result after approval.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+</section>
+<section class="note rfcEditorRemove" id="section-note.1">
+      <h2 id="name-about-this-document">
+<a href="#name-about-this-document" class="section-name selfRef">About This Document</a>
+      </h2>
+<p id="section-note.1-1">This note is to be removed before publishing as an RFC.<a href="#section-note.1-1" class="pilcrow">¶</a></p>
+<p id="section-note.1-2">
+        Status information for this document may be found at <span><a href="https://datatracker.ietf.org/doc/draft-mcguinness-authzen-access-request/">https://datatracker.ietf.org/doc/draft-mcguinness-authzen-access-request/</a></span>.<a href="#section-note.1-2" class="pilcrow">¶</a></p>
+<p id="section-note.1-3">
+        Discussion of this document takes place on the
+        OpenID AuthZEN Working Group Working Group mailing list (<span><a href="mailto:openid-specs-authzen@lists.openid.net">mailto:openid-specs-authzen@lists.openid.net</a></span>),
+        which is archived at <span><a href="https://lists.openid.net/pipermail/openid-specs-authzen/">https://lists.openid.net/pipermail/openid-specs-authzen/</a></span>.<a href="#section-note.1-3" class="pilcrow">¶</a></p>
+</section>
+<div id="status-of-memo">
+<section id="section-boilerplate.1">
+        <h2 id="name-status-of-this-memo">
+<a href="#name-status-of-this-memo" class="section-name selfRef">Status of This Memo</a>
+        </h2>
+<p id="section-boilerplate.1-1">
+        This Internet-Draft is submitted in full conformance with the
+        provisions of BCP 78 and BCP 79.<a href="#section-boilerplate.1-1" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-2">
+        Internet-Drafts are working documents of the Internet Engineering Task
+        Force (IETF). Note that other groups may also distribute working
+        documents as Internet-Drafts. The list of current Internet-Drafts is
+        at <span><a href="https://datatracker.ietf.org/drafts/current/">https://datatracker.ietf.org/drafts/current/</a></span>.<a href="#section-boilerplate.1-2" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-3">
+        Internet-Drafts are draft documents valid for a maximum of six months
+        and may be updated, replaced, or obsoleted by other documents at any
+        time. It is inappropriate to use Internet-Drafts as reference
+        material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.1-4">
+        This Internet-Draft will expire on 1 November 2026.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="copyright">
+<section id="section-boilerplate.2">
+        <h2 id="name-copyright-notice">
+<a href="#name-copyright-notice" class="section-name selfRef">Copyright Notice</a>
+        </h2>
+<p id="section-boilerplate.2-1">
+            Copyright (c) 2026 IETF Trust and the persons identified as the
+            document authors. All rights reserved.<a href="#section-boilerplate.2-1" class="pilcrow">¶</a></p>
+<p id="section-boilerplate.2-2">
+            This document is subject to BCP 78 and the IETF Trust's Legal
+            Provisions Relating to IETF Documents
+            (<span><a href="https://trustee.ietf.org/license-info">https://trustee.ietf.org/license-info</a></span>) in effect on the date of
+            publication of this document. Please review these documents
+            carefully, as they describe your rights and restrictions with
+            respect to this document. Code Components extracted from this
+            document must include Revised BSD License text as described in
+            Section 4.e of the Trust Legal Provisions and are provided without
+            warranty as described in the Revised BSD License.<a href="#section-boilerplate.2-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="toc">
+<section id="section-toc.1">
+        <a href="#" onclick="scroll(0,0)" class="toplink">▲</a><h2 id="name-table-of-contents">
+<a href="#name-table-of-contents" class="section-name selfRef">Table of Contents</a>
+        </h2>
+<nav class="toc"><ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.1">
+            <p id="section-toc.1-1.1.1" class="keepWithNext"><a href="#section-1" class="auto internal xref">1</a>.  <a href="#name-introduction" class="internal xref">Introduction</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.2">
+            <p id="section-toc.1-1.2.1" class="keepWithNext"><a href="#section-2" class="auto internal xref">2</a>.  <a href="#name-requirements-notation-and-c" class="internal xref">Requirements Notation and Conventions</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.3">
+            <p id="section-toc.1-1.3.1" class="keepWithNext"><a href="#section-3" class="auto internal xref">3</a>.  <a href="#name-design-goals" class="internal xref">Design Goals</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.4">
+            <p id="section-toc.1-1.4.1"><a href="#section-4" class="auto internal xref">4</a>.  <a href="#name-terminology" class="internal xref">Terminology</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.5">
+            <p id="section-toc.1-1.5.1"><a href="#section-5" class="auto internal xref">5</a>.  <a href="#name-protocol-overview" class="internal xref">Protocol Overview</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.6">
+            <p id="section-toc.1-1.6.1"><a href="#section-6" class="auto internal xref">6</a>.  <a href="#name-discovery" class="internal xref">Discovery</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.7">
+            <p id="section-toc.1-1.7.1"><a href="#section-7" class="auto internal xref">7</a>.  <a href="#name-requestable-denial-context" class="internal xref">Requestable Denial Context</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8">
+            <p id="section-toc.1-1.8.1"><a href="#section-8" class="auto internal xref">8</a>.  <a href="#name-access-request-endpoint" class="internal xref">Access Request Endpoint</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8.2.1">
+                <p id="section-toc.1-1.8.2.1.1"><a href="#section-8.1" class="auto internal xref">8.1</a>.  <a href="#name-access-request-submission" class="internal xref">Access Request Submission</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.8.2.2">
+                <p id="section-toc.1-1.8.2.2.1"><a href="#section-8.2" class="auto internal xref">8.2</a>.  <a href="#name-access-request-response" class="internal xref">Access Request Response</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9">
+            <p id="section-toc.1-1.9.1"><a href="#section-9" class="auto internal xref">9</a>.  <a href="#name-task-status-endpoint" class="internal xref">Task Status Endpoint</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9.2.1">
+                <p id="section-toc.1-1.9.2.1.1"><a href="#section-9.1" class="auto internal xref">9.1</a>.  <a href="#name-task-status-values" class="internal xref">Task Status Values</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9.2.2">
+                <p id="section-toc.1-1.9.2.2.1"><a href="#section-9.2" class="auto internal xref">9.2</a>.  <a href="#name-pending-task-response" class="internal xref">Pending Task Response</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9.2.3">
+                <p id="section-toc.1-1.9.2.3.1"><a href="#section-9.3" class="auto internal xref">9.3</a>.  <a href="#name-completed-task-response" class="internal xref">Completed Task Response</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10">
+            <p id="section-toc.1-1.10.1"><a href="#section-10" class="auto internal xref">10</a>. <a href="#name-completion-semantics" class="internal xref">Completion Semantics</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.1">
+                <p id="section-toc.1-1.10.2.1.1"><a href="#section-10.1" class="auto internal xref">10.1</a>.  <a href="#name-re-evaluation-mode" class="internal xref">Re-evaluation Mode</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.2">
+                <p id="section-toc.1-1.10.2.2.1"><a href="#section-10.2" class="auto internal xref">10.2</a>.  <a href="#name-decision-result-mode" class="internal xref">Decision Result Mode</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.10.2.3">
+                <p id="section-toc.1-1.10.2.3.1"><a href="#section-10.3" class="auto internal xref">10.3</a>.  <a href="#name-token-result-mode" class="internal xref">Token Result Mode</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11">
+            <p id="section-toc.1-1.11.1"><a href="#section-11" class="auto internal xref">11</a>. <a href="#name-callback-completion" class="internal xref">Callback Completion</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12">
+            <p id="section-toc.1-1.12.1"><a href="#section-12" class="auto internal xref">12</a>. <a href="#name-shared-signals-framework-bi" class="internal xref">Shared Signals Framework Binding</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.1">
+                <p id="section-toc.1-1.12.2.1.1"><a href="#section-12.1" class="auto internal xref">12.1</a>.  <a href="#name-event-types" class="internal xref">Event Types</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.2">
+                <p id="section-toc.1-1.12.2.2.1"><a href="#section-12.2" class="auto internal xref">12.2</a>.  <a href="#name-set-payload" class="internal xref">SET Payload</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.3">
+                <p id="section-toc.1-1.12.2.3.1"><a href="#section-12.3" class="auto internal xref">12.3</a>.  <a href="#name-stream-management-and-deliv" class="internal xref">Stream Management and Delivery</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.4">
+                <p id="section-toc.1-1.12.2.4.1"><a href="#section-12.4" class="auto internal xref">12.4</a>.  <a href="#name-relationship-to-per-task-ca" class="internal xref">Relationship to Per-Task Callback</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.12.2.5">
+                <p id="section-toc.1-1.12.2.5.1"><a href="#section-12.5" class="auto internal xref">12.5</a>.  <a href="#name-ssf-binding-discovery" class="internal xref">SSF Binding Discovery</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.13">
+            <p id="section-toc.1-1.13.1"><a href="#section-13" class="auto internal xref">13</a>. <a href="#name-error-responses" class="internal xref">Error Responses</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.14">
+            <p id="section-toc.1-1.14.1"><a href="#section-14" class="auto internal xref">14</a>. <a href="#name-pep-processing-rules" class="internal xref">PEP Processing Rules</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.15">
+            <p id="section-toc.1-1.15.1"><a href="#section-15" class="auto internal xref">15</a>. <a href="#name-pdp-processing-rules" class="internal xref">PDP Processing Rules</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.16">
+            <p id="section-toc.1-1.16.1"><a href="#section-16" class="auto internal xref">16</a>. <a href="#name-access-request-service-proc" class="internal xref">Access Request Service Processing Rules</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.17">
+            <p id="section-toc.1-1.17.1"><a href="#section-17" class="auto internal xref">17</a>. <a href="#name-authorization-and-authentic" class="internal xref">Authorization and Authentication</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.18">
+            <p id="section-toc.1-1.18.1"><a href="#section-18" class="auto internal xref">18</a>. <a href="#name-privacy-considerations" class="internal xref">Privacy Considerations</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19">
+            <p id="section-toc.1-1.19.1"><a href="#section-19" class="auto internal xref">19</a>. <a href="#name-security-considerations" class="internal xref">Security Considerations</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.1">
+                <p id="section-toc.1-1.19.2.1.1"><a href="#section-19.1" class="auto internal xref">19.1</a>.  <a href="#name-denial-remains-denial" class="internal xref">Denial Remains Denial</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.2">
+                <p id="section-toc.1-1.19.2.2.1"><a href="#section-19.2" class="auto internal xref">19.2</a>.  <a href="#name-confused-deputy-and-request" class="internal xref">Confused Deputy and Request Substitution</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.3">
+                <p id="section-toc.1-1.19.2.3.1"><a href="#section-19.3" class="auto internal xref">19.3</a>.  <a href="#name-approval-replay" class="internal xref">Approval Replay</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.4">
+                <p id="section-toc.1-1.19.2.4.1"><a href="#section-19.4" class="auto internal xref">19.4</a>.  <a href="#name-overbroad-approval" class="internal xref">Overbroad Approval</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.5">
+                <p id="section-toc.1-1.19.2.5.1"><a href="#section-19.5" class="auto internal xref">19.5</a>.  <a href="#name-task-handle-leakage" class="internal xref">Task Handle Leakage</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.6">
+                <p id="section-toc.1-1.19.2.6.1"><a href="#section-19.6" class="auto internal xref">19.6</a>.  <a href="#name-callback-security" class="internal xref">Callback Security</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.7">
+                <p id="section-toc.1-1.19.2.7.1"><a href="#section-19.7" class="auto internal xref">19.7</a>.  <a href="#name-shared-signals-framework-bin" class="internal xref">Shared Signals Framework Binding Security</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.8">
+                <p id="section-toc.1-1.19.2.8.1"><a href="#section-19.8" class="auto internal xref">19.8</a>.  <a href="#name-pep-acting-on-behalf-of-the" class="internal xref">PEP Acting on Behalf of the Subject</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.9">
+                <p id="section-toc.1-1.19.2.9.1"><a href="#section-19.9" class="auto internal xref">19.9</a>.  <a href="#name-idempotency-key-abuse" class="internal xref">Idempotency Key Abuse</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.19.2.10">
+                <p id="section-toc.1-1.19.2.10.1"><a href="#section-19.10" class="auto internal xref">19.10</a>. <a href="#name-availability" class="internal xref">Availability</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.20">
+            <p id="section-toc.1-1.20.1"><a href="#section-20" class="auto internal xref">20</a>. <a href="#name-iana-considerations" class="internal xref">IANA Considerations</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.20.2.1">
+                <p id="section-toc.1-1.20.2.1.1"><a href="#section-20.1" class="auto internal xref">20.1</a>.  <a href="#name-authzen-policy-decision-poi" class="internal xref">AuthZEN Policy Decision Point Metadata Registry</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.20.2.2">
+                <p id="section-toc.1-1.20.2.2.1"><a href="#section-20.2" class="auto internal xref">20.2</a>.  <a href="#name-authzen-policy-decision-poin" class="internal xref">AuthZEN Policy Decision Point Capabilities Registry</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.20.2.3">
+                <p id="section-toc.1-1.20.2.3.1"><a href="#section-20.3" class="auto internal xref">20.3</a>.  <a href="#name-security-event-type-identif" class="internal xref">Security Event Type Identifiers Registry</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21">
+            <p id="section-toc.1-1.21.1"><a href="#section-21" class="auto internal xref">21</a>. <a href="#name-examples" class="internal xref">Examples</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.1">
+                <p id="section-toc.1-1.21.2.1.1"><a href="#section-21.1" class="auto internal xref">21.1</a>.  <a href="#name-end-to-end-manager-approval" class="internal xref">End-to-End Manager Approval</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.1.2.1">
+                    <p id="section-toc.1-1.21.2.1.2.1.1"><a href="#section-21.1.1" class="auto internal xref">21.1.1</a>.  <a href="#name-initial-evaluation-request" class="internal xref">Initial Evaluation Request</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.1.2.2">
+                    <p id="section-toc.1-1.21.2.1.2.2.1"><a href="#section-21.1.2" class="auto internal xref">21.1.2</a>.  <a href="#name-requestable-denial" class="internal xref">Requestable Denial</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.1.2.3">
+                    <p id="section-toc.1-1.21.2.1.2.3.1"><a href="#section-21.1.3" class="auto internal xref">21.1.3</a>.  <a href="#name-submitting-the-access-reque" class="internal xref">Submitting the Access Request</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.1.2.4">
+                    <p id="section-toc.1-1.21.2.1.2.4.1"><a href="#section-21.1.4" class="auto internal xref">21.1.4</a>.  <a href="#name-task-handle" class="internal xref">Task Handle</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.1.2.5">
+                    <p id="section-toc.1-1.21.2.1.2.5.1"><a href="#section-21.1.5" class="auto internal xref">21.1.5</a>.  <a href="#name-completed-task" class="internal xref">Completed Task</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.1.2.6">
+                    <p id="section-toc.1-1.21.2.1.2.6.1"><a href="#section-21.1.6" class="auto internal xref">21.1.6</a>.  <a href="#name-re-evaluation-after-approva" class="internal xref">Re-evaluation After Approval</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.1.2.7">
+                    <p id="section-toc.1-1.21.2.1.2.7.1"><a href="#section-21.1.7" class="auto internal xref">21.1.7</a>.  <a href="#name-final-decision" class="internal xref">Final Decision</a></p>
+</li>
+                </ul>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.22">
+            <p id="section-toc.1-1.22.1"><a href="#section-22" class="auto internal xref">22</a>. <a href="#name-references" class="internal xref">References</a></p>
+<ul class="compact toc ulBare ulEmpty">
+<li class="compact toc ulBare ulEmpty" id="section-toc.1-1.22.2.1">
+                <p id="section-toc.1-1.22.2.1.1"><a href="#section-22.1" class="auto internal xref">22.1</a>.  <a href="#name-normative-references" class="internal xref">Normative References</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.22.2.2">
+                <p id="section-toc.1-1.22.2.2.1"><a href="#section-22.2" class="auto internal xref">22.2</a>.  <a href="#name-informative-references" class="internal xref">Informative References</a></p>
+</li>
+            </ul>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.23">
+            <p id="section-toc.1-1.23.1"><a href="#appendix-A" class="auto internal xref">Appendix A</a>.  <a href="#name-acknowledgements" class="internal xref">Acknowledgements</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.24">
+            <p id="section-toc.1-1.24.1"><a href="#appendix-B" class="auto internal xref">Appendix B</a>.  <a href="#name-document-history" class="internal xref">Document History</a></p>
+</li>
+          <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.25">
+            <p id="section-toc.1-1.25.1"><a href="#appendix-C" class="auto internal xref"></a><a href="#name-authors-address" class="internal xref">Author's Address</a></p>
+</li>
+        </ul>
+</nav>
+</section>
+</div>
+<div id="introduction">
+<section id="section-1">
+      <h2 id="name-introduction">
+<a href="#section-1" class="section-number selfRef">1. </a><a href="#name-introduction" class="section-name selfRef">Introduction</a>
+      </h2>
+<p id="section-1-1">The AuthZEN Authorization API enables a Policy Enforcement Point (PEP) to ask a Policy Decision Point (PDP) whether a Subject may perform an Action on a Resource within a Context.  The PDP returns a Decision indicating whether the operation is allowed or denied.<a href="#section-1-1" class="pilcrow">¶</a></p>
+<p id="section-1-2">Many real-world authorization systems require a remediation path when access is denied.  For example, a user may be denied access to a customer record because manager approval is required, or a machine workload may be denied a privileged operation until a change-control task is approved.  Without an interoperable protocol surface, PEPs commonly fall back to non-standard user-interface messages, out-of-band tickets, or vendor-specific governance integrations.<a href="#section-1-2" class="pilcrow">¶</a></p>
+<p id="section-1-3">This profile defines a narrow, interoperable mechanism for requestable denials:<a href="#section-1-3" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-1-4">
+<li id="section-1-4.1">
+          <p id="section-1-4.1.1">The PEP evaluates access using the AuthZEN Access Evaluation API.<a href="#section-1-4.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-1-4.2">
+          <p id="section-1-4.2.1">The PDP returns <code>decision: false</code> and a structured <code>access_request</code> object in the Decision Context when the denial is eligible for an approval workflow.<a href="#section-1-4.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-1-4.3">
+          <p id="section-1-4.3.1">The PEP submits an access request to the Access Request Endpoint.<a href="#section-1-4.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-1-4.4">
+          <p id="section-1-4.4.1">The Access Request Service returns an opaque task handle.<a href="#section-1-4.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-1-4.5">
+          <p id="section-1-4.5.1">The PEP can poll the task, receive a callback, or otherwise use the task handle to determine completion.<a href="#section-1-4.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li id="section-1-4.6">
+          <p id="section-1-4.6.1">When the task is approved, the PEP either performs a new AuthZEN evaluation or receives an approval-bound result that can be enforced according to this profile.<a href="#section-1-4.6.1" class="pilcrow">¶</a></p>
+</li>
+      </ol>
+<p id="section-1-5">This specification intentionally does not define a workflow engine, approval policy language, ticketing system, entitlement catalog, or user interface.  Those capabilities remain behind the PDP or Access Request Service.  The purpose of this profile is to standardize the handoff between authorization enforcement and approval workflow.<a href="#section-1-5" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="requirements-notation-and-conventions">
+<section id="section-2">
+      <h2 id="name-requirements-notation-and-c">
+<a href="#section-2" class="section-number selfRef">2. </a><a href="#name-requirements-notation-and-c" class="section-name selfRef">Requirements Notation and Conventions</a>
+      </h2>
+<p id="section-2-1">The key words "<span class="bcp14">MUST</span>", "<span class="bcp14">MUST NOT</span>", "<span class="bcp14">REQUIRED</span>", "<span class="bcp14">SHALL</span>", "<span class="bcp14">SHALL NOT</span>", "<span class="bcp14">SHOULD</span>", "<span class="bcp14">SHOULD NOT</span>", "<span class="bcp14">RECOMMENDED</span>", "<span class="bcp14">NOT RECOMMENDED</span>",
+"<span class="bcp14">MAY</span>", and "<span class="bcp14">OPTIONAL</span>" in this document are to be interpreted as
+described in BCP 14 <span>[<a href="#RFC2119" class="cite xref">RFC2119</a>]</span> <span>[<a href="#RFC8174" class="cite xref">RFC8174</a>]</span> when, and only when, they
+appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶</a></p>
+<p id="section-2-2">The terms Policy Decision Point (PDP), Policy Enforcement Point (PEP), Subject, Resource, Action, Context, and Decision are used as defined by <span>[<a href="#AuthZEN" class="cite xref">AuthZEN</a>]</span>.<a href="#section-2-2" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="design-goals">
+<section id="section-3">
+      <h2 id="name-design-goals">
+<a href="#section-3" class="section-number selfRef">3. </a><a href="#name-design-goals" class="section-name selfRef">Design Goals</a>
+      </h2>
+<p id="section-3-1">This profile has the following design goals:<a href="#section-3-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-3-2.1">
+          <p id="section-3-2.1.1">Preserve the AuthZEN allow/deny decision model.<a href="#section-3-2.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-3-2.2">
+          <p id="section-3-2.2.1">Make requestability explicit and machine-readable.<a href="#section-3-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-3-2.3">
+          <p id="section-3-2.3.1">Provide an opaque task handle suitable for asynchronous approval workflows.<a href="#section-3-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-3-2.4">
+          <p id="section-3-2.4.1">Avoid embedding a workflow policy language in the authorization response.<a href="#section-3-2.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-3-2.5">
+          <p id="section-3-2.5.1">Allow approval systems such as ITSM, IGA, chat approval, case management, or custom governance systems to sit behind a common endpoint.<a href="#section-3-2.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-3-2.6">
+          <p id="section-3-2.6.1">Support re-evaluation after approval so the PDP remains authoritative at enforcement time.<a href="#section-3-2.6.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-3-2.7">
+          <p id="section-3-2.7.1">Provide enough audit correlation to bind the original denial, submitted request, approver action, and final authorization result.<a href="#section-3-2.7.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+</section>
+</div>
+<div id="terminology">
+<section id="section-4">
+      <h2 id="name-terminology">
+<a href="#section-4" class="section-number selfRef">4. </a><a href="#name-terminology" class="section-name selfRef">Terminology</a>
+      </h2>
+<span class="break"></span><dl class="dlParallel" id="section-4-1">
+        <dt id="section-4-1.1">Access Request:</dt>
+        <dd style="margin-left: 1.5em" id="section-4-1.2">
+          <p id="section-4-1.2.1">A request submitted after a denied AuthZEN decision asking that access be approved, granted, or otherwise remediated.<a href="#section-4-1.2.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-4-1.3">Access Request Service:</dt>
+        <dd style="margin-left: 1.5em" id="section-4-1.4">
+          <p id="section-4-1.4.1">The service that receives Access Request submissions and manages the resulting approval task.  It <span class="bcp14">MAY</span> be implemented by the PDP, by a governance system, or by an external workflow engine acting on behalf of the PDP.<a href="#section-4-1.4.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-4-1.5">Requestable Denial:</dt>
+        <dd style="margin-left: 1.5em" id="section-4-1.6">
+          <p id="section-4-1.6.1">An AuthZEN Decision with <code>decision</code> set to <code>false</code> and a Decision Context indicating that the denied access can be requested through an Access Request Endpoint.<a href="#section-4-1.6.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-4-1.7">Task Handle:</dt>
+        <dd style="margin-left: 1.5em" id="section-4-1.8">
+          <p id="section-4-1.8.1">An opaque identifier and associated status endpoint representing the lifecycle of an Access Request.<a href="#section-4-1.8.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-4-1.9">Approval Result:</dt>
+        <dd style="margin-left: 1.5em" id="section-4-1.10">
+          <p id="section-4-1.10.1">The completed result of an Access Request task.  An Approval Result does not itself permit access unless it is returned as, or is used to obtain, an AuthZEN allow decision according to this profile.<a href="#section-4-1.10.1" class="pilcrow">¶</a></p>
+</dd>
+      <dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="protocol-overview">
+<section id="section-5">
+      <h2 id="name-protocol-overview">
+<a href="#section-5" class="section-number selfRef">5. </a><a href="#name-protocol-overview" class="section-name selfRef">Protocol Overview</a>
+      </h2>
+<div class="alignLeft art-ascii-art art-text artwork" id="section-5-1">
+<pre>
++---------+                         +---------+                    +----------------+
+|   PEP   |                         |   PDP   |                    | Access Request |
+|         |                         |         |                    |    Service     |
++----+----+                         +----+----+                    +-------+--------+
+     |                                   |                                 |
+     | 1. Access Evaluation              |                                 |
+     |----------------------------------&gt;|                                 |
+     |                                   |                                 |
+     | 2. decision=false                 |                                 |
+     |    context.access_request         |                                 |
+     |&lt;----------------------------------|                                 |
+     |                                   |                                 |
+     | 3. Submit Access Request          |                                 |
+     |-------------------------------------------------------------------&gt;|
+     |                                   |                                 |
+     | 4. task handle                    |                                 |
+     |&lt;-------------------------------------------------------------------|
+     |                                   |                                 |
+     | 5. Poll task or receive callback  |                                 |
+     |-------------------------------------------------------------------&gt;|
+     |&lt;-------------------------------------------------------------------|
+     |                                   |                                 |
+     | 6. Re-evaluate or consume result  |                                 |
+     |----------------------------------&gt;|                                 |
+     |&lt;----------------------------------|                                 |
+</pre><a href="#section-5-1" class="pilcrow">¶</a>
+</div>
+<p id="section-5-2">The access evaluation in step 1 uses the existing AuthZEN Access Evaluation API.  The denial in step 2 is still a denial.  The PEP <span class="bcp14">MUST NOT</span> permit the requested operation based only on the presence of <code>context.access_request</code>.<a href="#section-5-2" class="pilcrow">¶</a></p>
+<p id="section-5-3">The Access Request Service <span class="bcp14">MAY</span> additionally publish lifecycle events for governance, audit, and analytics consumers using the <span class="bcp14">OPTIONAL</span> Shared Signals Framework binding defined in <a href="#ssf-binding" class="auto internal xref">Section 12</a>.  That channel is independent of the per-task callback and is not used for enforcement.<a href="#section-5-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="discovery">
+<section id="section-6">
+      <h2 id="name-discovery">
+<a href="#section-6" class="section-number selfRef">6. </a><a href="#name-discovery" class="section-name selfRef">Discovery</a>
+      </h2>
+<p id="section-6-1">A PDP supporting this profile <span class="bcp14">MUST</span> publish an <code>access_request_endpoint</code> in PDP metadata.  The endpoint value <span class="bcp14">MUST</span> be an HTTPS URI.<a href="#section-6-1" class="pilcrow">¶</a></p>
+<p id="section-6-2">A PDP supporting this profile <span class="bcp14">SHOULD</span> include the following capability URN in the <code>capabilities</code> array:<a href="#section-6-2" class="pilcrow">¶</a></p>
+<p id="section-6-3"><code>urn:openid:authzen:capability:access-request</code><a href="#section-6-3" class="pilcrow">¶</a></p>
+<p id="section-6-4">The following is a non-normative metadata example:<a href="#section-6-4" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-6-5">
+<pre>
+{
+  "policy_decision_point": "https://pdp.example.com",
+  "access_evaluation_endpoint": "https://pdp.example.com/access/v1/evaluation",
+  "access_evaluations_endpoint": "https://pdp.example.com/access/v1/evaluations",
+  "access_request_endpoint": "https://pdp.example.com/access/v1/requests",
+  "capabilities": [
+    "urn:openid:authzen:capability:access-request",
+    "urn:openid:authzen:capability:access-request-ssf"
+  ]
+}
+</pre><a href="#section-6-5" class="pilcrow">¶</a>
+</div>
+<p id="section-6-6">The <code>access-request-ssf</code> capability is <span class="bcp14">OPTIONAL</span> and is included only when the deployment supports the Shared Signals Framework binding (<a href="#ssf-binding" class="auto internal xref">Section 12</a>).<a href="#section-6-6" class="pilcrow">¶</a></p>
+<p id="section-6-7">The <code>access_request_endpoint</code> <span class="bcp14">MAY</span> be hosted by the PDP or by another service trusted by the PDP.  When hosted by another service, the PDP metadata <span class="bcp14">MUST</span> identify the endpoint actually used by the PEP to submit access requests.<a href="#section-6-7" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="requestable-denial-context">
+<section id="section-7">
+      <h2 id="name-requestable-denial-context">
+<a href="#section-7" class="section-number selfRef">7. </a><a href="#name-requestable-denial-context" class="section-name selfRef">Requestable Denial Context</a>
+      </h2>
+<p id="section-7-1">When an AuthZEN Access Evaluation response denies access and the denial is eligible for an access request, the PDP <span class="bcp14">MAY</span> include an <code>access_request</code> object in the Decision Context.<a href="#section-7-1" class="pilcrow">¶</a></p>
+<p id="section-7-2">The <code>access_request</code> object has the following members:<a href="#section-7-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-7-3">
+        <dt id="section-7-3.1">
+<code>requestable</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.2">
+          <p id="section-7-3.2.1"><span class="bcp14">REQUIRED</span>.  Boolean.  When <code>true</code>, indicates that the denied request is eligible for submission to an Access Request Endpoint.  When absent or <code>false</code>, the PEP <span class="bcp14">MUST NOT</span> treat the denial as requestable under this profile.<a href="#section-7-3.2.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-7-3.3">
+<code>endpoint</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.4">
+          <p id="section-7-3.4.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  The endpoint to which the PEP submits the access request.  If omitted, the PEP <span class="bcp14">MUST</span> use the <code>access_request_endpoint</code> from PDP metadata.<a href="#section-7-3.4.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-7-3.5">
+<code>template</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.6">
+          <p id="section-7-3.6.1"><span class="bcp14">OPTIONAL</span>.  String.  An opaque template identifier that can guide the Access Request Service.  The value is not a policy language and <span class="bcp14">MUST NOT</span> be interpreted by the PEP except for display or request submission.<a href="#section-7-3.6.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-7-3.7">
+<code>reason</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.8">
+          <p id="section-7-3.8.1"><span class="bcp14">OPTIONAL</span>.  String.  A stable, machine-readable reason code for the requestable denial.<a href="#section-7-3.8.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-7-3.9">
+<code>display</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.10">
+          <p id="section-7-3.10.1"><span class="bcp14">OPTIONAL</span>.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP <span class="bcp14">MAY</span> ignore this member.<a href="#section-7-3.10.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-7-3.11">
+<code>expires_at</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.12">
+          <p id="section-7-3.12.1"><span class="bcp14">OPTIONAL</span>.  String containing an <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp.  Indicates when the requestable denial hint expires.<a href="#section-7-3.12.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-7-3.13">
+<code>expires_in</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.14">
+          <p id="section-7-3.14.1"><span class="bcp14">OPTIONAL</span>.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.<a href="#section-7-3.14.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-7-3.15">
+<code>request_context</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.16">
+          <p id="section-7-3.16.1"><span class="bcp14">OPTIONAL</span>.  Object.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP <span class="bcp14">MUST NOT</span> modify or interpret this object.  The PEP returns it unchanged inside <code>denial.access_request.request_context</code> when submitting the Access Request (<a href="#access-request-submission" class="auto internal xref">Section 8.1</a>).<a href="#section-7-3.16.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-7-3.17">
+<code>required_fields</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-7-3.18">
+          <p id="section-7-3.18.1"><span class="bcp14">OPTIONAL</span>.  Object identifying additional request fields the Access Request Service expects.  Each member name identifies a destination object in the Access Request submission body and the value is an array of field names that the Access Request Service expects within that destination.  Defined destination names are <code>context</code> (members of the submission <code>context</code> object) and <code>requested_access</code> (members of the submission <code>requested_access</code> object).  Implementations <span class="bcp14">MAY</span> define additional destinations for extension fields.<a href="#section-7-3.18.1" class="pilcrow">¶</a></p>
+</dd>
+      <dd class="break"></dd>
+</dl>
+<p id="section-7-4">If both <code>expires_at</code> and <code>expires_in</code> are present, <code>expires_at</code> takes precedence and the PEP <span class="bcp14">MUST</span> ignore <code>expires_in</code>.<a href="#section-7-4" class="pilcrow">¶</a></p>
+<p id="section-7-5">The <code>reason</code> member of the <code>access_request</code> object is independent of any <code>reason</code> member that the PDP may include directly in <code>context</code>.  The outer <code>context.reason</code> describes why the Decision was denied; <code>context.access_request.reason</code> describes why the denial is requestable and which approval flow applies.<a href="#section-7-5" class="pilcrow">¶</a></p>
+<p id="section-7-6">The following is a non-normative example:<a href="#section-7-6" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-7-7">
+<pre>
+{
+  "decision": false,
+  "context": {
+    "reason": "approval_required",
+    "access_request": {
+      "requestable": true,
+      "endpoint": "https://pdp.example.com/access/v1/requests",
+      "template": "manager_approval",
+      "reason": "manager_approval_required",
+      "expires_in": 600,
+      "required_fields": {
+        "context": ["business_justification"],
+        "requested_access": ["requested_duration"]
+      },
+      "display": {
+        "title": "Request access",
+        "description": "Manager approval is required before this document can be opened."
+      }
+    }
+  }
+}
+</pre><a href="#section-7-7" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="access-request-endpoint">
+<section id="section-8">
+      <h2 id="name-access-request-endpoint">
+<a href="#section-8" class="section-number selfRef">8. </a><a href="#name-access-request-endpoint" class="section-name selfRef">Access Request Endpoint</a>
+      </h2>
+<p id="section-8-1">The Access Request Endpoint accepts an Access Request submission and returns a Task Handle.<a href="#section-8-1" class="pilcrow">¶</a></p>
+<p id="section-8-2">The endpoint is identified by the <code>access_request_endpoint</code> PDP metadata parameter or by the <code>context.access_request.endpoint</code> value returned in a requestable denial.  The endpoint path is deployment-specific.<a href="#section-8-2" class="pilcrow">¶</a></p>
+<div id="access-request-submission">
+<section id="section-8.1">
+        <h3 id="name-access-request-submission">
+<a href="#section-8.1" class="section-number selfRef">8.1. </a><a href="#name-access-request-submission" class="section-name selfRef">Access Request Submission</a>
+        </h3>
+<p id="section-8.1-1">The PEP submits an Access Request using the HTTP <code>POST</code> method as defined in <span>[<a href="#RFC9110" class="cite xref">RFC9110</a>]</span>.<a href="#section-8.1-1" class="pilcrow">¶</a></p>
+<p id="section-8.1-2">The request body is a JSON object with the following members:<a href="#section-8.1-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-8.1-3">
+          <dt id="section-8.1-3.1">
+<code>subject</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-3.2">
+            <p id="section-8.1-3.2.1"><span class="bcp14">REQUIRED</span>.  The AuthZEN Subject from the denied evaluation.<a href="#section-8.1-3.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-3.3">
+<code>resource</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-3.4">
+            <p id="section-8.1-3.4.1"><span class="bcp14">REQUIRED</span>.  The AuthZEN Resource from the denied evaluation.<a href="#section-8.1-3.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-3.5">
+<code>action</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-3.6">
+            <p id="section-8.1-3.6.1"><span class="bcp14">REQUIRED</span>.  The AuthZEN Action from the denied evaluation.<a href="#section-8.1-3.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-3.7">
+<code>context</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-3.8">
+            <p id="section-8.1-3.8.1"><span class="bcp14">OPTIONAL</span>.  The AuthZEN Context from the denied evaluation, augmented with submission-time fields such as business justification.<a href="#section-8.1-3.8.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-3.9">
+<code>denial</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-3.10">
+            <p id="section-8.1-3.10.1"><span class="bcp14">REQUIRED</span>.  Object binding the Access Request to the denied AuthZEN Decision.<a href="#section-8.1-3.10.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-3.11">
+<code>requested_access</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-3.12">
+            <p id="section-8.1-3.12.1"><span class="bcp14">OPTIONAL</span>.  Object containing request-specific information such as requested duration, requested role, requested entitlement, or requested scope.  This object does not define policy semantics and is interpreted by the Access Request Service.<a href="#section-8.1-3.12.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-3.13">
+<code>callback</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-3.14">
+            <p id="section-8.1-3.14.1"><span class="bcp14">OPTIONAL</span>.  Object describing a callback endpoint where the Access Request Service can send completion notifications.<a href="#section-8.1-3.14.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-3.15">
+<code>client</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-3.16">
+            <p id="section-8.1-3.16.1"><span class="bcp14">OPTIONAL</span>.  Object identifying the PEP or calling application submitting the Access Request, supplementing the authenticated caller identity.  The following members are defined; implementations <span class="bcp14">MAY</span> include additional members.<a href="#section-8.1-3.16.1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-8.1-3.16.2.1">
+                <p id="section-8.1-3.16.2.1.1"><code>id</code>: <span class="bcp14">OPTIONAL</span>.  String.  Stable identifier for the calling application or PEP deployment.<a href="#section-8.1-3.16.2.1.1" class="pilcrow">¶</a></p>
+</li>
+              <li class="normal" id="section-8.1-3.16.2.2">
+                <p id="section-8.1-3.16.2.2.1"><code>instance_id</code>: <span class="bcp14">OPTIONAL</span>.  String.  Identifier for a specific running instance of the PEP.<a href="#section-8.1-3.16.2.2.1" class="pilcrow">¶</a></p>
+</li>
+              <li class="normal" id="section-8.1-3.16.2.3">
+                <p id="section-8.1-3.16.2.3.1"><code>name</code>: <span class="bcp14">OPTIONAL</span>.  String.  Human-readable name of the calling application.<a href="#section-8.1-3.16.2.3.1" class="pilcrow">¶</a></p>
+</li>
+            </ul>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-8.1-4">The <code>denial</code> object has the following members:<a href="#section-8.1-4" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-8.1-5">
+          <dt id="section-8.1-5.1">
+<code>decision</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-5.2">
+            <p id="section-8.1-5.2.1"><span class="bcp14">REQUIRED</span>.  The denied AuthZEN Decision returned by the PDP, including its Decision Context.<a href="#section-8.1-5.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-5.3">
+<code>access_request</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-5.4">
+            <p id="section-8.1-5.4.1"><span class="bcp14">REQUIRED</span>.  The <code>context.access_request</code> object from the denied decision.<a href="#section-8.1-5.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-5.5">
+<code>evaluation_id</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-5.6">
+            <p id="section-8.1-5.6.1"><span class="bcp14">RECOMMENDED</span>.  A stable identifier for the denied evaluation.  When the PDP returns an evaluation identifier (for example in the Decision Context or in a response header), the PEP <span class="bcp14">SHOULD</span> include it here.  <code>evaluation_id</code> provides the strongest audit binding between the original denial and the submitted Access Request and <span class="bcp14">SHOULD</span> be preferred over <code>evaluated_at</code> alone.<a href="#section-8.1-5.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.1-5.7">
+<code>evaluated_at</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.1-5.8">
+            <p id="section-8.1-5.8.1"><span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the denial was produced.<a href="#section-8.1-5.8.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-8.1-6">A PEP <span class="bcp14">MUST</span> submit an Access Request only for an AuthZEN Decision with <code>decision</code> equal to <code>false</code> and <code>context.access_request.requestable</code> equal to <code>true</code>.<a href="#section-8.1-6" class="pilcrow">¶</a></p>
+<p id="section-8.1-7">A PEP <span class="bcp14">SHOULD</span> include an <code>Idempotency-Key</code> header, following the conventions described in <span>[<a href="#I-D.ietf-httpapi-idempotency-key-header" class="cite xref">I-D.ietf-httpapi-idempotency-key-header</a>]</span>.  The Access Request Service <span class="bcp14">SHOULD</span> treat repeated submissions with the same <code>Idempotency-Key</code>, requester, subject, action, resource, and denial binding as the same request and return the same Task Handle while the original request remains available.<a href="#section-8.1-7" class="pilcrow">¶</a></p>
+<p id="section-8.1-8">Non-normative example:<a href="#section-8.1-8" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-8.1-9">
+<pre>
+POST /access/v1/requests HTTP/1.1
+Host: pdp.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Content-Type: application/json
+Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
+
+{
+  "subject": {
+    "type": "user",
+    "id": "alice@example.com"
+  },
+  "resource": {
+    "type": "document",
+    "id": "q4-plan"
+  },
+  "action": {
+    "name": "can_read"
+  },
+  "context": {
+    "business_justification": "Needed for customer renewal review"
+  },
+  "requested_access": {
+    "requested_duration": "PT4H"
+  },
+  "denial": {
+    "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+    "evaluated_at": "2026-04-30T20:15:00Z",
+    "decision": {
+      "decision": false,
+      "context": {
+        "reason": "approval_required"
+      }
+    },
+    "access_request": {
+      "requestable": true,
+      "template": "manager_approval",
+      "reason": "manager_approval_required"
+    }
+  }
+}
+</pre><a href="#section-8.1-9" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="access-request-response">
+<section id="section-8.2">
+        <h3 id="name-access-request-response">
+<a href="#section-8.2" class="section-number selfRef">8.2. </a><a href="#name-access-request-response" class="section-name selfRef">Access Request Response</a>
+        </h3>
+<p id="section-8.2-1">A successful Access Request submission returns HTTP status code <code>201 Created</code> or <code>202 Accepted</code> and a JSON object containing a <code>task</code> member.  The <code>task.status_endpoint</code> member is authoritative for subsequent status retrieval.  A response <span class="bcp14">MAY</span> also include an HTTP <code>Location</code> header equal to <code>task.status_endpoint</code>.<a href="#section-8.2-1" class="pilcrow">¶</a></p>
+<p id="section-8.2-2">The <code>task</code> object has the following members:<a href="#section-8.2-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-8.2-3">
+          <dt id="section-8.2-3.1">
+<code>id</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.2-3.2">
+            <p id="section-8.2-3.2.1"><span class="bcp14">REQUIRED</span>.  Opaque task identifier.  The PEP <span class="bcp14">MUST NOT</span> parse or infer semantics from this value.<a href="#section-8.2-3.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.2-3.3">
+<code>status</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.2-3.4">
+            <p id="section-8.2-3.4.1"><span class="bcp14">REQUIRED</span>.  Current task status.  Values are defined in <a href="#task-status" class="auto internal xref">Section 9.1</a>.<a href="#section-8.2-3.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.2-3.5">
+<code>status_endpoint</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.2-3.6">
+            <p id="section-8.2-3.6.1"><span class="bcp14">REQUIRED</span>.  HTTPS URI used to retrieve task status.<a href="#section-8.2-3.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.2-3.7">
+<code>expires_at</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.2-3.8">
+            <p id="section-8.2-3.8.1"><span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp after which the task handle is no longer valid.<a href="#section-8.2-3.8.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.2-3.9">
+<code>display</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.2-3.10">
+            <p id="section-8.2-3.10.1"><span class="bcp14">OPTIONAL</span>.  Object containing user-interface hints for the pending request.<a href="#section-8.2-3.10.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-8.2-3.11">
+<code>links</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-8.2-3.12">
+            <p id="section-8.2-3.12.1"><span class="bcp14">OPTIONAL</span>.  Object containing related URLs.  Each member name is a link relation type and the value is an HTTPS URI.  The following relation types are defined; implementations <span class="bcp14">MAY</span> define additional relation types.<a href="#section-8.2-3.12.1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-8.2-3.12.2.1">
+                <p id="section-8.2-3.12.2.1.1"><code>ticket</code>: URL where the requester (Subject) can view the request and its status.<a href="#section-8.2-3.12.2.1.1" class="pilcrow">¶</a></p>
+</li>
+              <li class="normal" id="section-8.2-3.12.2.2">
+                <p id="section-8.2-3.12.2.2.1"><code>review</code>: URL where an approver or administrator can review or act on the request.<a href="#section-8.2-3.12.2.2.1" class="pilcrow">¶</a></p>
+</li>
+            </ul>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-8.2-4">Non-normative example:<a href="#section-8.2-4" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-8.2-5">
+<pre>
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4
+
+{
+  "task": {
+    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "status": "pending",
+    "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "expires_at": "2026-04-30T23:00:00Z",
+    "display": {
+      "title": "Access request submitted",
+      "description": "Your manager has been asked to approve access."
+    }
+  }
+}
+</pre><a href="#section-8.2-5" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+</section>
+</div>
+<div id="task-status-endpoint">
+<section id="section-9">
+      <h2 id="name-task-status-endpoint">
+<a href="#section-9" class="section-number selfRef">9. </a><a href="#name-task-status-endpoint" class="section-name selfRef">Task Status Endpoint</a>
+      </h2>
+<p id="section-9-1">The Task Status Endpoint allows the PEP to retrieve the state of a previously submitted Access Request.<a href="#section-9-1" class="pilcrow">¶</a></p>
+<p id="section-9-2">The PEP calls the <code>status_endpoint</code> using the HTTP <code>GET</code> method as defined in <span>[<a href="#RFC9110" class="cite xref">RFC9110</a>]</span>.<a href="#section-9-2" class="pilcrow">¶</a></p>
+<p id="section-9-3">Non-normative example:<a href="#section-9-3" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-9-4">
+<pre>
+GET /access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4 HTTP/1.1
+Host: pdp.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Accept: application/json
+</pre><a href="#section-9-4" class="pilcrow">¶</a>
+</div>
+<p id="section-9-5">A successful response returns a JSON object containing a <code>task</code> member and, when the task is complete, <span class="bcp14">MAY</span> include a <code>result</code> member.<a href="#section-9-5" class="pilcrow">¶</a></p>
+<div id="task-status">
+<section id="section-9.1">
+        <h3 id="name-task-status-values">
+<a href="#section-9.1" class="section-number selfRef">9.1. </a><a href="#name-task-status-values" class="section-name selfRef">Task Status Values</a>
+        </h3>
+<p id="section-9.1-1">The following task status values are defined:<a href="#section-9.1-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-9.1-2">
+          <dt id="section-9.1-2.1">
+<code>pending</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-9.1-2.2">
+            <p id="section-9.1-2.2.1">The request has been accepted and is awaiting processing or approval.<a href="#section-9.1-2.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-9.1-2.3">
+<code>approved</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-9.1-2.4">
+            <p id="section-9.1-2.4.1">The request was approved.  Approval does not by itself grant access unless accompanied by a result that can be enforced under <a href="#completion-semantics" class="auto internal xref">Section 10</a>.<a href="#section-9.1-2.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-9.1-2.5">
+<code>denied</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-9.1-2.6">
+            <p id="section-9.1-2.6.1">The request was denied by the approval workflow.<a href="#section-9.1-2.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-9.1-2.7">
+<code>expired</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-9.1-2.8">
+            <p id="section-9.1-2.8.1">The request expired before completion.<a href="#section-9.1-2.8.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-9.1-2.9">
+<code>cancelled</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-9.1-2.10">
+            <p id="section-9.1-2.10.1">The request was cancelled by the requester, approver, administrator, or system.<a href="#section-9.1-2.10.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-9.1-2.11">
+<code>failed</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-9.1-2.12">
+            <p id="section-9.1-2.12.1">The request could not be completed due to an error.<a href="#section-9.1-2.12.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-9.1-3">Implementations <span class="bcp14">MAY</span> define additional status values.  A PEP that receives an unknown status value <span class="bcp14">MUST</span> treat the task as not approved.<a href="#section-9.1-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="pending-task-response">
+<section id="section-9.2">
+        <h3 id="name-pending-task-response">
+<a href="#section-9.2" class="section-number selfRef">9.2. </a><a href="#name-pending-task-response" class="section-name selfRef">Pending Task Response</a>
+        </h3>
+<p id="section-9.2-1">Non-normative example:<a href="#section-9.2-1" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-9.2-2">
+<pre>
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "task": {
+    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "status": "pending",
+    "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "expires_at": "2026-04-30T23:00:00Z"
+  }
+}
+</pre><a href="#section-9.2-2" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="completed-task-response">
+<section id="section-9.3">
+        <h3 id="name-completed-task-response">
+<a href="#section-9.3" class="section-number selfRef">9.3. </a><a href="#name-completed-task-response" class="section-name selfRef">Completed Task Response</a>
+        </h3>
+<p id="section-9.3-1">A completed task response <span class="bcp14">MAY</span> include a <code>result</code> object.  The <code>result</code> object <span class="bcp14">MUST</span> use one of the completion forms defined in <a href="#completion-semantics" class="auto internal xref">Section 10</a>.<a href="#section-9.3-1" class="pilcrow">¶</a></p>
+<p id="section-9.3-2">A task remains retrievable from the Task Status Endpoint after it has reached a terminal status, until <code>task.expires_at</code> is reached or the Access Request Service removes it according to local retention policy.  After expiry or removal, the Task Status Endpoint <span class="bcp14">MUST</span> return <code>urn:openid:authzen:access-request:error:task_expired</code> or <code>urn:openid:authzen:access-request:error:unknown_task</code> as appropriate.<a href="#section-9.3-2" class="pilcrow">¶</a></p>
+<p id="section-9.3-3">Cancellation of a pending Access Request is administrative and is performed by the Access Request Service, the requester through a separate user interface, or an approver.  This profile does not define a PEP-initiated cancellation API; PEPs that need to abandon an outstanding request stop polling and rely on <code>task.expires_at</code> and Access Request Service expiry to release resources.<a href="#section-9.3-3" class="pilcrow">¶</a></p>
+<p id="section-9.3-4">Non-normative example using a re-evaluation requirement:<a href="#section-9.3-4" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-9.3-5">
+<pre>
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "task": {
+    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "status": "approved"
+  },
+  "result": {
+    "mode": "reevaluate",
+    "approval": {
+      "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "approved_at": "2026-04-30T20:42:00Z",
+      "approved_until": "2026-05-01T00:42:00Z"
+    },
+    "approval_context": {
+      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+    }
+  }
+}
+</pre><a href="#section-9.3-5" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+</section>
+</div>
+<div id="completion-semantics">
+<section id="section-10">
+      <h2 id="name-completion-semantics">
+<a href="#section-10" class="section-number selfRef">10. </a><a href="#name-completion-semantics" class="section-name selfRef">Completion Semantics</a>
+      </h2>
+<p id="section-10-1">This profile defines three completion modes, identified by <code>result.mode</code>: <code>reevaluate</code>, <code>decision</code>, and <code>token</code>.  Implementations <span class="bcp14">MAY</span> define additional completion modes.  A PEP that receives an unknown <code>result.mode</code> value <span class="bcp14">MUST</span> treat the task as not approved and <span class="bcp14">MUST NOT</span> permit access on the basis of that result.<a href="#section-10-1" class="pilcrow">¶</a></p>
+<div id="re-evaluation-mode">
+<section id="section-10.1">
+        <h3 id="name-re-evaluation-mode">
+<a href="#section-10.1" class="section-number selfRef">10.1. </a><a href="#name-re-evaluation-mode" class="section-name selfRef">Re-evaluation Mode</a>
+        </h3>
+<p id="section-10.1-1">In re-evaluation mode, the Access Request Service returns an approval reference and instructs the PEP to perform a new AuthZEN Access Evaluation.<a href="#section-10.1-1" class="pilcrow">¶</a></p>
+<p id="section-10.1-2">The <code>result.mode</code> value is <code>reevaluate</code>.<a href="#section-10.1-2" class="pilcrow">¶</a></p>
+<p id="section-10.1-3">The result <span class="bcp14">MAY</span> include an <code>approval_context</code> member.  <code>approval_context</code> is an opaque object populated by the Access Request Service or PDP.  When present, the PEP <span class="bcp14">MUST</span> include it as a member named <code>authzen_access_request_approval</code> inside the AuthZEN request <code>context</code> when re-evaluating.  The PEP <span class="bcp14">MUST NOT</span> modify or interpret the contents of <code>approval_context</code>.<a href="#section-10.1-3" class="pilcrow">¶</a></p>
+<p id="section-10.1-4">The PDP <span class="bcp14">MUST</span> evaluate the new request using current policy and the approval reference.  The PDP <span class="bcp14">MAY</span> still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.<a href="#section-10.1-4" class="pilcrow">¶</a></p>
+<p id="section-10.1-5">Non-normative re-evaluation request:<a href="#section-10.1-5" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-10.1-6">
+<pre>
+{
+  "subject": {
+    "type": "user",
+    "id": "alice@example.com"
+  },
+  "resource": {
+    "type": "document",
+    "id": "q4-plan"
+  },
+  "action": {
+    "name": "can_read"
+  },
+  "context": {
+    "authzen_access_request_approval": {
+      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+    },
+    "time": "2026-04-30T20:43:00Z"
+  }
+}
+</pre><a href="#section-10.1-6" class="pilcrow">¶</a>
+</div>
+<p id="section-10.1-7">Non-normative re-evaluation response:<a href="#section-10.1-7" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-10.1-8">
+<pre>
+{
+  "decision": true,
+  "context": {
+    "approval": {
+      "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "approved_until": "2026-05-01T00:42:00Z"
+    }
+  }
+}
+</pre><a href="#section-10.1-8" class="pilcrow">¶</a>
+</div>
+<p id="section-10.1-9">Re-evaluation mode is the <span class="bcp14">RECOMMENDED</span> completion mode because it ensures the PDP remains authoritative at enforcement time.<a href="#section-10.1-9" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="decision-result-mode">
+<section id="section-10.2">
+        <h3 id="name-decision-result-mode">
+<a href="#section-10.2" class="section-number selfRef">10.2. </a><a href="#name-decision-result-mode" class="section-name selfRef">Decision Result Mode</a>
+        </h3>
+<p id="section-10.2-1">In decision result mode, the completed task response includes an AuthZEN Decision in <code>result.decision</code>.<a href="#section-10.2-1" class="pilcrow">¶</a></p>
+<p id="section-10.2-2">The <code>result.mode</code> value is <code>decision</code>.<a href="#section-10.2-2" class="pilcrow">¶</a></p>
+<p id="section-10.2-3">A <code>result</code> with <code>mode</code> equal to <code>decision</code> <span class="bcp14">MUST</span> include a <code>binding</code> member.  The <code>binding</code> object has the following members:<a href="#section-10.2-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-10.2-4.1">
+            <p id="section-10.2-4.1.1"><code>task_id</code>: <span class="bcp14">REQUIRED</span>.  String.  The task identifier this Decision is bound to; <span class="bcp14">MUST</span> equal the <code>task.id</code> returned for the same Access Request.<a href="#section-10.2-4.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-10.2-4.2">
+            <p id="section-10.2-4.2.1"><code>subject</code>: <span class="bcp14">REQUIRED</span>.  The AuthZEN Subject the Decision applies to.<a href="#section-10.2-4.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-10.2-4.3">
+            <p id="section-10.2-4.3.1"><code>resource</code>: <span class="bcp14">REQUIRED</span>.  The AuthZEN Resource the Decision applies to.<a href="#section-10.2-4.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-10.2-4.4">
+            <p id="section-10.2-4.4.1"><code>action</code>: <span class="bcp14">REQUIRED</span>.  The AuthZEN Action the Decision applies to.<a href="#section-10.2-4.4.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-10.2-4.5">
+            <p id="section-10.2-4.5.1"><code>approval_id</code>: <span class="bcp14">RECOMMENDED</span>.  String.  Identifier of the approval that produced the Decision.<a href="#section-10.2-4.5.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-10.2-4.6">
+            <p id="section-10.2-4.6.1"><code>expires_at</code>: <span class="bcp14">REQUIRED</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp after which the Decision <span class="bcp14">MUST NOT</span> be enforced.<a href="#section-10.2-4.6.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-10.2-5">The PEP <span class="bcp14">MAY</span> enforce the returned Decision only if all of the following are true:<a href="#section-10.2-5" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-10.2-6.1">
+            <p id="section-10.2-6.1.1">The response was retrieved over an authenticated channel from the Access Request Service identified in PDP metadata or the requestable denial.<a href="#section-10.2-6.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-10.2-6.2">
+            <p id="section-10.2-6.2.1">The <code>binding.task_id</code> equals the task identifier the PEP submitted, and the <code>binding.subject</code>, <code>binding.resource</code>, and <code>binding.action</code> equal the values the PEP submitted in the Access Request.<a href="#section-10.2-6.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-10.2-6.3">
+            <p id="section-10.2-6.3.1">The current time is at or before <code>binding.expires_at</code>.<a href="#section-10.2-6.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-10.2-6.4">
+            <p id="section-10.2-6.4.1">The PEP understands all obligations required for enforcement.<a href="#section-10.2-6.4.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-10.2-7">A Decision Result that is not signed using a mechanism agreed between the PEP and Access Request Service relies on the integrity of the transport channel and the trust the PEP places in the Access Request Service.  Deployments requiring stronger integrity <span class="bcp14">SHOULD</span> wrap the result in a JSON Web Signature (JWS) whose payload contains the <code>binding</code> and <code>decision</code> members; this profile does not mandate a specific signing format.<a href="#section-10.2-7" class="pilcrow">¶</a></p>
+<p id="section-10.2-8">Non-normative example:<a href="#section-10.2-8" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-10.2-9">
+<pre>
+{
+  "task": {
+    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "status": "approved"
+  },
+  "result": {
+    "mode": "decision",
+    "binding": {
+      "task_id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+      "subject": {
+        "type": "user",
+        "id": "alice@example.com"
+      },
+      "resource": {
+        "type": "document",
+        "id": "q4-plan"
+      },
+      "action": {
+        "name": "can_read"
+      },
+      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "expires_at": "2026-05-01T00:42:00Z"
+    },
+    "decision": {
+      "decision": true,
+      "context": {
+        "approval": {
+          "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+          "approved_until": "2026-05-01T00:42:00Z"
+        },
+        "obligations": [
+          {
+            "type": "audit",
+            "message": "Record approved access usage"
+          }
+        ]
+      }
+    }
+  }
+}
+</pre><a href="#section-10.2-9" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="token-result-mode">
+<section id="section-10.3">
+        <h3 id="name-token-result-mode">
+<a href="#section-10.3" class="section-number selfRef">10.3. </a><a href="#name-token-result-mode" class="section-name selfRef">Token Result Mode</a>
+        </h3>
+<p id="section-10.3-1">In token result mode, the completed task response returns a token or token reference that the PEP can use to call a downstream resource server, or to exchange for a downstream credential, in order to perform the approved operation.  The PEP <span class="bcp14">MUST NOT</span> treat receipt of the token as itself an authorization decision; the token is consumed by the system that the token is audience-restricted to, and that system performs its own authorization checks.<a href="#section-10.3-1" class="pilcrow">¶</a></p>
+<p id="section-10.3-2">The <code>result.mode</code> value is <code>token</code>.<a href="#section-10.3-2" class="pilcrow">¶</a></p>
+<p id="section-10.3-3">This profile does not define the token format.  When OAuth 2.0 access tokens are used, the token response and token usage <span class="bcp14">MUST</span> follow the applicable OAuth specifications, including <span>[<a href="#RFC6749" class="cite xref">RFC6749</a>]</span> and <span>[<a href="#RFC6750" class="cite xref">RFC6750</a>]</span>.<a href="#section-10.3-3" class="pilcrow">¶</a></p>
+<p id="section-10.3-4">The token <span class="bcp14">MUST</span> be audience-restricted to the intended recipient, time-bounded, and bound to the approved subject, resource, action, and task to the extent supported by the token format.<a href="#section-10.3-4" class="pilcrow">¶</a></p>
+<p id="section-10.3-5">Non-normative example:<a href="#section-10.3-5" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-10.3-6">
+<pre>
+{
+  "task": {
+    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "status": "approved"
+  },
+  "result": {
+    "mode": "token",
+    "token_type": "Bearer",
+    "access_token": "eyJhbGciOi...",
+    "expires_in": 900
+  }
+}
+</pre><a href="#section-10.3-6" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+</section>
+</div>
+<div id="callback-completion">
+<section id="section-11">
+      <h2 id="name-callback-completion">
+<a href="#section-11" class="section-number selfRef">11. </a><a href="#name-callback-completion" class="section-name selfRef">Callback Completion</a>
+      </h2>
+<p id="section-11-1">A PEP <span class="bcp14">MAY</span> request callback notification by including a <code>callback</code> object in the Access Request submission.<a href="#section-11-1" class="pilcrow">¶</a></p>
+<p id="section-11-2">The <code>callback</code> object has the following members:<a href="#section-11-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-11-3">
+        <dt id="section-11-3.1">
+<code>endpoint</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-11-3.2">
+          <p id="section-11-3.2.1"><span class="bcp14">REQUIRED</span>.  HTTPS URI to which the Access Request Service sends completion notifications.<a href="#section-11-3.2.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-11-3.3">
+<code>state</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-11-3.4">
+          <p id="section-11-3.4.1"><span class="bcp14">OPTIONAL</span>.  Opaque value supplied by the PEP and returned unmodified in the callback.<a href="#section-11-3.4.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-11-3.5">
+<code>events</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-11-3.6">
+          <p id="section-11-3.6.1"><span class="bcp14">OPTIONAL</span>.  Array of event names requested by the PEP.  Defined event names are <code>approved</code>, <code>denied</code>, <code>expired</code>, <code>cancelled</code>, and <code>failed</code>.<a href="#section-11-3.6.1" class="pilcrow">¶</a></p>
+</dd>
+      <dd class="break"></dd>
+</dl>
+<p id="section-11-4">The Access Request Service <span class="bcp14">MUST</span> authenticate to the callback endpoint using a mechanism agreed between the PEP and Access Request Service.  This specification does not mandate a single callback authentication mechanism, but implementations <span class="bcp14">SHOULD</span> use one of the following: an OAuth 2.0 bearer token <span>[<a href="#RFC6750" class="cite xref">RFC6750</a>]</span> issued to the Access Request Service, mutual TLS, or an HMAC signature over the request body using a pre-shared key.  Unauthenticated callbacks <span class="bcp14">MUST NOT</span> be accepted.<a href="#section-11-4" class="pilcrow">¶</a></p>
+<p id="section-11-5">Callback delivery is a notification optimization.  The Task Status Endpoint remains authoritative unless the callback contains an enforceable completion result under <a href="#completion-semantics" class="auto internal xref">Section 10</a>.<a href="#section-11-5" class="pilcrow">¶</a></p>
+<p id="section-11-6">Non-normative callback example:<a href="#section-11-6" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-11-7">
+<pre>
+POST /callbacks/access-requests HTTP/1.1
+Host: pep.example.com
+Content-Type: application/json
+
+{
+  "state": "b3Blbi1kb2N1bWVudC1mbG93",
+  "task": {
+    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "status": "approved",
+    "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4"
+  }
+}
+</pre><a href="#section-11-7" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="ssf-binding">
+<section id="section-12">
+      <h2 id="name-shared-signals-framework-bi">
+<a href="#section-12" class="section-number selfRef">12. </a><a href="#name-shared-signals-framework-bi" class="section-name selfRef">Shared Signals Framework Binding</a>
+      </h2>
+<p id="section-12-1">This section defines an <span class="bcp14">OPTIONAL</span> binding that publishes Access Request lifecycle events using the OpenID Shared Signals Framework <span>[<a href="#SSF" class="cite xref">SSF</a>]</span> and Security Event Tokens <span>[<a href="#RFC8417" class="cite xref">RFC8417</a>]</span>.<a href="#section-12-1" class="pilcrow">¶</a></p>
+<p id="section-12-2">The SSF binding does not replace the per-task callback defined in <a href="#callback-completion" class="auto internal xref">Section 11</a>.  The callback addresses synchronous correlation between a single PEP and the Access Request task it submitted.  The SSF binding addresses fan-out to governance, audit, analytics, and operations consumers that need to observe Access Request activity across many submissions and submitters.<a href="#section-12-2" class="pilcrow">¶</a></p>
+<div id="event-types">
+<section id="section-12.1">
+        <h3 id="name-event-types">
+<a href="#section-12.1" class="section-number selfRef">12.1. </a><a href="#name-event-types" class="section-name selfRef">Event Types</a>
+        </h3>
+<p id="section-12.1-1">This profile defines the following SET event type:<a href="#section-12.1-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-12.1-2">
+          <dt id="section-12.1-2.1">
+<code>urn:openid:authzen:event:access-request-completed</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.1-2.2">
+            <p id="section-12.1-2.2.1">Emitted when an Access Request reaches a terminal status (<code>approved</code>, <code>denied</code>, <code>expired</code>, <code>cancelled</code>, or <code>failed</code>).<a href="#section-12.1-2.2.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-12.1-3">Implementations <span class="bcp14">MAY</span> define additional event types for non-terminal transitions, such as submission, assignment, or escalation.  Receivers <span class="bcp14">MUST</span> ignore SET event types that they do not recognize.<a href="#section-12.1-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="set-payload">
+<section id="section-12.2">
+        <h3 id="name-set-payload">
+<a href="#section-12.2" class="section-number selfRef">12.2. </a><a href="#name-set-payload" class="section-name selfRef">SET Payload</a>
+        </h3>
+<p id="section-12.2-1">A Security Event Token carrying an <code>access-request-completed</code> event has the following structure:<a href="#section-12.2-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-12.2-2.1">
+            <p id="section-12.2-2.1.1"><code>iss</code> — the issuer identifier of the Access Request Service.<a href="#section-12.2-2.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-12.2-2.2">
+            <p id="section-12.2-2.2.1"><code>aud</code> — the intended receiver of the event.<a href="#section-12.2-2.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-12.2-2.3">
+            <p id="section-12.2-2.3.1"><code>iat</code> — the time the event was issued.<a href="#section-12.2-2.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-12.2-2.4">
+            <p id="section-12.2-2.4.1"><code>jti</code> — a unique identifier for the SET.<a href="#section-12.2-2.4.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-12.2-2.5">
+            <p id="section-12.2-2.5.1"><code>events</code> — a JSON object whose member name is the event type URN and whose member value is the event payload.<a href="#section-12.2-2.5.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-12.2-3">The event payload is a JSON object with the following members:<a href="#section-12.2-3" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-12.2-4">
+          <dt id="section-12.2-4.1">
+<code>task</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.2-4.2">
+            <p id="section-12.2-4.2.1"><span class="bcp14">REQUIRED</span>.  A <code>task</code> object as defined in <a href="#task-status" class="auto internal xref">Section 9.1</a>, including the terminal status.<a href="#section-12.2-4.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-12.2-4.3">
+<code>subject</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.2-4.4">
+            <p id="section-12.2-4.4.1"><span class="bcp14">RECOMMENDED</span>.  The AuthZEN Subject from the original denied evaluation.<a href="#section-12.2-4.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-12.2-4.5">
+<code>resource</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.2-4.6">
+            <p id="section-12.2-4.6.1"><span class="bcp14">RECOMMENDED</span>.  The AuthZEN Resource from the original denied evaluation.<a href="#section-12.2-4.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-12.2-4.7">
+<code>action</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.2-4.8">
+            <p id="section-12.2-4.8.1"><span class="bcp14">RECOMMENDED</span>.  The AuthZEN Action from the original denied evaluation.<a href="#section-12.2-4.8.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-12.2-4.9">
+<code>evaluation_id</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.2-4.10">
+            <p id="section-12.2-4.10.1"><span class="bcp14">OPTIONAL</span>.  The evaluation identifier from the original denied evaluation, when available.<a href="#section-12.2-4.10.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-12.2-4.11">
+<code>result</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-12.2-4.12">
+            <p id="section-12.2-4.12.1"><span class="bcp14">OPTIONAL</span>.  A completion result object as defined in <a href="#completion-semantics" class="auto internal xref">Section 10</a>.  A receiver <span class="bcp14">MUST NOT</span> enforce a <code>result</code> carried in a SET as an authorization decision; SET delivery is a notification channel, not an enforcement channel.  Receivers requiring an enforceable result <span class="bcp14">MUST</span> obtain it from the Task Status Endpoint or from a per-task callback.<a href="#section-12.2-4.12.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+<p id="section-12.2-5">Non-normative example:<a href="#section-12.2-5" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-12.2-6">
+<pre>
+{
+  "iss": "https://pdp.example.com",
+  "aud": "https://audit.example.com",
+  "iat": 1714508520,
+  "jti": "set_01HX4Y9V3ZJ9C2X7K8M0N1P2Q3",
+  "events": {
+    "urn:openid:authzen:event:access-request-completed": {
+      "task": {
+        "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+        "status": "approved"
+      },
+      "subject": {
+        "type": "user",
+        "id": "alice@example.com"
+      },
+      "resource": {
+        "type": "document",
+        "id": "q4-plan"
+      },
+      "action": {
+        "name": "can_read"
+      },
+      "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+      "result": {
+        "mode": "reevaluate",
+        "approval": {
+          "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+          "approved_until": "2026-05-01T00:42:00Z"
+        }
+      }
+    }
+  }
+}
+</pre><a href="#section-12.2-6" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="stream-management-and-delivery">
+<section id="section-12.3">
+        <h3 id="name-stream-management-and-deliv">
+<a href="#section-12.3" class="section-number selfRef">12.3. </a><a href="#name-stream-management-and-deliv" class="section-name selfRef">Stream Management and Delivery</a>
+        </h3>
+<p id="section-12.3-1">Stream configuration, verification, and delivery (push or poll) follow <span>[<a href="#SSF" class="cite xref">SSF</a>]</span>.  The Access Request Service acts as an SSF Transmitter; consumers act as SSF Receivers.  Receivers verify SET signatures using keys discovered through the Transmitter's configuration metadata.<a href="#section-12.3-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="relationship-to-per-task-callback">
+<section id="section-12.4">
+        <h3 id="name-relationship-to-per-task-ca">
+<a href="#section-12.4" class="section-number selfRef">12.4. </a><a href="#name-relationship-to-per-task-ca" class="section-name selfRef">Relationship to Per-Task Callback</a>
+        </h3>
+<p id="section-12.4-1">A deployment <span class="bcp14">MAY</span> support the per-task callback (<a href="#callback-completion" class="auto internal xref">Section 11</a>), the SSF binding, both, or neither.  When both are supported:<a href="#section-12.4-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-12.4-2.1">
+            <p id="section-12.4-2.1.1">The same Access Request lifecycle event <span class="bcp14">MAY</span> be delivered through both channels.<a href="#section-12.4-2.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-12.4-2.2">
+            <p id="section-12.4-2.2.1">Receivers <span class="bcp14">MUST NOT</span> assume ordering between callback delivery and SET delivery.<a href="#section-12.4-2.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-12.4-2.3">
+            <p id="section-12.4-2.3.1">A <code>result</code> member that is enforceable under <a href="#completion-semantics" class="auto internal xref">Section 10</a> <span class="bcp14">MAY</span> appear in the per-task callback.  An equivalent <code>result</code> carried in a SET is a notification only and <span class="bcp14">MUST NOT</span> be enforced by the receiver.<a href="#section-12.4-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+</section>
+</div>
+<div id="ssf-binding-discovery">
+<section id="section-12.5">
+        <h3 id="name-ssf-binding-discovery">
+<a href="#section-12.5" class="section-number selfRef">12.5. </a><a href="#name-ssf-binding-discovery" class="section-name selfRef">SSF Binding Discovery</a>
+        </h3>
+<p id="section-12.5-1">A PDP supporting the SSF binding <span class="bcp14">SHOULD</span> include the following capability URN in PDP metadata:<a href="#section-12.5-1" class="pilcrow">¶</a></p>
+<p id="section-12.5-2"><code>urn:openid:authzen:capability:access-request-ssf</code><a href="#section-12.5-2" class="pilcrow">¶</a></p>
+<p id="section-12.5-3">When present, the PDP metadata <span class="bcp14">SHOULD</span> also identify the SSF Transmitter configuration endpoint that publishes Access Request events, using the discovery mechanism defined by <span>[<a href="#SSF" class="cite xref">SSF</a>]</span>.<a href="#section-12.5-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="error-responses">
+<section id="section-13">
+      <h2 id="name-error-responses">
+<a href="#section-13" class="section-number selfRef">13. </a><a href="#name-error-responses" class="section-name selfRef">Error Responses</a>
+      </h2>
+<p id="section-13-1">HTTP error responses from the Access Request Endpoint and Task Status Endpoint <span class="bcp14">SHOULD</span> use <code>application/problem+json</code> as defined by <span>[<a href="#RFC9457" class="cite xref">RFC9457</a>]</span>.<a href="#section-13-1" class="pilcrow">¶</a></p>
+<p id="section-13-2">The following problem types are defined:<a href="#section-13-2" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-13-3">
+        <dt id="section-13-3.1">
+<code>urn:openid:authzen:access-request:error:not_requestable</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-13-3.2">
+          <p id="section-13-3.2.1">HTTP <code>400 Bad Request</code>.  The submitted denial is not requestable.<a href="#section-13-3.2.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-13-3.3">
+<code>urn:openid:authzen:access-request:error:expired_denial</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-13-3.4">
+          <p id="section-13-3.4.1">HTTP <code>410 Gone</code>.  The requestable denial hint has expired.<a href="#section-13-3.4.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-13-3.5">
+<code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-13-3.6">
+          <p id="section-13-3.6.1">HTTP <code>400 Bad Request</code>.  The submitted Access Request cannot be bound to the denied AuthZEN Decision.<a href="#section-13-3.6.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-13-3.7">
+<code>urn:openid:authzen:access-request:error:duplicate_request</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-13-3.8">
+          <p id="section-13-3.8.1">HTTP <code>409 Conflict</code>.  A semantically duplicate Access Request exists and cannot be reused.<a href="#section-13-3.8.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-13-3.9">
+<code>urn:openid:authzen:access-request:error:unknown_task</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-13-3.10">
+          <p id="section-13-3.10.1">HTTP <code>404 Not Found</code>.  The task handle is unknown or unavailable to the caller.<a href="#section-13-3.10.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+<dt id="section-13-3.11">
+<code>urn:openid:authzen:access-request:error:task_expired</code>:</dt>
+        <dd style="margin-left: 1.5em" id="section-13-3.12">
+          <p id="section-13-3.12.1">HTTP <code>410 Gone</code>.  The task handle has expired.<a href="#section-13-3.12.1" class="pilcrow">¶</a></p>
+</dd>
+      <dd class="break"></dd>
+</dl>
+<p id="section-13-4">Non-normative example:<a href="#section-13-4" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-13-5">
+<pre>
+HTTP/1.1 400 Bad Request
+Content-Type: application/problem+json
+
+{
+  "type": "urn:openid:authzen:access-request:error:not_requestable",
+  "title": "Access is not requestable",
+  "status": 400,
+  "detail": "The denied decision did not contain context.access_request.requestable=true."
+}
+</pre><a href="#section-13-5" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="pep-processing-rules">
+<section id="section-14">
+      <h2 id="name-pep-processing-rules">
+<a href="#section-14" class="section-number selfRef">14. </a><a href="#name-pep-processing-rules" class="section-name selfRef">PEP Processing Rules</a>
+      </h2>
+<p id="section-14-1">A PEP implementing this profile:<a href="#section-14-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-14-2.1">
+          <p id="section-14-2.1.1"><span class="bcp14">MUST</span> treat <code>decision: false</code> as a denial, even when the Decision Context contains an <code>access_request</code> object.<a href="#section-14-2.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.2">
+          <p id="section-14-2.2.1"><span class="bcp14">MUST NOT</span> submit an Access Request unless the denied Decision contains <code>context.access_request.requestable</code> set to <code>true</code>.<a href="#section-14-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.3">
+          <p id="section-14-2.3.1"><span class="bcp14">MUST</span> use the <code>endpoint</code> from the denial context when present; otherwise it <span class="bcp14">MUST</span> use the <code>access_request_endpoint</code> from PDP metadata.<a href="#section-14-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.4">
+          <p id="section-14-2.4.1"><span class="bcp14">MUST</span> preserve the Subject, Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.<a href="#section-14-2.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.5">
+          <p id="section-14-2.5.1"><span class="bcp14">SHOULD</span> include <code>denial.evaluation_id</code> when the PDP returned an evaluation identifier.<a href="#section-14-2.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.6">
+          <p id="section-14-2.6.1"><span class="bcp14">SHOULD</span> include an idempotency key for Access Request submissions.<a href="#section-14-2.6.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.7">
+          <p id="section-14-2.7.1"><span class="bcp14">MUST</span> treat a Task Handle as opaque.<a href="#section-14-2.7.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.8">
+          <p id="section-14-2.8.1"><span class="bcp14">MUST NOT</span> infer approval from a task identifier, link, or display text.<a href="#section-14-2.8.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.9">
+          <p id="section-14-2.9.1"><span class="bcp14">MUST</span> treat unknown task status values as not approved.<a href="#section-14-2.9.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.10">
+          <p id="section-14-2.10.1"><span class="bcp14">MUST</span> enforce an approved result only according to <a href="#completion-semantics" class="auto internal xref">Section 10</a>.<a href="#section-14-2.10.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.11">
+          <p id="section-14-2.11.1"><span class="bcp14">MUST</span> treat unknown <code>result.mode</code> values as not approved.<a href="#section-14-2.11.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.12">
+          <p id="section-14-2.12.1">When using Re-evaluation Mode, <span class="bcp14">MUST</span> include any returned <code>approval_context</code> unchanged as a member named <code>authzen_access_request_approval</code> inside the AuthZEN request <code>context</code>.<a href="#section-14-2.12.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.13">
+          <p id="section-14-2.13.1">When using Decision Result Mode, <span class="bcp14">MUST</span> verify the <code>result.binding</code> matches the originally submitted task identifier, Subject, Resource, and Action, and <span class="bcp14">MUST NOT</span> enforce the Decision after <code>binding.expires_at</code>.<a href="#section-14-2.13.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-14-2.14">
+          <p id="section-14-2.14.1"><span class="bcp14">SHOULD</span> re-evaluate access after approval unless the deployment explicitly supports Decision Result Mode or Token Result Mode.<a href="#section-14-2.14.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+</section>
+</div>
+<div id="pdp-processing-rules">
+<section id="section-15">
+      <h2 id="name-pdp-processing-rules">
+<a href="#section-15" class="section-number selfRef">15. </a><a href="#name-pdp-processing-rules" class="section-name selfRef">PDP Processing Rules</a>
+      </h2>
+<p id="section-15-1">A PDP implementing this profile:<a href="#section-15-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-15-2.1">
+          <p id="section-15-2.1.1"><span class="bcp14">MAY</span> include <code>context.access_request</code> in a denied AuthZEN Decision when the denied access is eligible for approval.<a href="#section-15-2.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-15-2.2">
+          <p id="section-15-2.2.1"><span class="bcp14">MUST NOT</span> include <code>context.access_request.requestable=true</code> unless an Access Request Endpoint is available to process the request.<a href="#section-15-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-15-2.3">
+          <p id="section-15-2.3.1"><span class="bcp14">SHOULD</span> include a stable machine-readable reason code when returning a requestable denial.<a href="#section-15-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-15-2.4">
+          <p id="section-15-2.4.1"><span class="bcp14">SHOULD</span> include an expiration time or lifetime for the requestable denial hint.<a href="#section-15-2.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-15-2.5">
+          <p id="section-15-2.5.1"><span class="bcp14">SHOULD</span> return a stable evaluation identifier that the PEP can supply as <code>evaluation_id</code> when submitting an Access Request, either in the Decision Context or in a response header.<a href="#section-15-2.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-15-2.6">
+          <p id="section-15-2.6.1"><span class="bcp14">MUST</span> validate approval references presented during re-evaluation.<a href="#section-15-2.6.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-15-2.7">
+          <p id="section-15-2.7.1"><span class="bcp14">MUST</span> ensure that approval does not override policy conditions that remain mandatory at enforcement time, such as subject status, resource sensitivity, action constraints, environmental risk, and approval expiry.<a href="#section-15-2.7.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+</section>
+</div>
+<div id="access-request-service-processing-rules">
+<section id="section-16">
+      <h2 id="name-access-request-service-proc">
+<a href="#section-16" class="section-number selfRef">16. </a><a href="#name-access-request-service-proc" class="section-name selfRef">Access Request Service Processing Rules</a>
+      </h2>
+<p id="section-16-1">An Access Request Service implementing this profile:<a href="#section-16-1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-16-2.1">
+          <p id="section-16-2.1.1"><span class="bcp14">MUST</span> authenticate and authorize the PEP before accepting Access Request submissions.<a href="#section-16-2.1.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-16-2.2">
+          <p id="section-16-2.2.1"><span class="bcp14">MUST</span> validate that the submission is based on a requestable denial.<a href="#section-16-2.2.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-16-2.3">
+          <p id="section-16-2.3.1"><span class="bcp14">MUST</span> bind the task to the submitted Subject, Resource, Action, Context, denial, requester, and client.<a href="#section-16-2.3.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-16-2.4">
+          <p id="section-16-2.4.1"><span class="bcp14">MUST</span> return an opaque Task Handle for accepted requests.<a href="#section-16-2.4.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-16-2.5">
+          <p id="section-16-2.5.1"><span class="bcp14">SHOULD</span> support idempotent request submission using the <code>Idempotency-Key</code> header.<a href="#section-16-2.5.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-16-2.6">
+          <p id="section-16-2.6.1"><span class="bcp14">MUST</span> expire Access Requests and approvals according to local policy.<a href="#section-16-2.6.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-16-2.7">
+          <p id="section-16-2.7.1"><span class="bcp14">MUST</span> not return <code>approved</code> unless the configured approval workflow has completed successfully.<a href="#section-16-2.7.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-16-2.8">
+          <p id="section-16-2.8.1"><span class="bcp14">MUST</span> retain sufficient audit records to reconstruct the request, approval, denial, and completion result.<a href="#section-16-2.8.1" class="pilcrow">¶</a></p>
+</li>
+      </ul>
+</section>
+</div>
+<div id="authorization-and-authentication">
+<section id="section-17">
+      <h2 id="name-authorization-and-authentic">
+<a href="#section-17" class="section-number selfRef">17. </a><a href="#name-authorization-and-authentic" class="section-name selfRef">Authorization and Authentication</a>
+      </h2>
+<p id="section-17-1">The Access Request Endpoint and Task Status Endpoint are protected APIs.  Support for OAuth 2.0 <span>[<a href="#RFC6749" class="cite xref">RFC6749</a>]</span> is <span class="bcp14">RECOMMENDED</span>.  When OAuth 2.0 bearer tokens are used, the endpoints <span class="bcp14">MUST</span> follow <span>[<a href="#RFC6750" class="cite xref">RFC6750</a>]</span>.<a href="#section-17-1" class="pilcrow">¶</a></p>
+<p id="section-17-2">The Access Request Service <span class="bcp14">MUST</span> authenticate the PEP or caller before accepting a submission or returning task status.  The service <span class="bcp14">MUST</span> verify that the caller is authorized to submit or view the request for the supplied Subject, Resource, and Action.<a href="#section-17-2" class="pilcrow">¶</a></p>
+<p id="section-17-3">A task status response <span class="bcp14">MUST NOT</span> disclose approval details, approver identities, policy identifiers, or resource metadata to a caller that is not authorized to receive them.<a href="#section-17-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="privacy-considerations">
+<section id="section-18">
+      <h2 id="name-privacy-considerations">
+<a href="#section-18" class="section-number selfRef">18. </a><a href="#name-privacy-considerations" class="section-name selfRef">Privacy Considerations</a>
+      </h2>
+<p id="section-18-1">Access Requests may contain sensitive information, including user identifiers, resource identifiers, business justifications, approval chains, and policy reasons.  Implementations <span class="bcp14">SHOULD</span> minimize the amount of information returned to the PEP and displayed to the end user.<a href="#section-18-1" class="pilcrow">¶</a></p>
+<p id="section-18-2">The Access Request Service <span class="bcp14">SHOULD</span> separate end-user display reasons from administrator diagnostic reasons.  A requestable denial response <span class="bcp14">SHOULD</span> avoid exposing internal policy identifiers unless the PEP is authorized for administrative diagnostics.<a href="#section-18-2" class="pilcrow">¶</a></p>
+<p id="section-18-3">Approval records <span class="bcp14">SHOULD</span> be retained only as long as required by business, security, and compliance policy.<a href="#section-18-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="security-considerations">
+<section id="section-19">
+      <h2 id="name-security-considerations">
+<a href="#section-19" class="section-number selfRef">19. </a><a href="#name-security-considerations" class="section-name selfRef">Security Considerations</a>
+      </h2>
+<div id="denial-remains-denial">
+<section id="section-19.1">
+        <h3 id="name-denial-remains-denial">
+<a href="#section-19.1" class="section-number selfRef">19.1. </a><a href="#name-denial-remains-denial" class="section-name selfRef">Denial Remains Denial</a>
+        </h3>
+<p id="section-19.1-1">The presence of <code>context.access_request</code> does not weaken the AuthZEN decision.  A PEP <span class="bcp14">MUST NOT</span> grant access based on a requestable denial.  Access is permitted only after an approved completion result is enforced according to this profile.<a href="#section-19.1-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="confused-deputy-and-request-substitution">
+<section id="section-19.2">
+        <h3 id="name-confused-deputy-and-request">
+<a href="#section-19.2" class="section-number selfRef">19.2. </a><a href="#name-confused-deputy-and-request" class="section-name selfRef">Confused Deputy and Request Substitution</a>
+        </h3>
+<p id="section-19.2-1">An attacker could attempt to obtain approval for one resource and apply it to another.  Implementations <span class="bcp14">MUST</span> bind Access Requests and approval results to the Subject, Resource, Action, Context, task, and requester.  PDPs <span class="bcp14">MUST</span> validate this binding during re-evaluation.<a href="#section-19.2-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="approval-replay">
+<section id="section-19.3">
+        <h3 id="name-approval-replay">
+<a href="#section-19.3" class="section-number selfRef">19.3. </a><a href="#name-approval-replay" class="section-name selfRef">Approval Replay</a>
+        </h3>
+<p id="section-19.3-1">Approval references and tokens can be replayed if not time-bounded and audience-restricted.  Approval results <span class="bcp14">MUST</span> expire.  Token Result Mode <span class="bcp14">MUST</span> use short-lived, audience-restricted tokens.  Re-evaluation Mode <span class="bcp14">SHOULD</span> bind approval references to the original request tuple.<a href="#section-19.3-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="overbroad-approval">
+<section id="section-19.4">
+        <h3 id="name-overbroad-approval">
+<a href="#section-19.4" class="section-number selfRef">19.4. </a><a href="#name-overbroad-approval" class="section-name selfRef">Overbroad Approval</a>
+        </h3>
+<p id="section-19.4-1">This profile does not define an approval policy language.  Implementations <span class="bcp14">MUST NOT</span> treat the <code>template</code>, <code>reason</code>, <code>requested_access</code>, or <code>display</code> fields as sufficient authorization policy.  Actual approval scope and enforcement semantics are determined by the PDP and Access Request Service.<a href="#section-19.4-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="task-handle-leakage">
+<section id="section-19.5">
+        <h3 id="name-task-handle-leakage">
+<a href="#section-19.5" class="section-number selfRef">19.5. </a><a href="#name-task-handle-leakage" class="section-name selfRef">Task Handle Leakage</a>
+        </h3>
+<p id="section-19.5-1">Task handles can reveal workflow state or be used to poll for sensitive information.  Task handles <span class="bcp14">MUST</span> be opaque, unguessable, and protected by authentication and authorization checks.  A leaked task handle <span class="bcp14">MUST NOT</span> be sufficient to retrieve task status without caller authorization.<a href="#section-19.5-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="callback-security">
+<section id="section-19.6">
+        <h3 id="name-callback-security">
+<a href="#section-19.6" class="section-number selfRef">19.6. </a><a href="#name-callback-security" class="section-name selfRef">Callback Security</a>
+        </h3>
+<p id="section-19.6-1">Callback endpoints can be abused for spoofing, replay, and request forgery.  Callback notifications <span class="bcp14">MUST</span> be authenticated.  PEPs <span class="bcp14">SHOULD</span> verify callback origin, bind callbacks to expected task identifiers and state values, and treat callbacks as notifications unless they contain an enforceable result under this profile.<a href="#section-19.6-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="shared-signals-framework-binding-security">
+<section id="section-19.7">
+        <h3 id="name-shared-signals-framework-bin">
+<a href="#section-19.7" class="section-number selfRef">19.7. </a><a href="#name-shared-signals-framework-bin" class="section-name selfRef">Shared Signals Framework Binding Security</a>
+        </h3>
+<p id="section-19.7-1">When the SSF binding (<a href="#ssf-binding" class="auto internal xref">Section 12</a>) is used, SETs carry information about denied evaluations, approval outcomes, subjects, and resources.  Transmitters <span class="bcp14">MUST</span> authorize Receivers before delivering events and <span class="bcp14">MUST NOT</span> broadcast events to Receivers that are not entitled to observe the affected Subject, Resource, or Action.  Receivers <span class="bcp14">MUST</span> validate SET signatures and <span class="bcp14">MUST</span> reject SETs whose <code>iss</code> does not match the configured Transmitter for the stream.  A SET delivered by the SSF binding <span class="bcp14">MUST NOT</span> be treated as an enforceable authorization decision; the Task Status Endpoint or per-task callback remains authoritative for enforcement.<a href="#section-19.7-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="pep-acting-on-behalf-of-the-subject">
+<section id="section-19.8">
+        <h3 id="name-pep-acting-on-behalf-of-the">
+<a href="#section-19.8" class="section-number selfRef">19.8. </a><a href="#name-pep-acting-on-behalf-of-the" class="section-name selfRef">PEP Acting on Behalf of the Subject</a>
+        </h3>
+<p id="section-19.8-1">A PEP submitting an Access Request typically acts on behalf of the Subject identified in the original AuthZEN evaluation.  The Access Request Service <span class="bcp14">MUST</span> verify that the authenticated caller is authorized to act for that Subject for that Resource and Action, including that the caller is a recognized PEP and that the Subject has consented or been delegated to where required.  Deployments requiring explicit delegation <span class="bcp14">MAY</span> use OAuth 2.0 Token Exchange <span>[<a href="#RFC8693" class="cite xref">RFC8693</a>]</span> so the PEP presents a token that names the Subject as the on-behalf-of party.<a href="#section-19.8-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="idempotency-key-abuse">
+<section id="section-19.9">
+        <h3 id="name-idempotency-key-abuse">
+<a href="#section-19.9" class="section-number selfRef">19.9. </a><a href="#name-idempotency-key-abuse" class="section-name selfRef">Idempotency Key Abuse</a>
+        </h3>
+<p id="section-19.9-1">Idempotency keys can be used to correlate requests.  Implementations <span class="bcp14">SHOULD</span> scope idempotency keys to the authenticated caller and avoid storing them longer than necessary.<a href="#section-19.9-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="availability">
+<section id="section-19.10">
+        <h3 id="name-availability">
+<a href="#section-19.10" class="section-number selfRef">19.10. </a><a href="#name-availability" class="section-name selfRef">Availability</a>
+        </h3>
+<p id="section-19.10-1">Approval workflows can introduce latency and dependency on external systems.  PEPs <span class="bcp14">SHOULD</span> fail closed when task status cannot be determined.  Access Request Services <span class="bcp14">SHOULD</span> apply rate limits and abuse detection to request submission and polling endpoints.<a href="#section-19.10-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+</section>
+</div>
+<div id="iana-considerations">
+<section id="section-20">
+      <h2 id="name-iana-considerations">
+<a href="#section-20" class="section-number selfRef">20. </a><a href="#name-iana-considerations" class="section-name selfRef">IANA Considerations</a>
+      </h2>
+<div id="authzen-policy-decision-point-metadata-registry">
+<section id="section-20.1">
+        <h3 id="name-authzen-policy-decision-poi">
+<a href="#section-20.1" class="section-number selfRef">20.1. </a><a href="#name-authzen-policy-decision-poi" class="section-name selfRef">AuthZEN Policy Decision Point Metadata Registry</a>
+        </h3>
+<p id="section-20.1-1">This specification requests registration of the following PDP metadata parameter in the AuthZEN Policy Decision Point Metadata Registry.<a href="#section-20.1-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-20.1-2">
+          <dt id="section-20.1-2.1">Name:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.1-2.2">
+            <p id="section-20.1-2.2.1"><code>access_request_endpoint</code><a href="#section-20.1-2.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.1-2.3">Description:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.1-2.4">
+            <p id="section-20.1-2.4.1">HTTPS endpoint used to submit Access Requests for requestable denials.<a href="#section-20.1-2.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.1-2.5">Change Controller:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.1-2.6">
+            <p id="section-20.1-2.6.1">OpenID Foundation AuthZEN Working Group<a href="#section-20.1-2.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.1-2.7">Specification Document:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.1-2.8">
+            <p id="section-20.1-2.8.1">This document.<a href="#section-20.1-2.8.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="authzen-policy-decision-point-capabilities-registry">
+<section id="section-20.2">
+        <h3 id="name-authzen-policy-decision-poin">
+<a href="#section-20.2" class="section-number selfRef">20.2. </a><a href="#name-authzen-policy-decision-poin" class="section-name selfRef">AuthZEN Policy Decision Point Capabilities Registry</a>
+        </h3>
+<p id="section-20.2-1">This specification requests registration of the following PDP capabilities in the AuthZEN Policy Decision Point Capabilities Registry.<a href="#section-20.2-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-20.2-2">
+          <dt id="section-20.2-2.1">Capability Name:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.2">
+            <p id="section-20.2-2.2.1"><code>access-request</code><a href="#section-20.2-2.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.3">Capability URN:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.4">
+            <p id="section-20.2-2.4.1"><code>urn:openid:authzen:capability:access-request</code><a href="#section-20.2-2.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.5">Capability Description:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.6">
+            <p id="section-20.2-2.6.1">Indicates that the PDP supports requestable denials and the Access Request Endpoint defined by this specification.<a href="#section-20.2-2.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.7">Change Controller:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.8">
+            <p id="section-20.2-2.8.1">OpenID Foundation AuthZEN Working Group<a href="#section-20.2-2.8.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.9">Specification Document:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.10">
+            <p id="section-20.2-2.10.1">This document.<a href="#section-20.2-2.10.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.11">Capability Name:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.12">
+            <p id="section-20.2-2.12.1"><code>access-request-ssf</code><a href="#section-20.2-2.12.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.13">Capability URN:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.14">
+            <p id="section-20.2-2.14.1"><code>urn:openid:authzen:capability:access-request-ssf</code><a href="#section-20.2-2.14.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.15">Capability Description:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.16">
+            <p id="section-20.2-2.16.1">Indicates that the PDP or Access Request Service publishes Access Request lifecycle events using the Shared Signals Framework binding defined by this specification.<a href="#section-20.2-2.16.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.17">Change Controller:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.18">
+            <p id="section-20.2-2.18.1">OpenID Foundation AuthZEN Working Group<a href="#section-20.2-2.18.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.2-2.19">Specification Document:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.2-2.20">
+            <p id="section-20.2-2.20.1">This document.<a href="#section-20.2-2.20.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="security-event-type-identifiers-registry">
+<section id="section-20.3">
+        <h3 id="name-security-event-type-identif">
+<a href="#section-20.3" class="section-number selfRef">20.3. </a><a href="#name-security-event-type-identif" class="section-name selfRef">Security Event Type Identifiers Registry</a>
+        </h3>
+<p id="section-20.3-1">This specification requests registration of the following event type in the IANA "Security Event Type Identifiers" registry established by <span>[<a href="#RFC8417" class="cite xref">RFC8417</a>]</span>.<a href="#section-20.3-1" class="pilcrow">¶</a></p>
+<span class="break"></span><dl class="dlParallel" id="section-20.3-2">
+          <dt id="section-20.3-2.1">Name:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.3-2.2">
+            <p id="section-20.3-2.2.1">AuthZEN Access Request Completed<a href="#section-20.3-2.2.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.3-2.3">URI:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.3-2.4">
+            <p id="section-20.3-2.4.1"><code>urn:openid:authzen:event:access-request-completed</code><a href="#section-20.3-2.4.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.3-2.5">Description:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.3-2.6">
+            <p id="section-20.3-2.6.1">Indicates that an AuthZEN Access Request has reached a terminal status.<a href="#section-20.3-2.6.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.3-2.7">Change Controller:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.3-2.8">
+            <p id="section-20.3-2.8.1">OpenID Foundation AuthZEN Working Group<a href="#section-20.3-2.8.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-20.3-2.9">Specification Document:</dt>
+          <dd style="margin-left: 1.5em" id="section-20.3-2.10">
+            <p id="section-20.3-2.10.1">This document.<a href="#section-20.3-2.10.1" class="pilcrow">¶</a></p>
+</dd>
+        <dd class="break"></dd>
+</dl>
+</section>
+</div>
+</section>
+</div>
+<div id="examples">
+<section id="section-21">
+      <h2 id="name-examples">
+<a href="#section-21" class="section-number selfRef">21. </a><a href="#name-examples" class="section-name selfRef">Examples</a>
+      </h2>
+<div id="end-to-end-manager-approval">
+<section id="section-21.1">
+        <h3 id="name-end-to-end-manager-approval">
+<a href="#section-21.1" class="section-number selfRef">21.1. </a><a href="#name-end-to-end-manager-approval" class="section-name selfRef">End-to-End Manager Approval</a>
+        </h3>
+<div id="initial-evaluation-request">
+<section id="section-21.1.1">
+          <h4 id="name-initial-evaluation-request">
+<a href="#section-21.1.1" class="section-number selfRef">21.1.1. </a><a href="#name-initial-evaluation-request" class="section-name selfRef">Initial Evaluation Request</a>
+          </h4>
+<div class="lang-http sourcecode" id="section-21.1.1-1">
+<pre>
+POST /access/v1/evaluation HTTP/1.1
+Host: pdp.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Content-Type: application/json
+
+{
+  "subject": {
+    "type": "user",
+    "id": "alice@example.com"
+  },
+  "resource": {
+    "type": "document",
+    "id": "q4-plan"
+  },
+  "action": {
+    "name": "can_read"
+  },
+  "context": {
+    "time": "2026-04-30T20:15:00Z"
+  }
+}
+</pre><a href="#section-21.1.1-1" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="requestable-denial">
+<section id="section-21.1.2">
+          <h4 id="name-requestable-denial">
+<a href="#section-21.1.2" class="section-number selfRef">21.1.2. </a><a href="#name-requestable-denial" class="section-name selfRef">Requestable Denial</a>
+          </h4>
+<div class="lang-http sourcecode" id="section-21.1.2-1">
+<pre>
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "decision": false,
+  "context": {
+    "reason": "approval_required",
+    "access_request": {
+      "requestable": true,
+      "template": "manager_approval",
+      "reason": "manager_approval_required",
+      "expires_in": 600,
+      "required_fields": {
+        "context": ["business_justification"]
+      }
+    }
+  }
+}
+</pre><a href="#section-21.1.2-1" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="submitting-the-access-request">
+<section id="section-21.1.3">
+          <h4 id="name-submitting-the-access-reque">
+<a href="#section-21.1.3" class="section-number selfRef">21.1.3. </a><a href="#name-submitting-the-access-reque" class="section-name selfRef">Submitting the Access Request</a>
+          </h4>
+<div class="lang-http sourcecode" id="section-21.1.3-1">
+<pre>
+POST /access/v1/requests HTTP/1.1
+Host: pdp.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Content-Type: application/json
+Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
+
+{
+  "subject": {
+    "type": "user",
+    "id": "alice@example.com"
+  },
+  "resource": {
+    "type": "document",
+    "id": "q4-plan"
+  },
+  "action": {
+    "name": "can_read"
+  },
+  "context": {
+    "business_justification": "Needed for customer renewal review"
+  },
+  "denial": {
+    "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+    "evaluated_at": "2026-04-30T20:15:00Z",
+    "decision": {
+      "decision": false,
+      "context": {
+        "reason": "approval_required"
+      }
+    },
+    "access_request": {
+      "requestable": true,
+      "template": "manager_approval",
+      "reason": "manager_approval_required"
+    }
+  }
+}
+</pre><a href="#section-21.1.3-1" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="task-handle">
+<section id="section-21.1.4">
+          <h4 id="name-task-handle">
+<a href="#section-21.1.4" class="section-number selfRef">21.1.4. </a><a href="#name-task-handle" class="section-name selfRef">Task Handle</a>
+          </h4>
+<div class="lang-http sourcecode" id="section-21.1.4-1">
+<pre>
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4
+
+{
+  "task": {
+    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "status": "pending",
+    "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "expires_at": "2026-04-30T23:00:00Z"
+  }
+}
+</pre><a href="#section-21.1.4-1" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="completed-task">
+<section id="section-21.1.5">
+          <h4 id="name-completed-task">
+<a href="#section-21.1.5" class="section-number selfRef">21.1.5. </a><a href="#name-completed-task" class="section-name selfRef">Completed Task</a>
+          </h4>
+<div class="lang-http sourcecode" id="section-21.1.5-1">
+<pre>
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "task": {
+    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+    "status": "approved"
+  },
+  "result": {
+    "mode": "reevaluate",
+    "approval": {
+      "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "approved_until": "2026-05-01T00:42:00Z"
+    },
+    "approval_context": {
+      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+    }
+  }
+}
+</pre><a href="#section-21.1.5-1" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="re-evaluation-after-approval">
+<section id="section-21.1.6">
+          <h4 id="name-re-evaluation-after-approva">
+<a href="#section-21.1.6" class="section-number selfRef">21.1.6. </a><a href="#name-re-evaluation-after-approva" class="section-name selfRef">Re-evaluation After Approval</a>
+          </h4>
+<div class="lang-http sourcecode" id="section-21.1.6-1">
+<pre>
+POST /access/v1/evaluation HTTP/1.1
+Host: pdp.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Content-Type: application/json
+
+{
+  "subject": {
+    "type": "user",
+    "id": "alice@example.com"
+  },
+  "resource": {
+    "type": "document",
+    "id": "q4-plan"
+  },
+  "action": {
+    "name": "can_read"
+  },
+  "context": {
+    "time": "2026-04-30T20:43:00Z",
+    "authzen_access_request_approval": {
+      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+    }
+  }
+}
+</pre><a href="#section-21.1.6-1" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+<div id="final-decision">
+<section id="section-21.1.7">
+          <h4 id="name-final-decision">
+<a href="#section-21.1.7" class="section-number selfRef">21.1.7. </a><a href="#name-final-decision" class="section-name selfRef">Final Decision</a>
+          </h4>
+<div class="lang-http sourcecode" id="section-21.1.7-1">
+<pre>
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "decision": true,
+  "context": {
+    "approval": {
+      "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "approved_until": "2026-05-01T00:42:00Z"
+    }
+  }
+}
+</pre><a href="#section-21.1.7-1" class="pilcrow">¶</a>
+</div>
+</section>
+</div>
+</section>
+</div>
+</section>
+</div>
+<div id="sec-combined-references">
+<section id="section-22">
+      <h2 id="name-references">
+<a href="#section-22" class="section-number selfRef">22. </a><a href="#name-references" class="section-name selfRef">References</a>
+      </h2>
+<div id="sec-normative-references">
+<section id="section-22.1">
+        <h3 id="name-normative-references">
+<a href="#section-22.1" class="section-number selfRef">22.1. </a><a href="#name-normative-references" class="section-name selfRef">Normative References</a>
+        </h3>
+<dl class="references">
+<dt id="AuthZEN">[AuthZEN]</dt>
+        <dd>
+<span class="refAuthor">Gazitt, O.</span>, <span class="refAuthor">Brossard, D.</span>, and <span class="refAuthor">A. Tulshibagwale</span>, <span class="refTitle">"Authorization API 1.0"</span>, <time datetime="2026-04-29" class="refDate">29 April 2026</time>, <span>&lt;<a href="https://openid.github.io/authzen/">https://openid.github.io/authzen/</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC2119">[RFC2119]</dt>
+        <dd>
+<span class="refAuthor">Bradner, S.</span>, <span class="refTitle">"Key words for use in RFCs to Indicate Requirement Levels"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 2119</span>, <span class="seriesInfo">DOI 10.17487/RFC2119</span>, <time datetime="1997-03" class="refDate">March 1997</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc2119">https://www.rfc-editor.org/rfc/rfc2119</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC3339">[RFC3339]</dt>
+        <dd>
+<span class="refAuthor">Klyne, G.</span> and <span class="refAuthor">C. Newman</span>, <span class="refTitle">"Date and Time on the Internet: Timestamps"</span>, <span class="seriesInfo">RFC 3339</span>, <span class="seriesInfo">DOI 10.17487/RFC3339</span>, <time datetime="2002-07" class="refDate">July 2002</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc3339">https://www.rfc-editor.org/rfc/rfc3339</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC6749">[RFC6749]</dt>
+        <dd>
+<span class="refAuthor">Hardt, D., Ed.</span>, <span class="refTitle">"The OAuth 2.0 Authorization Framework"</span>, <span class="seriesInfo">RFC 6749</span>, <span class="seriesInfo">DOI 10.17487/RFC6749</span>, <time datetime="2012-10" class="refDate">October 2012</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc6749">https://www.rfc-editor.org/rfc/rfc6749</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC6750">[RFC6750]</dt>
+        <dd>
+<span class="refAuthor">Jones, M.</span> and <span class="refAuthor">D. Hardt</span>, <span class="refTitle">"The OAuth 2.0 Authorization Framework: Bearer Token Usage"</span>, <span class="seriesInfo">RFC 6750</span>, <span class="seriesInfo">DOI 10.17487/RFC6750</span>, <time datetime="2012-10" class="refDate">October 2012</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc6750">https://www.rfc-editor.org/rfc/rfc6750</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8174">[RFC8174]</dt>
+        <dd>
+<span class="refAuthor">Leiba, B.</span>, <span class="refTitle">"Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 8174</span>, <span class="seriesInfo">DOI 10.17487/RFC8174</span>, <time datetime="2017-05" class="refDate">May 2017</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8174">https://www.rfc-editor.org/rfc/rfc8174</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8417">[RFC8417]</dt>
+        <dd>
+<span class="refAuthor">Hunt, P., Ed.</span>, <span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Denniss, W.</span>, and <span class="refAuthor">M. Ansari</span>, <span class="refTitle">"Security Event Token (SET)"</span>, <span class="seriesInfo">RFC 8417</span>, <span class="seriesInfo">DOI 10.17487/RFC8417</span>, <time datetime="2018-07" class="refDate">July 2018</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8417">https://www.rfc-editor.org/rfc/rfc8417</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9110">[RFC9110]</dt>
+        <dd>
+<span class="refAuthor">Fielding, R., Ed.</span>, <span class="refAuthor">Nottingham, M., Ed.</span>, and <span class="refAuthor">J. Reschke, Ed.</span>, <span class="refTitle">"HTTP Semantics"</span>, <span class="seriesInfo">STD 97</span>, <span class="seriesInfo">RFC 9110</span>, <span class="seriesInfo">DOI 10.17487/RFC9110</span>, <time datetime="2022-06" class="refDate">June 2022</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9110">https://www.rfc-editor.org/rfc/rfc9110</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC9457">[RFC9457]</dt>
+        <dd>
+<span class="refAuthor">Nottingham, M.</span>, <span class="refAuthor">Wilde, E.</span>, and <span class="refAuthor">S. Dalal</span>, <span class="refTitle">"Problem Details for HTTP APIs"</span>, <span class="seriesInfo">RFC 9457</span>, <span class="seriesInfo">DOI 10.17487/RFC9457</span>, <time datetime="2023-07" class="refDate">July 2023</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc9457">https://www.rfc-editor.org/rfc/rfc9457</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="SSF">[SSF]</dt>
+      <dd>
+<span class="refAuthor">Tulshibagwale, A.</span>, <span class="refAuthor">Cappalli, T.</span>, <span class="refAuthor">Scurtescu, M.</span>, <span class="refAuthor">Backman, A.</span>, and <span class="refAuthor">J. Bradley</span>, <span class="refTitle">"OpenID Shared Signals Framework Specification 1.0"</span>, <time datetime="2024" class="refDate">2024</time>, <span>&lt;<a href="https://openid.net/specs/openid-sharedsignals-framework-1_0.html">https://openid.net/specs/openid-sharedsignals-framework-1_0.html</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="sec-informative-references">
+<section id="section-22.2">
+        <h3 id="name-informative-references">
+<a href="#section-22.2" class="section-number selfRef">22.2. </a><a href="#name-informative-references" class="section-name selfRef">Informative References</a>
+        </h3>
+<dl class="references">
+<dt id="I-D.ietf-httpapi-idempotency-key-header">[I-D.ietf-httpapi-idempotency-key-header]</dt>
+        <dd>
+<span class="refAuthor">Jena, J.</span> and <span class="refAuthor">S. Dalal</span>, <span class="refTitle">"The Idempotency-Key HTTP Header Field"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-ietf-httpapi-idempotency-key-header-07</span>, <time datetime="2025-10-15" class="refDate">15 October 2025</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07">https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-idempotency-key-header-07</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8693">[RFC8693]</dt>
+        <dd>
+<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Nadalin, A.</span>, <span class="refAuthor">Campbell, B., Ed.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">C. Mortimore</span>, <span class="refTitle">"OAuth 2.0 Token Exchange"</span>, <span class="seriesInfo">RFC 8693</span>, <span class="seriesInfo">DOI 10.17487/RFC8693</span>, <time datetime="2020-01" class="refDate">January 2020</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8693">https://www.rfc-editor.org/rfc/rfc8693</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="XACML">[XACML]</dt>
+      <dd>
+<span class="refAuthor">OASIS</span>, <span class="refTitle">"eXtensible Access Control Markup Language (XACML) Version 3.0"</span>, <time datetime="2013-01" class="refDate">January 2013</time>, <span>&lt;<a href="https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html">https://docs.oasis-open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+</dl>
+</section>
+</div>
+</section>
+</div>
+<div id="acknowledgements">
+<section id="appendix-A">
+      <h2 id="name-acknowledgements">
+<a href="#appendix-A" class="section-number selfRef">Appendix A. </a><a href="#name-acknowledgements" class="section-name selfRef">Acknowledgements</a>
+      </h2>
+<p id="appendix-A-1">TODO.<a href="#appendix-A-1" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="document-history">
+<section id="appendix-B">
+      <h2 id="name-document-history">
+<a href="#appendix-B" class="section-number selfRef">Appendix B. </a><a href="#name-document-history" class="section-name selfRef">Document History</a>
+      </h2>
+<span class="break"></span><dl class="dlParallel" id="appendix-B-1">
+        <dt id="appendix-B-1.1">-00</dt>
+        <dd style="margin-left: 1.5em" id="appendix-B-1.2">
+          <p id="appendix-B-1.2.1">Initial version defining requestable denials, the Access Request Endpoint, task handles, task completion, re-evaluation, the optional Shared Signals Framework binding, and registry additions.<a href="#appendix-B-1.2.1" class="pilcrow">¶</a></p>
+</dd>
+      <dd class="break"></dd>
+</dl>
+</section>
+</div>
+<div id="authors-addresses">
+<section id="appendix-C">
+      <h2 id="name-authors-address">
+<a href="#name-authors-address" class="section-name selfRef">Author's Address</a>
+      </h2>
+<address class="vcard">
+        <div dir="auto" class="left"><span class="fn nameRole">Karl McGuinness</span></div>
+<div dir="auto" class="left"><span class="org">Independent</span></div>
+<div class="email">
+<span>Email:</span>
+<a href="mailto:public@karlmcguinness.com" class="email">public@karlmcguinness.com</a>
+</div>
+</address>
+</section>
+</div>
+<script>const toc = document.getElementById("toc");
+toc.querySelector("h2").addEventListener("click", e => {
+  toc.classList.toggle("active");
+});
+toc.querySelector("nav").addEventListener("click", e => {
+  toc.classList.remove("active");
+});
+</script>
+</body>
+</html>
