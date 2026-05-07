@@ -201,7 +201,7 @@ The `access-request-ssf` capability is OPTIONAL and is included only when the de
 
 The `access_request_endpoint` MAY be hosted by the PDP or by another service trusted by the PDP.  When hosted by another service, the PDP metadata MUST identify the endpoint actually used by the PEP to submit access requests.
 
-# Requestable Denial Context
+# Requestable Denial Context {#requestable-denial-context}
 
 When an AuthZEN Access Evaluation response denies access and the denial is eligible for an access request, the PDP MAY include an `access_request` object in the Decision Context.
 
@@ -219,9 +219,6 @@ The `access_request` object has the following members:
 `reason`:
 : OPTIONAL.  String.  A stable, machine-readable reason code for the requestable denial.
 
-`display`:
-: OPTIONAL.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP MAY ignore this member.
-
 `expires_at`:
 : OPTIONAL.  String containing an {{RFC3339}} timestamp.  Indicates when the requestable denial hint expires.
 
@@ -229,10 +226,19 @@ The `access_request` object has the following members:
 : OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.
 
 `request_context`:
-: OPTIONAL.  Object.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT modify or interpret this object.  The PEP returns it unchanged inside `denial.access_request.request_context` when submitting the Access Request ({{access-request-submission}}).
+: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged inside `denial.access_request.request_context` when submitting the Access Request ({{access-request-submission}}).  The value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{?RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
 
-`required_fields`:
-: OPTIONAL.  Object identifying additional request fields the Access Request Service expects.  Each member name identifies a destination object in the Access Request submission body and the value is an array of field names that the Access Request Service expects within that destination.  Defined destination names are `context` (members of the submission `context` object) and `requested_access` (members of the submission `requested_access` object).  Implementations MAY define additional destinations for extension fields.
+`form_url`:
+: OPTIONAL.  HTTPS URI.  URL of a form, hosted by the Access Request Service or another service trusted by the deployment, where the requester can supply additional information required for the Access Request.  Suitable for PEPs that render the form for a human user.  See {{machine-readable-forms}}.
+
+`form_schema_url`:
+: OPTIONAL.  HTTPS URI.  URL where the Access Request Service publishes a machine-readable description of the augmentations the PEP must add to the submission's `context` and `requested_access` objects.  RECOMMENDED to be a JSON Schema {{!I-D.bhutton-json-schema}} {{!I-D.bhutton-json-schema-validation}} document.  Suitable for autonomous PEPs and for PEPs that render forms natively against a schema.  See {{machine-readable-forms}}.
+
+`form_catalogs_url`:
+: OPTIONAL.  HTTPS URI.  URL of a Catalogs Document describing how the PEP resolves form fields whose values are selected from a backing catalog.  See {{catalog-references}}.
+
+`display`:
+: OPTIONAL.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP MAY ignore this member.
 
 If both `expires_at` and `expires_in` are present, `expires_at` takes precedence and the PEP MUST ignore `expires_in`.
 
@@ -251,10 +257,10 @@ The following is a non-normative example:
       "template": "manager_approval",
       "reason": "manager_approval_required",
       "expires_in": 600,
-      "required_fields": {
-        "context": ["business_justification"],
-        "requested_access": ["requested_duration"]
-      },
+      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+      "form_url": "https://requests.example.com/forms/manager_approval",
+      "form_schema_url": "https://requests.example.com/schemas/manager_approval.json",
+      "form_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json",
       "display": {
         "title": "Request access",
         "description": "Manager approval is required before this document can be opened."
@@ -263,6 +269,156 @@ The following is a non-normative example:
   }
 }
 ~~~
+
+# Machine-Readable Forms {#machine-readable-forms}
+
+When the Access Request Service expects additional submission fields beyond those produced by the original AuthZEN evaluation, the requestable denial describes those fields using `form_url`, `form_schema_url`, or both:
+
+* `form_url` identifies a form hosted by the Access Request Service or a service it trusts.  It is suitable for PEPs that render the form for a human user.
+* `form_schema_url` identifies a machine-readable description of the same augmentations.  It is suitable for autonomous PEPs that construct submissions programmatically, and for PEPs that render forms natively against a schema.
+
+When a deployment expects autonomous PEP submissions, the requestable denial SHOULD include `form_schema_url`.  The referenced document is RECOMMENDED to be a JSON Schema {{!I-D.bhutton-json-schema}} {{!I-D.bhutton-json-schema-validation}} that describes the structure of the augmentations the PEP MUST add to the submission's `context` and `requested_access` objects.  An autonomous PEP MAY consume the schema directly to construct a valid submission.
+
+Many existing IGA, ITSM, and approval platforms already use proprietary form description languages.  Implementations built on top of such platforms MAY publish a JSON Schema document derived from their native form description.  Some loss of fidelity is expected when translating between form description languages; the JSON Schema referenced by `form_schema_url` SHOULD provide enough information for an autonomous PEP to construct a conformant submission, while richer rendering, widget, and interaction details remain in `form_url`.
+
+Field values that are selected from a backing catalog (for example, applications, entitlements, roles, or cost centers) are described in a separate Catalogs Document referenced by `form_catalogs_url`.  This profile keeps catalog references outside the form schema so the schema remains a pure description of data shape.  See {{catalog-references}}.
+
+This profile does not define a UI rendering vocabulary.  Deployments that need richer rendering hints (such as widget selection, layout, or conditional display) MAY layer a UI vocabulary, identified out of band, typically keyed by `template`.
+
+This profile does not define an agent protocol surface.  Deployments serving agentic PEPs MAY additionally expose Access Request submission through an agent protocol where the tool input schema corresponds to the JSON Schema referenced by `form_schema_url`.  Discovery of such surfaces is out of scope for this specification.
+
+# Catalog References {#catalog-references}
+
+The Access Request Service MAY publish a Catalogs Document that tells PEPs how to resolve form fields whose values come from backing catalogs (for example, applications, entitlements, roles, or cost centers).  The Catalogs Document is a sibling artifact to the form schema; it does not modify or extend the JSON Schema referenced by `form_schema_url`.
+
+The location of the Catalogs Document is identified by `form_catalogs_url` in the `access_request` object ({{requestable-denial-context}}).
+
+## Catalogs Document
+
+The Catalogs Document is a JSON object retrieved from `form_catalogs_url` using HTTP `GET`.  It has the following members:
+
+`fields`:
+: REQUIRED.  Object.  Each member name is a JSON Pointer ({{?RFC6901}}) into the form data instance described by the form schema, identifying a field whose value is selected from a catalog.  Each member value is a Catalog Reference object.
+
+Implementations MAY include additional members for documentation or vendor metadata; consumers MUST ignore members they do not recognize.
+
+A Catalog Reference object has the following members:
+
+`endpoint`:
+: REQUIRED.  HTTPS URI.  Catalog Endpoint from which catalog items are retrieved.
+
+`search_param`:
+: OPTIONAL.  String.  Query parameter used to pass a free-text search term to the Catalog Endpoint.  Defaults to `q`.
+
+`scope_params`:
+: OPTIONAL.  Object.  Each member name is the query parameter sent to the Catalog Endpoint and the value is a JSON Pointer ({{?RFC6901}}) into the form data instance identifying the source field.  The PEP MUST resolve each pointer at request time and MUST NOT call the Catalog Endpoint until every referenced source field has a value.
+
+`value_path`:
+: OPTIONAL.  String.  JSON Pointer ({{?RFC6901}}) into a Catalog Item, identifying the value the PEP places into the form field.  Defaults to `/value`.
+
+`label_path`:
+: OPTIONAL.  String.  JSON Pointer ({{?RFC6901}}) into a Catalog Item, identifying a human-readable label.  Defaults to `/label`.
+
+Non-normative example:
+
+~~~ json
+{
+  "fields": {
+    "/application_id": {
+      "endpoint": "https://requests.example.com/catalog/applications",
+      "search_param": "q"
+    },
+    "/entitlement_id": {
+      "endpoint": "https://requests.example.com/catalog/entitlements",
+      "search_param": "q",
+      "scope_params": { "application_id": "/application_id" }
+    }
+  }
+}
+~~~
+
+## Catalog Endpoint
+
+A Catalog Endpoint accepts an HTTP `GET` request and returns a paginated list of Catalog Items.
+
+The Catalog Endpoint MUST accept the following query parameters:
+
+* The search parameter named by `search_param` (default `q`): String.  Free-text query supplied by the caller.
+* The scope parameters named by `scope_params`: String values taken from other form data fields.
+* `cursor`: OPTIONAL.  String.  Opaque pagination cursor returned by a previous response.
+* `limit`: OPTIONAL.  Integer.  Caller-requested page size.  The Catalog Endpoint MAY clamp or ignore this value.
+
+The Catalog Endpoint MAY accept additional deployment-specific parameters; receivers MUST ignore parameters they do not recognize.
+
+A Catalog Endpoint SHOULD share an origin with the Access Request Endpoint and SHOULD accept the same caller credentials.  Deployments that host catalogs on a different origin MUST define how the PEP obtains credentials for the Catalog Endpoint, for example through OAuth 2.0 Token Exchange {{?RFC8693}}; this profile does not define cross-origin credential acquisition.
+
+The Catalog Endpoint MUST authenticate the caller, MUST authorize the caller to enumerate the catalog, and MUST return only items the caller is permitted to see for the original Subject, Resource, and Action.  The catalog response is itself an authorization boundary; it MUST NOT disclose entries the requester would not be permitted to request.
+
+## Catalog Response
+
+A successful response returns HTTP `200 OK` and a JSON object with the following members:
+
+`items`:
+: REQUIRED.  Array of Catalog Items.  Each Catalog Item is a JSON object containing the value identified by `value_path` and SHOULD include the value identified by `label_path`.  Items SHOULD include the following well-known optional members when applicable, and MAY include additional vendor-specific metadata:
+
+  * `description`: String.  Human-readable description of the item.
+  * `risk_level`: String.  Risk classification used by the deployment (for example, `low`, `medium`, `high`).  Useful for agent and human triage.
+  * `granted`: Boolean.  When `true`, indicates that the requester already has access to the item.  Allows a PEP to suppress redundant or no-op Access Request submissions.
+  * `owner`: Object or String.  Identifier or reference for the item's owner, when the catalog tracks ownership.
+
+`next_cursor`:
+: OPTIONAL.  String.  Opaque cursor that the caller passes as `cursor` to retrieve the next page.  Absent when no further pages are available.
+
+`total`:
+: OPTIONAL.  Integer.  Approximate total number of items matching the search and scope filters.  Used as a hint only; the PEP MUST NOT rely on its accuracy.
+
+Non-normative example:
+
+~~~ http
+GET /catalog/entitlements?application_id=app_123&q=customer&limit=2 HTTP/1.1
+Host: requests.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Accept: application/json
+~~~
+
+~~~ http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "value": "ent_abc",
+      "label": "Customer Records (Read)",
+      "description": "Read access to customer master data"
+    },
+    {
+      "value": "ent_def",
+      "label": "Customer Records (Write)",
+      "description": "Write access to customer master data",
+      "risk_level": "high"
+    }
+  ],
+  "next_cursor": "eyJvZmZzZXQiOjJ9"
+}
+~~~
+
+## PEP Resolution Rules
+
+A PEP submitting an Access Request based on a form schema with a companion Catalogs Document:
+
+* MUST treat field values resolved from a catalog as opaque identifiers; the value submitted is exactly the value identified by `value_path` in the chosen Catalog Item.
+* MUST resolve every `scope_params` source field before calling the Catalog Endpoint for a dependent field.
+* MUST NOT submit catalog values that were not returned by the Catalog Endpoint with the same scope parameters.
+* SHOULD use `search_param` rather than enumerating large catalogs.
+* MUST treat unknown members of a Catalog Item as informational and MUST NOT rely on them for enforcement.
+* MUST NOT treat `granted` or any other Catalog Item member as an authorization decision.  Such members can only be used to suppress or shape Access Request submission.
+
+## Agent Protocol Catalogs {#catalog-agent-protocol}
+
+Deployments serving agentic PEPs MAY additionally expose catalogs through an agent protocol.  When such a protocol is used, each catalog SHOULD be exposed as a resource whose identifier or URI template encodes the same scope parameters described by `scope_params` (for example, `entitlements://{application_id}`).  Resource read responses SHOULD use the Catalog Response shape defined in this section.
+
+This profile does not define agent-protocol discovery or transport.  When both an HTTP Catalog Endpoint and an agent-protocol catalog are exposed, they MUST return the same Catalog Items for equivalent scope parameters.
 
 # Access Request Endpoint
 
@@ -303,11 +459,17 @@ The request body is a JSON object with the following members:
   * `id`: OPTIONAL.  String.  Stable identifier for the calling application or PEP deployment.
   * `instance_id`: OPTIONAL.  String.  Identifier for a specific running instance of the PEP.
   * `name`: OPTIONAL.  String.  Human-readable name of the calling application.
+  * `source`: OPTIONAL.  Object.  Audit-trail context describing where the request originated.  The following members are defined; implementations MAY include additional members.
+    * `conversation_id`: OPTIONAL.  String.  Identifier of a chat or agent conversation that produced the request.
+    * `external_url`: OPTIONAL.  HTTPS URI.  URL of an external system (ticket, document, dashboard, chat thread) that motivated the request.
+    * `integration_id`: OPTIONAL.  String.  Identifier of an upstream integration or workflow that produced the request.
+
+  The `source` object is supplied for audit correlation.  The Access Request Service MUST NOT rely on `client.source` as authorization input unless the source values are independently verified by the service.
 
 The `denial` object has the following members:
 
 `decision`:
-: REQUIRED.  The denied AuthZEN Decision returned by the PDP, including its Decision Context.
+: REQUIRED.  The denied AuthZEN Decision returned by the PDP, including its Decision Context.  The PEP MAY omit `context.access_request` from the embedded Decision Context when the same object is supplied in `denial.access_request`.
 
 `access_request`:
 : REQUIRED.  The `context.access_request` object from the denied decision.
@@ -317,6 +479,8 @@ The `denial` object has the following members:
 
 `evaluated_at`:
 : OPTIONAL.  {{RFC3339}} timestamp indicating when the denial was produced.
+
+The PEP determines the additional members of the `context` and `requested_access` objects from the JSON Schema referenced by the requestable denial's `form_schema_url`, when present.  Field values that are selected from a backing catalog are resolved according to the Catalogs Document referenced by `form_catalogs_url`; see {{catalog-references}}.
 
 A PEP MUST submit an Access Request only for an AuthZEN Decision with `decision` equal to `false` and `context.access_request.requestable` equal to `true`.
 
@@ -361,13 +525,14 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
     "access_request": {
       "requestable": true,
       "template": "manager_approval",
-      "reason": "manager_approval_required"
+      "reason": "manager_approval_required",
+      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl"
     }
   }
 }
 ~~~
 
-## Access Request Response
+## Access Request Response {#access-request-response}
 
 A successful Access Request submission returns HTTP status code `201 Created` or `202 Accepted` and a JSON object containing a `task` member.  The `task.status_endpoint` member is authoritative for subsequent status retrieval.  A response MAY also include an HTTP `Location` header equal to `task.status_endpoint`.
 
@@ -456,6 +621,23 @@ The following task status values are defined:
 
 Implementations MAY define additional status values.  A PEP that receives an unknown status value MUST treat the task as not approved.
 
+### Mapping Backend States {#status-mapping}
+
+Access Request Services typically maintain richer task lifecycle state than the canonical statuses defined above.  Common backend models include separate fields for open versus closed, processing versus waiting, escalation states, and auto-approval states.  Implementations are expected to collapse such richer state into the canonical statuses for the purpose of the Task Status Endpoint.
+
+The following non-normative mapping illustrates one such collapse and may be used as a starting point:
+
+| Backend state | Canonical status |
+|---|---|
+| Open, awaiting approval or processing | `pending` |
+| Closed, all required approval steps satisfied | `approved` |
+| Closed, an approval step rejected the request | `denied` |
+| Closed, time-bounded request elapsed before completion | `expired` |
+| Closed, requester or administrator stopped the request | `cancelled` |
+| Closed, system error prevented completion | `failed` |
+
+Implementations SHOULD document the mapping they apply so that PEP behavior remains predictable across upgrades and operational changes.
+
 ## Pending Task Response
 
 Non-normative example:
@@ -510,6 +692,8 @@ Content-Type: application/json
 # Completion Semantics {#completion-semantics}
 
 This profile defines three completion modes, identified by `result.mode`: `reevaluate`, `decision`, and `token`.  Implementations MAY define additional completion modes.  A PEP that receives an unknown `result.mode` value MUST treat the task as not approved and MUST NOT permit access on the basis of that result.
+
+Most existing approval, IGA, and ITSM systems map naturally onto Re-evaluation Mode: approval changes state in a backing system, and a subsequent AuthZEN evaluation reflects that state.  Decision Result Mode and Token Result Mode address narrower deployment patterns and are not expected to be supported by every Access Request Service.
 
 ## Re-evaluation Mode
 
@@ -583,7 +767,7 @@ The PEP MAY enforce the returned Decision only if all of the following are true:
 * The current time is at or before `binding.expires_at`.
 * The PEP understands all obligations required for enforcement.
 
-A Decision Result that is not signed using a mechanism agreed between the PEP and Access Request Service relies on the integrity of the transport channel and the trust the PEP places in the Access Request Service.  Deployments requiring stronger integrity SHOULD wrap the result in a JSON Web Signature (JWS) whose payload contains the `binding` and `decision` members; this profile does not mandate a specific signing format.
+A Decision Result that is not signed using a mechanism agreed between the PEP and Access Request Service relies on the integrity of the transport channel and the trust the PEP places in the Access Request Service.  Deployments requiring stronger integrity SHOULD wrap the result in a JSON Web Signature (JWS) {{?RFC7515}} whose payload contains the `binding` and `decision` members; this profile does not mandate a specific signing format.
 
 Non-normative example:
 
@@ -672,6 +856,8 @@ The `callback` object has the following members:
 `events`:
 : OPTIONAL.  Array of event names requested by the PEP.  Defined event names are `approved`, `denied`, `expired`, `cancelled`, and `failed`.
 
+Callback notifications MUST contain a `task` member and MAY contain a `result` member.  When present, the `result` object MUST use one of the completion forms defined in {{completion-semantics}}.
+
 The Access Request Service MUST authenticate to the callback endpoint using a mechanism agreed between the PEP and Access Request Service.  This specification does not mandate a single callback authentication mechanism, but implementations SHOULD use one of the following: an OAuth 2.0 bearer token {{RFC6750}} issued to the Access Request Service, mutual TLS, or an HMAC signature over the request body using a pre-shared key.  Unauthenticated callbacks MUST NOT be accepted.
 
 Callback delivery is a notification optimization.  The Task Status Endpoint remains authoritative unless the callback contains an enforceable completion result under {{completion-semantics}}.
@@ -681,6 +867,7 @@ Non-normative callback example:
 ~~~ http
 POST /callbacks/access-requests HTTP/1.1
 Host: pep.example.com
+Authorization: Bearer mF_9.B5f-4.1JqM
 Content-Type: application/json
 
 {
@@ -721,7 +908,7 @@ A Security Event Token carrying an `access-request-completed` event has the foll
 The event payload is a JSON object with the following members:
 
 `task`:
-: REQUIRED.  A `task` object as defined in {{task-status}}, including the terminal status.
+: REQUIRED.  A Task Handle object as defined in {{access-request-response}}, including the terminal status.
 
 `subject`:
 : RECOMMENDED.  The AuthZEN Subject from the original denied evaluation.
@@ -842,6 +1029,7 @@ A PEP implementing this profile:
 * MUST NOT submit an Access Request unless the denied Decision contains `context.access_request.requestable` set to `true`.
 * MUST use the `endpoint` from the denial context when present; otherwise it MUST use the `access_request_endpoint` from PDP metadata.
 * MUST preserve the Subject, Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.
+* When the requestable denial includes `form_schema_url` or `form_catalogs_url`, MUST construct the augmentations to the submission's `context` and `requested_access` objects according to {{machine-readable-forms}} and {{catalog-references}}.
 * SHOULD include `denial.evaluation_id` when the PDP returned an evaluation identifier.
 * SHOULD include an idempotency key for Access Request submissions.
 * MUST treat a Task Handle as opaque.
@@ -861,7 +1049,10 @@ A PDP implementing this profile:
 * MUST NOT include `context.access_request.requestable=true` unless an Access Request Endpoint is available to process the request.
 * SHOULD include a stable machine-readable reason code when returning a requestable denial.
 * SHOULD include an expiration time or lifetime for the requestable denial hint.
+* MAY include `form_url`, `form_schema_url`, and `form_catalogs_url` in the requestable denial when the Access Request requires additional submission fields beyond those produced by the original AuthZEN evaluation.
+* MUST include `form_schema_url` when including `form_catalogs_url`.
 * SHOULD return a stable evaluation identifier that the PEP can supply as `evaluation_id` when submitting an Access Request, either in the Decision Context or in a response header.
+* When including `context.access_request.request_context`, MUST integrity-protect it using a mechanism the Access Request Service can verify and SHOULD issue it as a JWS in compact serialization.
 * MUST validate approval references presented during re-evaluation.
 * MUST ensure that approval does not override policy conditions that remain mandatory at enforcement time, such as subject status, resource sensitivity, action constraints, environmental risk, and approval expiry.
 
@@ -871,12 +1062,14 @@ An Access Request Service implementing this profile:
 
 * MUST authenticate and authorize the PEP before accepting Access Request submissions.
 * MUST validate that the submission is based on a requestable denial.
+* MUST verify the integrity of any `denial.access_request.request_context` value submitted by the PEP.  When the value is a JWS, the service MUST verify the signature using a key bound to the PDP identity advertised in PDP metadata.  The service MUST reject submissions whose `request_context` integrity cannot be verified or whose claims do not bind to the submitted denial.
 * MUST bind the task to the submitted Subject, Resource, Action, Context, denial, requester, and client.
 * MUST return an opaque Task Handle for accepted requests.
 * SHOULD support idempotent request submission using the `Idempotency-Key` header.
 * MUST expire Access Requests and approvals according to local policy.
-* MUST not return `approved` unless the configured approval workflow has completed successfully.
+* MUST NOT return `approved` unless the configured approval workflow has completed successfully.
 * MUST retain sufficient audit records to reconstruct the request, approval, denial, and completion result.
+* When operating Catalog Endpoints under {{catalog-references}}, MUST authorize callers and MUST return only Catalog Items the caller is permitted to see in the context of the original Subject, Resource, and Action.
 
 # Authorization and Authentication
 
@@ -904,6 +1097,10 @@ The presence of `context.access_request` does not weaken the AuthZEN decision.  
 
 An attacker could attempt to obtain approval for one resource and apply it to another.  Implementations MUST bind Access Requests and approval results to the Subject, Resource, Action, Context, task, and requester.  PDPs MUST validate this binding during re-evaluation.
 
+## Request Context Integrity
+
+The `request_context` member round-trips PDP-issued state through the PEP to the Access Request Service.  Without integrity protection, a buggy or hostile PEP could drop, alter, or fabricate this value to influence approval routing or scope.  PDPs MUST integrity-protect `request_context` using a mechanism the Access Request Service can verify and SHOULD issue it as a JWS so the Access Request Service can prove the value was produced by the PDP and bound to the original denied evaluation.  When the payload contains information that must not be visible to the PEP, the PDP MAY use JWE in addition to integrity protection, for example by encrypting a signed payload.  This is a confused-deputy mitigation: it lets the Access Request Service confirm that the requestable-denial state was issued by the PDP and not fabricated or altered by the PEP.
+
 ## Approval Replay
 
 Approval references and tokens can be replayed if not time-bounded and audience-restricted.  Approval results MUST expire.  Token Result Mode MUST use short-lived, audience-restricted tokens.  Re-evaluation Mode SHOULD bind approval references to the original request tuple.
@@ -911,6 +1108,16 @@ Approval references and tokens can be replayed if not time-bounded and audience-
 ## Overbroad Approval
 
 This profile does not define an approval policy language.  Implementations MUST NOT treat the `template`, `reason`, `requested_access`, or `display` fields as sufficient authorization policy.  Actual approval scope and enforcement semantics are determined by the PDP and Access Request Service.
+
+## Trusting URLs from the Requestable Denial
+
+The `endpoint`, `form_url`, `form_schema_url`, `form_catalogs_url`, and the catalog `endpoint` values inside a Catalogs Document are all delivered to the PEP inside a denial response or document fetched on the basis of that response.  A compromised or misconfigured PDP, or an Access Request Service compelled by one, could direct the PEP at attacker-controlled hosts to harvest justifications, render hostile UI, substitute schemas and catalogs, or perform credential phishing against the requester.
+
+PEPs SHOULD verify that these URLs resolve to hosts trusted under the deployment, typically by requiring the same origin as the Access Request Endpoint advertised in PDP metadata or by maintaining an explicit allowlist of trusted Access Request Service hosts.  PEPs MUST NOT submit credentials to a host that is not trusted to receive them.
+
+## Catalog Disclosure
+
+Catalog Endpoints ({{catalog-references}}) can leak sensitive information about applications, entitlements, organizational structure, or finance master data if not properly authorized.  An attacker who can call a Catalog Endpoint without scoping or authorization can enumerate sensitive identifiers, infer access policy, or harvest catalog metadata.  Catalog Endpoints MUST authorize callers and MUST return only items the caller is permitted to see for the original Subject, Resource, and Action.  Catalog Endpoints SHOULD apply rate limits and abuse detection commensurate with the sensitivity of the catalog they expose.  PEPs SHOULD prefer searching with `search_param` over bulk enumeration.
 
 ## Task Handle Leakage
 
@@ -1052,9 +1259,8 @@ Content-Type: application/json
       "template": "manager_approval",
       "reason": "manager_approval_required",
       "expires_in": 600,
-      "required_fields": {
-        "context": ["business_justification"]
-      }
+      "form_url": "https://requests.example.com/forms/manager_approval",
+      "form_schema_url": "https://requests.example.com/schemas/manager_approval.json"
     }
   }
 }
@@ -1193,7 +1399,7 @@ Content-Type: application/json
 
 # Acknowledgements
 
-TODO.
+The author thanks the OpenID AuthZEN Working Group for discussion and review.
 
 # Document History
 
