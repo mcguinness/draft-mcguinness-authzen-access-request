@@ -84,58 +84,52 @@ Table of Contents
      12.2.  Decision Result Mode
      12.3.  Token Result Mode
    13. Callback Completion
-   14. Shared Signals Framework Binding
-     14.1.  Event Types
-     14.2.  SET Payload
-     14.3.  Stream Management and Delivery
-     14.4.  Relationship to Per-Task Callback
-     14.5.  SSF Binding Discovery
-   15. Error Responses
-   16. Extensibility and Profiles
-     16.1.  Extension Points
-     16.2.  Naming Extensions
-     16.3.  Forward Compatibility
-     16.4.  Profiles
-   17. PEP Processing Rules
-   18. PDP Processing Rules
-   19. Access Request Service Processing Rules
-   20. Authorization and Authentication
-   21. Privacy Considerations
-   22. Security Considerations
-     22.1.  Denial Remains Denial
-     22.2.  Confused Deputy and Request Substitution
-     22.3.  Request Context Integrity
-     22.4.  Approval Replay
-     22.5.  Overbroad Approval
-     22.6.  Trusting URLs from the Requestable Denial
-     22.7.  Catalog Disclosure
-     22.8.  Task Handle Leakage
-     22.9.  Callback Security
-     22.10. Shared Signals Framework Binding Security
-     22.11. PEP Acting on Behalf of the Subject
-     22.12. Idempotency Key Abuse
-     22.13. Availability
-   23. IANA Considerations
-     23.1.  AuthZEN Policy Decision Point Metadata Registry
-     23.2.  AuthZEN Policy Decision Point Capabilities Registry
-     23.3.  AuthZEN Access Request Member Names Registry
-     23.4.  Security Event Type Identifiers Registry
-   24. Examples
-     24.1.  End-to-End Manager Approval
-       24.1.1.  Initial Evaluation Request
-       24.1.2.  Requestable Denial
-       24.1.3.  Submitting the Access Request
-       24.1.4.  Task Handle
-       24.1.5.  Completed Task
-       24.1.6.  Re-evaluation After Approval
-       24.1.7.  Final Decision
-   25. References
-     25.1.  Normative References
-     25.2.  Informative References
+   14. Error Responses
+   15. Extensibility and Profiles
+     15.1.  Extension Points
+     15.2.  Naming Extensions
+     15.3.  Forward Compatibility
+     15.4.  Profiles
+   16. PEP Processing Rules
+   17. PDP Processing Rules
+   18. Access Request Service Processing Rules
+   19. Authorization and Authentication
+   20. Privacy Considerations
+   21. Security Considerations
+     21.1.  Denial Remains Denial
+     21.2.  Confused Deputy and Request Substitution
+     21.3.  Request Context Integrity
+     21.4.  Approval Replay
+     21.5.  Overbroad Approval
+     21.6.  Trusting URLs from the Requestable Denial
+     21.7.  Catalog Disclosure
+     21.8.  Task Handle Leakage
+     21.9.  Callback Security
+     21.10. PEP Acting on Behalf of the Subject
+     21.11. Idempotency Key Abuse
+     21.12. Availability
+   22. IANA Considerations
+     22.1.  AuthZEN Policy Decision Point Metadata Registry
+     22.2.  AuthZEN Policy Decision Point Capabilities Registry
+     22.3.  AuthZEN Access Request Member Names Registry
+   23. Examples
+     23.1.  End-to-End Manager Approval
+       23.1.1.  Initial Evaluation Request
+       23.1.2.  Requestable Denial
+       23.1.3.  Submitting the Access Request
+       23.1.4.  Task Handle
+       23.1.5.  Completed Task
+       23.1.6.  Re-evaluation After Approval
+       23.1.7.  Final Decision
+   24. References
+     24.1.  Normative References
+     24.2.  Informative References
    Appendix A.  Implementation Considerations
      A.1.  Identity Governance and Approval Platforms
-     A.2.  Form and Catalog Translation
-     A.3.  Notification Channels
+     A.2.  Subjects, Principals, and Actors
+     A.3.  Form and Catalog Translation
+     A.4.  Notification Channels
+     A.5.  Approval Volume and Workflow Design
    Appendix B.  Acknowledgements
    Appendix C.  Document History
    Author's Address
@@ -147,16 +141,23 @@ Table of Contents
    perform an Action on a Resource within a Context.  The PDP returns a
    Decision indicating whether the operation is allowed or denied.
 
-   Many real-world authorization systems require a remediation path when
-   access is denied.  For example, a user may be denied access to a
-   customer record because manager approval is required, or a machine
-   workload may be denied a privileged operation until a change-control
-   task is approved.  Without an interoperable protocol surface, PEPs
-   commonly fall back to non-standard user-interface messages, out-of-
-   band tickets, or vendor-specific governance integrations.
+   When a Decision is denied but the access can be approved through some
+   workflow, real-world systems require a remediation path that returns
+   control to the PEP once approval lands.  This need is most visible in
+   modern deployments where autonomous callers (such as AI agents
+   discovering tool permissions at runtime, or OAuth Authorization
+   Servers issuing fine-grained access tokens to fleets of clients) may
+   produce hundreds of denials that all need to route to a centralized
+   human-in-the-loop approval mechanism.  The same need arises in long-
+   standing patterns: gateways and brokers requesting just-in-time
+   access on behalf of users, Security Token Services issuing scoped
+   tokens, and SaaS applications and APIs surfacing approval prompts to
+   end users.  Without an interoperable protocol surface, PEPs commonly
+   fall back to non-standard user-interface messages, out-of-band
+   tickets, or vendor-specific governance integrations.
 
    This profile defines a narrow, interoperable mechanism for
-   requestable denials:
+   requestable denials.  The flow is:
 
    1.  The PEP evaluates access using the AuthZEN Access Evaluation API.
 
@@ -179,7 +180,9 @@ Table of Contents
    approval policy language, ticketing system, entitlement catalog, or
    user interface.  Those capabilities remain behind the PDP or Access
    Request Service.  The purpose of this profile is to standardize the
-   handoff between authorization enforcement and approval workflow.
+   handoff between authorization enforcement and approval workflow so
+   that PEPs of any type can route denials to a centralized approval
+   mechanism through a uniform interface.
 
 2.  Requirements Notation and Conventions
 
@@ -199,7 +202,17 @@ Table of Contents
 
    *  Preserve the AuthZEN allow/deny decision model.
 
-   *  Make requestability explicit and machine-readable.
+   *  Provide an interoperable interface for any PEP to route denied
+      access to a centralized human-in-the-loop approval mechanism.
+
+   *  Support high request volume from autonomous callers by combining a
+      uniform per-denial submission shape with workflow patterns at the
+      Access Request Service that absorb volume (broad-scope approvals,
+      auto-approval, pre-approval, bulk approval).
+
+   *  Make requestability explicit and machine-readable so autonomous
+      PEPs can construct a conformant submission without human
+      intervention.
 
    *  Provide an opaque task handle suitable for asynchronous approval
       workflows.
@@ -274,10 +287,10 @@ Table of Contents
    context.access_request.
 
    The Access Request Service MAY additionally publish lifecycle events
-   for governance, audit, and analytics consumers using the OPTIONAL
-   Shared Signals Framework binding defined in Section 14.  That channel
-   is independent of the per-task callback and is not used for
-   enforcement.
+   for governance, audit, and analytics consumers through deployment-
+   level event subscriptions defined by companion specifications.  Such
+   channels are independent of the per-task callback and are not used
+   for enforcement.
 
 6.  Discovery
 
@@ -297,14 +310,9 @@ Table of Contents
      "access_evaluations_endpoint": "https://pdp.example.com/access/v1/evaluations",
      "access_request_endpoint": "https://pdp.example.com/access/v1/requests",
      "capabilities": [
-       "urn:openid:authzen:capability:access-request",
-       "urn:openid:authzen:capability:access-request-ssf"
+       "urn:openid:authzen:capability:access-request"
      ]
    }
-
-   The access-request-ssf capability is OPTIONAL and is included only
-   when the deployment supports the Shared Signals Framework binding
-   (Section 14).
 
    The access_request_endpoint MAY be hosted by the PDP or by another
    service trusted by the PDP.  When hosted by another service, the PDP
@@ -701,7 +709,8 @@ Table of Contents
 
       *  denial: OPTIONAL.  Per-item denial binding when items came from
          separate AuthZEN evaluations.  When omitted, the top-level
-         denial applies to the item.
+         denial applies to the item.  A per-item denial uses the same
+         members as the top-level denial object.
 
    context:  OPTIONAL.  The AuthZEN Context from the denied evaluation,
       augmented with submission-time fields such as business
@@ -720,7 +729,7 @@ Table of Contents
       entitlement, or requested scope.  This object does not define
       policy semantics and is interpreted by the Access Request Service.
       The following well-known optional members are defined; additional
-      members MAY be included subject to Section 16.2:
+      members MAY be included subject to Section 15.2:
 
       *  requested_duration: String.  ISO 8601 duration (for example,
          PT4H or P30D) requesting time-bounded access.
@@ -925,8 +934,10 @@ Table of Contents
       endpoint.
 
    progress:  OPTIONAL.  Object describing approval workflow progress
-      for tasks with multi-step approvals.  The following members are
-      defined:
+      for tasks with multi-step approvals.  When items is present,
+      progress describes aggregate workflow progress for the bundled
+      task; per-item progress is tracked in task.items[].  The following
+      members are defined:
 
       *  current_step: OPTIONAL.  Integer.  One-based index of the step
          currently in progress.
@@ -939,7 +950,7 @@ Table of Contents
 
       *  awaiting: OPTIONAL.  Array.  Identifiers of approvers whose
          action is currently expected.  Implementations SHOULD apply
-         privacy controls before populating this member; see Section 21.
+         privacy controls before populating this member; see Section 20.
 
    expires_at:  OPTIONAL.  [RFC3339] timestamp after which the task
       handle is no longer valid.
@@ -1229,6 +1240,26 @@ Table of Contents
    OAuth Authorization Server issuing access tokens) MUST bound the
    lifetime of those credentials by the approval expiry.
 
+   When the original submission carried an items array, the PEP re-
+   evaluates each item separately using the per-item
+   task.items[].result.approval_context; this profile does not define an
+   aggregate re-evaluation that covers multiple items in one AuthZEN
+   call.
+
+   Approval results in this mode typically cover a class of future
+   evaluations rather than a single submission.  An approval that grants
+   the requester an entitlement, role, scope, or other persistent state
+   causes subsequent AuthZEN evaluations matching that state to succeed
+   without further Access Requests.  Deployments serving high-volume
+   callers, such as autonomous agents that discover and request many
+   fine-grained permissions over time, rely on this property: a single
+   broad-scope approval (for example, one that grants access to a class
+   of resources for a defined duration) reduces the number of denial-
+   and-approval cycles by orders of magnitude.  Approval workflow policy
+   at the Access Request Service determines how broad an approval
+   grants; this profile does not constrain that policy beyond the
+   integrity, expiry, and audit requirements stated elsewhere.
+
    Non-normative re-evaluation request:
 
    {
@@ -1314,6 +1345,12 @@ Table of Contents
    result in a JSON Web Signature (JWS) [RFC7515] whose payload contains
    the binding and decision members; this profile does not mandate a
    specific signing format.
+
+   When the original submission carried an items array, per-item
+   bindings appear in task.items[].result.binding rather than in a top-
+   level result.binding.  Each per-item binding has the same shape as
+   the binding object defined above, with subject, resource, and action
+   carrying the per-item values from the submission.
 
    Non-normative example:
 
@@ -1428,13 +1465,14 @@ Table of Contents
 
    Implementations MAY satisfy completion notification through
    deployment-level event subscriptions (for example, organization-
-   scoped webhooks or the Shared Signals Framework binding defined in
-   Section 14) rather than per-task callbacks.  When a deployment relies
-   on such a subscription, the PEP MAY omit the callback member from the
-   Access Request submission.  Deployment-level event subscriptions
-   deliver the same Task Handle and lifecycle information to subscribed
-   receivers; they are a notification channel and MUST NOT be treated as
-   enforcement unless paired with a separate enforceable result.
+   scoped webhooks or event-streaming bindings defined by companion
+   specifications) rather than per-task callbacks.  When a deployment
+   relies on such a subscription, the PEP MAY omit the callback member
+   from the Access Request submission.  Deployment-level event
+   subscriptions deliver the same Task Handle and lifecycle information
+   to subscribed receivers; they are a notification channel and MUST NOT
+   be treated as enforcement unless paired with a separate enforceable
+   result.
 
    Non-normative callback example:
 
@@ -1452,142 +1490,7 @@ Table of Contents
      }
    }
 
-14.  Shared Signals Framework Binding
-
-   This section defines an OPTIONAL binding that publishes Access
-   Request lifecycle events using the OpenID Shared Signals Framework
-   [SSF] and Security Event Tokens [RFC8417].
-
-   The SSF binding does not replace the per-task callback defined in
-   Section 13.  The callback addresses synchronous correlation between a
-   single PEP and the Access Request task it submitted.  The SSF binding
-   addresses fan-out to governance, audit, analytics, and operations
-   consumers that need to observe Access Request activity across many
-   submissions and submitters.
-
-14.1.  Event Types
-
-   This profile defines the following SET event type:
-
-   urn:openid:authzen:event:access-request-completed:  Emitted when an
-      Access Request reaches a terminal status (approved, denied,
-      expired, cancelled, or failed).
-
-   Implementations MAY define additional event types for non-terminal
-   transitions, such as submission, assignment, or escalation.
-   Receivers MUST ignore SET event types that they do not recognize.
-
-14.2.  SET Payload
-
-   A Security Event Token carrying an access-request-completed event has
-   the following structure:
-
-   *  iss — the issuer identifier of the Access Request Service.
-
-   *  aud — the intended receiver of the event.
-
-   *  iat — the time the event was issued.
-
-   *  jti — a unique identifier for the SET.
-
-   *  events — a JSON object whose member name is the event type URN and
-      whose member value is the event payload.
-
-   The event payload is a JSON object with the following members:
-
-   task:  REQUIRED.  A Task Handle object as defined in Section 10.2,
-      including the terminal status.
-
-   subject:  RECOMMENDED.  The AuthZEN Subject from the original denied
-      evaluation.
-
-   resource:  RECOMMENDED.  The AuthZEN Resource from the original
-      denied evaluation.
-
-   action:  RECOMMENDED.  The AuthZEN Action from the original denied
-      evaluation.
-
-   evaluation_id:  OPTIONAL.  The evaluation identifier from the
-      original denied evaluation, when available.
-
-   result:  OPTIONAL.  A completion result object as defined in
-      Section 12.  A receiver MUST NOT enforce a result carried in a SET
-      as an authorization decision; SET delivery is a notification
-      channel, not an enforcement channel.  Receivers requiring an
-      enforceable result MUST obtain it from the Task Status Endpoint or
-      from a per-task callback.
-
-   Non-normative example:
-
-   {
-     "iss": "https://pdp.example.com",
-     "aud": "https://audit.example.com",
-     "iat": 1714508520,
-     "jti": "set_01HX4Y9V3ZJ9C2X7K8M0N1P2Q3",
-     "events": {
-       "urn:openid:authzen:event:access-request-completed": {
-         "task": {
-           "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-           "status": "approved"
-         },
-         "subject": {
-           "type": "user",
-           "id": "alice@example.com"
-         },
-         "resource": {
-           "type": "document",
-           "id": "q4-plan"
-         },
-         "action": {
-           "name": "can_read"
-         },
-         "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
-         "result": {
-           "mode": "reevaluate",
-           "approval": {
-             "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
-             "approved_until": "2026-05-01T00:42:00Z"
-           }
-         }
-       }
-     }
-   }
-
-14.3.  Stream Management and Delivery
-
-   Stream configuration, verification, and delivery (push or poll)
-   follow [SSF].  The Access Request Service acts as an SSF Transmitter;
-   consumers act as SSF Receivers.  Receivers verify SET signatures
-   using keys discovered through the Transmitter's configuration
-   metadata.
-
-14.4.  Relationship to Per-Task Callback
-
-   A deployment MAY support the per-task callback (Section 13), the SSF
-   binding, both, or neither.  When both are supported:
-
-   *  The same Access Request lifecycle event MAY be delivered through
-      both channels.
-
-   *  Receivers MUST NOT assume ordering between callback delivery and
-      SET delivery.
-
-   *  A result member that is enforceable under Section 12 MAY appear in
-      the per-task callback.  An equivalent result carried in a SET is a
-      notification only and MUST NOT be enforced by the receiver.
-
-14.5.  SSF Binding Discovery
-
-   A PDP supporting the SSF binding SHOULD include the following
-   capability URN in PDP metadata:
-
-   urn:openid:authzen:capability:access-request-ssf
-
-   When present, the PDP metadata SHOULD also identify the SSF
-   Transmitter configuration endpoint that publishes Access Request
-   events, using the discovery mechanism defined by [SSF].
-
-15.  Error Responses
+14.  Error Responses
 
    HTTP error responses from the Access Request Endpoint and Task Status
    Endpoint SHOULD use application/problem+json as defined by [RFC9457].
@@ -1631,7 +1534,7 @@ Table of Contents
      "detail": "The denied decision did not contain context.access_request.requestable=true."
    }
 
-16.  Extensibility and Profiles
+15.  Extensibility and Profiles
 
    This specification defines a base wire format.  Several of its
    objects are intentionally extensible so that profiles, deployments,
@@ -1639,7 +1542,7 @@ Table of Contents
    protocols, governance platforms, and request user interfaces without
    breaking interoperability.
 
-16.1.  Extension Points
+15.1.  Extension Points
 
    Additional members beyond those defined in this document MAY appear
    at the following locations.  No other object members may be extended
@@ -1670,19 +1573,16 @@ Table of Contents
 
    *  New values for result.mode (Section 12).
 
-   *  New event types for the Shared Signals Framework binding
+   *  New problem types for [RFC9457]-style error responses
       (Section 14).
 
-   *  New problem types for [RFC9457]-style error responses
-      (Section 15).
-
-16.2.  Naming Extensions
+15.2.  Naming Extensions
 
    A member name or value added at an extension point MUST be one of the
    following:
 
    1.  A name registered in the AuthZEN Access Request Member Names
-       registry (Section 23.3).  Registry-eligible names are short,
+       registry (Section 22.3).  Registry-eligible names are short,
        lowercase, snake_case identifiers carrying semantics that are
        useful across multiple implementations.
 
@@ -1694,15 +1594,15 @@ Table of Contents
        vendor.example.com/foo) when the member is private to a single
        deployment and not intended for cross-implementation use.
 
-16.3.  Forward Compatibility
+15.3.  Forward Compatibility
 
    An implementation receiving a member or value it does not recognize
    at an extension point MUST ignore it and MUST NOT fail processing on
    the basis of the unrecognized name.  An implementation MAY surface
    unrecognized members in audit records or pass them through unchanged
-   when echoing wire content (for example, in callbacks or SSF events).
+   when echoing wire content (for example, in callbacks).
 
-16.4.  Profiles
+15.4.  Profiles
 
    A profile of this specification is a separate document that defines a
    coherent set of extensions for a particular use case.  Examples
@@ -1719,7 +1619,7 @@ Table of Contents
       enumerated values it introduces.
 
    *  Register registry-eligible names in the AuthZEN Access Request
-      Member Names registry (Section 23.3) or in the relevant
+      Member Names registry (Section 22.3) or in the relevant
       enumeration registry.
 
    *  Define semantics, validation rules, and any normative requirements
@@ -1733,7 +1633,7 @@ Table of Contents
    profile's registered or namespaced members; this specification does
    not require declarative profile negotiation.
 
-17.  PEP Processing Rules
+16.  PEP Processing Rules
 
    A PEP implementing this profile:
 
@@ -1784,7 +1684,7 @@ Table of Contents
    *  SHOULD re-evaluate access after approval unless the deployment
       explicitly supports Decision Result Mode or Token Result Mode.
 
-18.  PDP Processing Rules
+17.  PDP Processing Rules
 
    A PDP implementing this profile:
 
@@ -1822,7 +1722,7 @@ Table of Contents
       resource sensitivity, action constraints, environmental risk, and
       approval expiry.
 
-19.  Access Request Service Processing Rules
+18.  Access Request Service Processing Rules
 
    An Access Request Service implementing this profile:
 
@@ -1862,11 +1762,14 @@ Table of Contents
       to see in the context of the original Subject, Resource, and
       Action.
 
-20.  Authorization and Authentication
+19.  Authorization and Authentication
 
    The Access Request Endpoint and Task Status Endpoint are protected
    APIs.  Support for OAuth 2.0 [RFC6749] is RECOMMENDED.  When OAuth
    2.0 bearer tokens are used, the endpoints MUST follow [RFC6750].
+   Catalog Endpoints (Section 9) and the Cancellation endpoint
+   (Section 11.4) are similarly protected; their authorization rules are
+   defined in their respective sections.
 
    The Access Request Service MUST authenticate the PEP or caller before
    accepting a submission or returning task status.  The service MUST
@@ -1877,7 +1780,7 @@ Table of Contents
    identities, policy identifiers, or resource metadata to a caller that
    is not authorized to receive them.
 
-21.  Privacy Considerations
+20.  Privacy Considerations
 
    Access Requests may contain sensitive information, including user
    identifiers, resource identifiers, business justifications, approval
@@ -1893,23 +1796,23 @@ Table of Contents
    Approval records SHOULD be retained only as long as required by
    business, security, and compliance policy.
 
-22.  Security Considerations
+21.  Security Considerations
 
-22.1.  Denial Remains Denial
+21.1.  Denial Remains Denial
 
    The presence of context.access_request does not weaken the AuthZEN
    decision.  A PEP MUST NOT grant access based on a requestable denial.
    Access is permitted only after an approved completion result is
    enforced according to this profile.
 
-22.2.  Confused Deputy and Request Substitution
+21.2.  Confused Deputy and Request Substitution
 
    An attacker could attempt to obtain approval for one resource and
    apply it to another.  Implementations MUST bind Access Requests and
    approval results to the Subject, Resource, Action, Context, task, and
    requester.  PDPs MUST validate this binding during re-evaluation.
 
-22.3.  Request Context Integrity
+21.3.  Request Context Integrity
 
    The request_context member round-trips PDP-issued state through the
    PEP to the Access Request Service.  Without integrity protection, a
@@ -1925,14 +1828,14 @@ Table of Contents
    Service confirm that the requestable-denial state was issued by the
    PDP and not fabricated or altered by the PEP.
 
-22.4.  Approval Replay
+21.4.  Approval Replay
 
    Approval references and tokens can be replayed if not time-bounded
    and audience-restricted.  Approval results MUST expire.  Token Result
    Mode MUST use short-lived, audience-restricted tokens.  Re-evaluation
    Mode SHOULD bind approval references to the original request tuple.
 
-22.5.  Overbroad Approval
+21.5.  Overbroad Approval
 
    This profile does not define an approval policy language.
    Implementations MUST NOT treat the template, reason,
@@ -1940,7 +1843,7 @@ Table of Contents
    policy.  Actual approval scope and enforcement semantics are
    determined by the PDP and Access Request Service.
 
-22.6.  Trusting URLs from the Requestable Denial
+21.6.  Trusting URLs from the Requestable Denial
 
    The endpoint, form_url, form_schema_url, form_catalogs_url, and the
    catalog endpoint values inside a Catalogs Document are all delivered
@@ -1958,7 +1861,7 @@ Table of Contents
    MUST NOT submit credentials to a host that is not trusted to receive
    them.
 
-22.7.  Catalog Disclosure
+21.7.  Catalog Disclosure
 
    Catalog Endpoints (Section 9) can leak sensitive information about
    applications, entitlements, organizational structure, or finance
@@ -1972,7 +1875,7 @@ Table of Contents
    expose.  PEPs SHOULD prefer searching with search_param over bulk
    enumeration.
 
-22.8.  Task Handle Leakage
+21.8.  Task Handle Leakage
 
    Task handles can reveal workflow state or be used to poll for
    sensitive information.  Task handles MUST be opaque, unguessable, and
@@ -1980,7 +1883,7 @@ Table of Contents
    handle MUST NOT be sufficient to retrieve task status without caller
    authorization.
 
-22.9.  Callback Security
+21.9.  Callback Security
 
    Callback endpoints can be abused for spoofing, replay, and request
    forgery.  Callback notifications MUST be authenticated.  PEPs SHOULD
@@ -1988,20 +1891,7 @@ Table of Contents
    and state values, and treat callbacks as notifications unless they
    contain an enforceable result under this profile.
 
-22.10.  Shared Signals Framework Binding Security
-
-   When the SSF binding (Section 14) is used, SETs carry information
-   about denied evaluations, approval outcomes, subjects, and resources.
-   Transmitters MUST authorize Receivers before delivering events and
-   MUST NOT broadcast events to Receivers that are not entitled to
-   observe the affected Subject, Resource, or Action.  Receivers MUST
-   validate SET signatures and MUST reject SETs whose iss does not match
-   the configured Transmitter for the stream.  A SET delivered by the
-   SSF binding MUST NOT be treated as an enforceable authorization
-   decision; the Task Status Endpoint or per-task callback remains
-   authoritative for enforcement.
-
-22.11.  PEP Acting on Behalf of the Subject
+21.10.  PEP Acting on Behalf of the Subject
 
    A PEP submitting an Access Request typically acts on behalf of the
    Subject identified in the original AuthZEN evaluation.  The Access
@@ -2013,22 +1903,22 @@ Table of Contents
    [RFC8693] so the PEP presents a token that names the Subject as the
    on-behalf-of party.
 
-22.12.  Idempotency Key Abuse
+21.11.  Idempotency Key Abuse
 
    Idempotency keys can be used to correlate requests.  Implementations
    SHOULD scope idempotency keys to the authenticated caller and avoid
    storing them longer than necessary.
 
-22.13.  Availability
+21.12.  Availability
 
    Approval workflows can introduce latency and dependency on external
    systems.  PEPs SHOULD fail closed when task status cannot be
    determined.  Access Request Services SHOULD apply rate limits and
    abuse detection to request submission and polling endpoints.
 
-23.  IANA Considerations
+22.  IANA Considerations
 
-23.1.  AuthZEN Policy Decision Point Metadata Registry
+22.1.  AuthZEN Policy Decision Point Metadata Registry
 
    This specification requests registration of the following PDP
    metadata parameter in the AuthZEN Policy Decision Point Metadata
@@ -2043,7 +1933,7 @@ Table of Contents
 
    Specification Document:  This document.
 
-23.2.  AuthZEN Policy Decision Point Capabilities Registry
+22.2.  AuthZEN Policy Decision Point Capabilities Registry
 
    This specification requests registration of the following PDP
    capabilities in the AuthZEN Policy Decision Point Capabilities
@@ -2061,30 +1951,18 @@ Table of Contents
 
    Specification Document:  This document.
 
-   Capability Name:  access-request-ssf
-
-   Capability URN:  urn:openid:authzen:capability:access-request-ssf
-
-   Capability Description:  Indicates that the PDP or Access Request
-      Service publishes Access Request lifecycle events using the Shared
-      Signals Framework binding defined by this specification.
-
-   Change Controller:  OpenID Foundation AuthZEN Working Group
-
-   Specification Document:  This document.
-
-23.3.  AuthZEN Access Request Member Names Registry
+22.3.  AuthZEN Access Request Member Names Registry
 
    This specification requests creation of a new registry: the AuthZEN
    Access Request Member Names registry.
 
    The registry tracks well-known member names that may appear at the
-   extension points defined in Section 16.  Registration policy is
+   extension points defined in Section 15.  Registration policy is
    Specification Required.  Each entry has the following fields:
 
    Name:  The member name as it appears on the wire.
 
-   Extension Point:  One of the extension points listed in Section 16.
+   Extension Point:  One of the extension points listed in Section 15.
 
    Description:  A short description of the member's semantics.
 
@@ -2160,28 +2038,11 @@ Table of Contents
    Working Group.  Specification Document for all initial entries: This
    document.
 
-23.4.  Security Event Type Identifiers Registry
+23.  Examples
 
-   This specification requests registration of the following event type
-   in the IANA "Security Event Type Identifiers" registry established by
-   [RFC8417].
+23.1.  End-to-End Manager Approval
 
-   Name:  AuthZEN Access Request Completed
-
-   URI:  urn:openid:authzen:event:access-request-completed
-
-   Description:  Indicates that an AuthZEN Access Request has reached a
-      terminal status.
-
-   Change Controller:  OpenID Foundation AuthZEN Working Group
-
-   Specification Document:  This document.
-
-24.  Examples
-
-24.1.  End-to-End Manager Approval
-
-24.1.1.  Initial Evaluation Request
+23.1.1.  Initial Evaluation Request
 
    POST /access/v1/evaluation HTTP/1.1
    Host: pdp.example.com
@@ -2205,7 +2066,7 @@ Table of Contents
      }
    }
 
-24.1.2.  Requestable Denial
+23.1.2.  Requestable Denial
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -2227,7 +2088,7 @@ Table of Contents
      }
    }
 
-24.1.3.  Submitting the Access Request
+23.1.3.  Submitting the Access Request
 
    POST /access/v1/requests HTTP/1.1
    Host: pdp.example.com
@@ -2268,7 +2129,7 @@ Table of Contents
      }
    }
 
-24.1.4.  Task Handle
+23.1.4.  Task Handle
 
    HTTP/1.1 202 Accepted
    Content-Type: application/json
@@ -2283,7 +2144,7 @@ Table of Contents
      }
    }
 
-24.1.5.  Completed Task
+23.1.5.  Completed Task
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -2305,7 +2166,7 @@ Table of Contents
      }
    }
 
-24.1.6.  Re-evaluation After Approval
+23.1.6.  Re-evaluation After Approval
 
    POST /access/v1/evaluation HTTP/1.1
    Host: pdp.example.com
@@ -2332,7 +2193,7 @@ Table of Contents
      }
    }
 
-24.1.7.  Final Decision
+23.1.7.  Final Decision
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -2347,9 +2208,9 @@ Table of Contents
      }
    }
 
-25.  References
+24.  References
 
-25.1.  Normative References
+24.1.  Normative References
 
    [AuthZEN]  Gazitt, O., Brossard, D., and A. Tulshibagwale,
               "Authorization API 1.0", 29 April 2026,
@@ -2399,11 +2260,6 @@ Table of Contents
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
 
-   [RFC8417]  Hunt, P., Ed., Jones, M., Denniss, W., and M. Ansari,
-              "Security Event Token (SET)", RFC 8417,
-              DOI 10.17487/RFC8417, July 2018,
-              <https://www.rfc-editor.org/rfc/rfc8417>.
-
    [RFC9110]  Fielding, R., Ed., Nottingham, M., Ed., and J. Reschke,
               Ed., "HTTP Semantics", STD 97, RFC 9110,
               DOI 10.17487/RFC9110, June 2022,
@@ -2413,12 +2269,14 @@ Table of Contents
               for HTTP APIs", RFC 9457, DOI 10.17487/RFC9457, July 2023,
               <https://www.rfc-editor.org/rfc/rfc9457>.
 
-   [SSF]      Tulshibagwale, A., Cappalli, T., Scurtescu, M., Backman,
-              A., and J. Bradley, "OpenID Shared Signals Framework
-              Specification 1.0", 2024, <https://openid.net/specs/
-              openid-sharedsignals-framework-1_0.html>.
+24.2.  Informative References
 
-25.2.  Informative References
+   [I-D.mcguinness-oauth-actor-profile]
+              McGuinness, K., "OAuth Actor Profile for Delegation", Work
+              in Progress, Internet-Draft, draft-mcguinness-oauth-actor-
+              profile-00, 30 April 2026,
+              <https://datatracker.ietf.org/doc/html/draft-mcguinness-
+              oauth-actor-profile-00>.
 
    [RFC6901]  Bryan, P., Ed., Zyp, K., and M. Nottingham, Ed.,
               "JavaScript Object Notation (JSON) Pointer", RFC 6901,
@@ -2482,7 +2340,31 @@ A.1.  Identity Governance and Approval Platforms
    provisioning changes platform state, and a subsequent AuthZEN
    evaluation reflects that state.
 
-A.2.  Form and Catalog Translation
+A.2.  Subjects, Principals, and Actors
+
+   For deployments where an autonomous actor (an AI agent, service, or
+   workload) submits Access Requests on behalf of a human or
+   organizational principal, the AuthZEN Subject needs to convey both
+   identities so the PDP and Access Request Service can apply policy and
+   route approvals on either.
+
+   This profile does not define a Subject shape for actor delegation.
+   Implementations SHOULD follow the conventions defined in
+   [I-D.mcguinness-oauth-actor-profile], which standardizes an act claim
+   representing the immediate actor with required act.sub and act.iss
+   members and a RECOMMENDED sub_profile member (taking values such as
+   ai_agent, service, or user).  Nested act objects represent delegation
+   chains.  Under this profile, an Access Request submission's subject
+   carries the principal, and the actor is conveyed as an act claim or
+   equivalent member; the canonical actor identifier is the (act.iss,
+   act.sub) pair.
+
+   Approval routing at the Access Request Service may consider both
+   identities (the principal's owner and the actor's deployment).  This
+   profile does not define routing policy; it only requires that the
+   necessary identities be representable in the submission.
+
+A.3.  Form and Catalog Translation
 
    Most existing platforms have proprietary form description languages
    with field types beyond JSON Schema's native vocabulary, and
@@ -2494,13 +2376,50 @@ A.2.  Form and Catalog Translation
    form_url, while the JSON Schema and Catalogs Document provide enough
    information for an autonomous PEP.
 
-A.3.  Notification Channels
+A.4.  Notification Channels
 
    Implementations frequently already have webhook subscriptions or
    other deployment-level event channels.  Per-task callbacks
    (Section 13) are an alternative; deployments may rely on existing
-   webhook infrastructure or the Shared Signals Framework binding
-   (Section 14) for completion notification.
+   webhook infrastructure or event-streaming bindings defined by
+   companion specifications for completion notification.
+
+A.5.  Approval Volume and Workflow Design
+
+   When the calling population includes high-volume PEPs (gateways
+   aggregating many users, OAuth Authorization Servers serving fleets of
+   clients, or autonomous agents that discover and request many fine-
+   grained permissions), the protocol's per-denial submission shape is
+   sufficient on the wire but must be paired with Access Request Service
+   workflow design that does not require human approval for every
+   submission.  Without such design, approval volume overwhelms
+   approvers and the deployment is unusable at scale.
+
+   Common workflow patterns that absorb volume include:
+
+   *  Auto-approval rules that resolve low-risk requests synchronously,
+      returning 201 Created with a populated result and never engaging a
+      human approver (see Section 10.2).
+
+   *  Broad-scope approvals that grant a class of future evaluations
+      from a single human decision (for example, "approve agent X to
+      call tool Y for the next 30 days"), so subsequent same-class
+      submissions either auto-approve or are unnecessary because re-
+      evaluation already permits the access.
+
+   *  Bulk approval, where an approver acts on a batch of related
+      submissions in a single workflow step.
+
+   *  Pre-approval or standing grants established out of band (for
+      example, when an agent is provisioned), so the caller never
+      reaches a denial that requires interactive approval.
+
+   This profile defines the substrate; it does not define approval
+   workflow.  The Access Request Service is responsible for implementing
+   the workflow primitives that prevent approval volume from
+   overwhelming approvers.  The protocol's bulk submission, idempotency,
+   synchronous-approval response, and approval-expiry semantics provide
+   the inputs an Access Request Service needs to apply these patterns.
 
 Appendix B.  Acknowledgements
 
@@ -2509,9 +2428,19 @@ Appendix B.  Acknowledgements
 
 Appendix C.  Document History
 
-   -00  Initial version defining requestable denials, the Access Request
-      Endpoint, task handles, task completion, re-evaluation, the
-      optional Shared Signals Framework binding, and registry additions.
+   -00  Initial version.  Defines requestable denials, the Access
+      Request Endpoint, Task Handles, Task Status Endpoint, three
+      completion modes (re-evaluation, decision result, token result),
+      per-task callbacks, machine-readable form schemas, sibling
+      Catalogs Document and Catalog Endpoint protocol, integrity-
+      protected request_context, bulk submission with per-item progress,
+      multi-step progress reporting, PEP-initiated cancellation,
+      synchronous-completion response, the Extensibility and Profiles
+      framework with the AuthZEN Access Request Member Names registry,
+      an Implementation Considerations appendix covering identity
+      governance platforms, subjects/principals/actors, form and catalog
+      translation, notification channels, and approval-volume workflow
+      design, and PDP / PEP / Access Request Service processing rules.
 
 Author's Address
 
