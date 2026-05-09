@@ -109,21 +109,22 @@ Table of Contents
      21.11. Idempotency Key Abuse
      21.12. Availability
    22. IANA Considerations
-     22.1.  AuthZEN Policy Decision Point Metadata Registry
-     22.2.  AuthZEN Policy Decision Point Capabilities Registry
-     22.3.  AuthZEN Access Request Member Names Registry
-   23. Examples
-     23.1.  End-to-End Manager Approval
-       23.1.1.  Initial Evaluation Request
-       23.1.2.  Requestable Denial
-       23.1.3.  Submitting the Access Request
-       23.1.4.  Task Handle
-       23.1.5.  Completed Task
-       23.1.6.  Re-evaluation After Approval
-       23.1.7.  Final Decision
-   24. References
-     24.1.  Normative References
-     24.2.  Informative References
+   23. OpenID Foundation Registry Considerations
+     23.1.  AuthZEN Policy Decision Point Metadata Registry
+     23.2.  AuthZEN Policy Decision Point Capabilities Registry
+     23.3.  AuthZEN Access Request Member Names Registry
+   24. Examples
+     24.1.  End-to-End Manager Approval
+       24.1.1.  Initial Evaluation Request
+       24.1.2.  Requestable Denial
+       24.1.3.  Submitting the Access Request
+       24.1.4.  Task Handle
+       24.1.5.  Completed Task
+       24.1.6.  Re-evaluation After Approval
+       24.1.7.  Final Decision
+   25. References
+     25.1.  Normative References
+     25.2.  Informative References
    Appendix A.  Implementation Considerations
      A.1.  Identity Governance and Approval Platforms
      A.2.  Subjects, Principals, and Actors
@@ -356,15 +357,23 @@ Table of Contents
       to the Access Request Service when submitting the access request.
       The PEP MUST NOT decode, modify, or interpret this value.  The PEP
       returns it unchanged inside denial.access_request.request_context
-      when submitting the Access Request (Section 10.1).  The value MUST
-      be integrity protected in a way the Access Request Service can
-      verify, and SHOULD be a JSON Web Signature (JWS) [RFC7515] in
-      compact serialization, signed by the PDP, with a payload (such as
-      a JWT [RFC7519]) that the Access Request Service can verify and
-      bind to the original denied evaluation.  JSON Web Encryption (JWE)
-      [RFC7516] MAY be used in addition to integrity protection when the
-      payload contains information that must not be visible to the PEP,
-      for example by encrypting a signed payload.
+      when submitting the Access Request (Section 10.1).  When present,
+      the value MUST be integrity protected in a way the Access Request
+      Service can verify, and SHOULD be a JSON Web Signature (JWS)
+      [RFC7515] in compact serialization, signed by the PDP, with a
+      payload (such as a JWT [RFC7519]) that the Access Request Service
+      can verify and bind to the original denied evaluation.  JSON Web
+      Encryption (JWE) [RFC7516] MAY be used in addition to integrity
+      protection when the payload contains information that must not be
+      visible to the PEP, for example by encrypting a signed payload.
+
+   The PDP MUST provide enough denial-binding material for the Access
+   Request Service to verify that a submitted Access Request corresponds
+   to the denied evaluation.  A requestable denial therefore MUST either
+   include an integrity-protected request_context, or be associated with
+   a stable evaluation identifier that the Access Request Service can
+   resolve or validate.  When neither binding form is available, the PDP
+   MUST NOT return requestable with a value of true.
 
    form_url:  OPTIONAL.  HTTPS URI.  URL of a form, hosted by the Access
       Request Service or another service trusted by the deployment,
@@ -709,8 +718,10 @@ Table of Contents
 
       *  denial: OPTIONAL.  Per-item denial binding when items came from
          separate AuthZEN evaluations.  When omitted, the top-level
-         denial applies to the item.  A per-item denial uses the same
-         members as the top-level denial object.
+         denial applies to the item only if the top-level denial is a
+         bundle denial whose binding material covers every item in the
+         items array.  A per-item denial uses the same members as the
+         top-level denial object.
 
    context:  OPTIONAL.  The AuthZEN Context from the denied evaluation,
       augmented with submission-time fields such as business
@@ -719,10 +730,11 @@ Table of Contents
    denial:  REQUIRED when items is absent; OPTIONAL when items is
       present.  Object binding the Access Request to the denied AuthZEN
       Decision.  When items is present, every item MUST be covered by
-      either a per-item denial or this top-level denial.  An Access
-      Request with items for which any item lacks a covering denial is
-      malformed and MUST be rejected with urn:openid:authzen:access-
-      request:error:invalid_denial_binding.
+      either a per-item denial or a top-level bundle denial whose
+      verifiable binding material covers every item in the items array.
+      An Access Request with items for which any item lacks a covering
+      denial is malformed and MUST be rejected with
+      urn:openid:authzen:access-request:error:invalid_denial_binding.
 
    requested_access:  OPTIONAL.  Object containing request-specific
       information such as requested duration, requested role, requested
@@ -786,10 +798,13 @@ Table of Contents
    access_request:  REQUIRED.  The context.access_request object from
       the denied decision.
 
-   evaluation_id:  RECOMMENDED.  A stable identifier for the denied
-      evaluation.  When the PDP returns an evaluation identifier (for
-      example in the Decision Context or in a response header), the PEP
-      SHOULD include it here.  evaluation_id provides the strongest
+   evaluation_id:  REQUIRED when denial.access_request.request_context
+      is absent; otherwise RECOMMENDED.  A stable identifier for the
+      denied evaluation.  When the PDP returns an evaluation identifier
+      (for example in the Decision Context or in a response header), the
+      PEP SHOULD include it here.  The Access Request Service MUST be
+      able to resolve or validate evaluation_id before relying on it as
+      denial-binding material.  evaluation_id provides the strongest
       audit binding between the original denial and the submitted Access
       Request and SHOULD be preferred over evaluated_at alone.
 
@@ -805,6 +820,12 @@ Table of Contents
    A PEP MUST submit an Access Request only for an AuthZEN Decision with
    decision equal to false and context.access_request.requestable equal
    to true.
+
+   The submitted denial object for each requested item MUST include
+   either denial.access_request.request_context or denial.evaluation_id.
+   The Access Request Service MUST reject a submission that lacks
+   verifiable denial-binding material with urn:openid:authzen:access-
+   request:error:invalid_denial_binding.
 
    A PEP SHOULD include an Idempotency-Key header, following the
    conventions described in [I-D.ietf-httpapi-idempotency-key-header].
@@ -895,7 +916,8 @@ Table of Contents
        },
        "access_request": {
          "requestable": true,
-         "template": "onboarding_bundle"
+         "template": "onboarding_bundle",
+         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl"
        }
      }
    }
@@ -969,10 +991,13 @@ Table of Contents
       *  review: URL where an approver or administrator can review or
          act on the request.
 
-   items:  OPTIONAL.  Array.  Per-item progress when the original
-      submission carried an items array.  Each element corresponds
-      positionally to the submission's items member and has the
-      following members:
+      *  cancel: URL where the PEP can cancel the request, when PEP-
+         initiated cancellation is supported.
+
+   items:  REQUIRED when the original submission carried an items array;
+      otherwise OPTIONAL.  Array.  Per-item progress for bundled Access
+      Requests.  Each element corresponds positionally to the
+      submission's items member and has the following members:
 
       *  resource: REQUIRED.  The AuthZEN Resource for this item,
          echoing the submission.
@@ -982,14 +1007,19 @@ Table of Contents
       *  status: REQUIRED.  Per-item status using the values defined in
          Section 11.1.
 
-      *  result: OPTIONAL.  Per-item completion result with the same
-         shape as the top-level result (Section 12).
+      *  result: OPTIONAL before the item reaches a terminal status;
+         REQUIRED when the item status is approved.  Per-item completion
+         result with the same shape as the top-level result
+         (Section 12).
 
    When the items member is present, the aggregate task.status reflects
    deployment-defined aggregation across per-item statuses.  A PEP
    processing a bundled task MUST consult task.items[].status and
    task.items[].result to determine per-item outcomes; the PEP MUST NOT
-   infer per-item outcomes from the aggregate task.status alone.
+   infer per-item outcomes from the aggregate task.status alone.  A top-
+   level result MUST NOT be used to authorize any individual item in a
+   bundled task unless the same result is also present in that item's
+   result member.
 
    Non-normative example:
 
@@ -1003,6 +1033,9 @@ Table of Contents
        "status": "pending",
        "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
        "expires_at": "2026-04-30T23:00:00Z",
+       "links": {
+         "cancel": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4/cancel"
+       },
        "display": {
          "title": "Access request submitted",
          "description": "Your manager has been asked to approve access."
@@ -1170,10 +1203,10 @@ Table of Contents
 11.4.  Cancellation
 
    An Access Request Service MAY support PEP-initiated cancellation of a
-   pending Access Request.  When supported, the PEP cancels by issuing
-   an HTTP POST to {status_endpoint}/cancel; implementations MAY also
-   accept HTTP DELETE against the status endpoint as an equivalent
-   cancellation request.
+   pending Access Request.  When supported, the Task Handle MUST include
+   a links.cancel member.  The PEP cancels by issuing an HTTP POST to
+   links.cancel; implementations MAY also accept HTTP DELETE against
+   links.cancel as an equivalent cancellation request.
 
    The cancellation request body is an OPTIONAL JSON object with the
    following members:
@@ -1193,7 +1226,9 @@ Table of Contents
    the PEP is authorized to cancel the request, typically by confirming
    the PEP submitted the request or that the PEP is authorized to act
    for the original Subject.  An Access Request Service that does not
-   support PEP-initiated cancellation returns 405 Method Not Allowed.
+   support PEP-initiated cancellation omits links.cancel.  If a PEP
+   nevertheless attempts cancellation at a cancellation endpoint, the
+   Access Request Service returns 405 Method Not Allowed.
 
    PEPs that need to abandon an outstanding request without using this
    endpoint MAY stop polling and rely on task.expires_at and Access
@@ -1241,7 +1276,7 @@ Table of Contents
    lifetime of those credentials by the approval expiry.
 
    When the original submission carried an items array, the PEP re-
-   evaluates each item separately using the per-item
+   evaluates each approved item separately using the per-item
    task.items[].result.approval_context; this profile does not define an
    aggregate re-evaluation that covers multiple items in one AuthZEN
    call.
@@ -1582,7 +1617,7 @@ Table of Contents
    following:
 
    1.  A name registered in the AuthZEN Access Request Member Names
-       registry (Section 22.3).  Registry-eligible names are short,
+       registry (Section 23.3).  Registry-eligible names are short,
        lowercase, snake_case identifiers carrying semantics that are
        useful across multiple implementations.
 
@@ -1619,7 +1654,7 @@ Table of Contents
       enumerated values it introduces.
 
    *  Register registry-eligible names in the AuthZEN Access Request
-      Member Names registry (Section 22.3) or in the relevant
+      Member Names registry (Section 23.3) or in the relevant
       enumeration registry.
 
    *  Define semantics, validation rules, and any normative requirements
@@ -1655,8 +1690,9 @@ Table of Contents
       submission's context and requested_access objects according to
       Section 8 and Section 9.
 
-   *  SHOULD include denial.evaluation_id when the PDP returned an
-      evaluation identifier.
+   *  MUST include denial.evaluation_id when
+      denial.access_request.request_context is absent, and SHOULD
+      include it when the PDP returned an evaluation identifier.
 
    *  SHOULD include an idempotency key for Access Request submissions.
 
@@ -1707,6 +1743,12 @@ Table of Contents
 
    *  MUST include form_schema_url when including form_catalogs_url.
 
+   *  MUST provide verifiable denial-binding material when returning
+      context.access_request.requestable=true, either by including an
+      integrity-protected context.access_request.request_context or by
+      returning a stable evaluation identifier that the Access Request
+      Service can resolve or validate.
+
    *  SHOULD return a stable evaluation identifier that the PEP can
       supply as evaluation_id when submitting an Access Request, either
       in the Decision Context or in a response header.
@@ -1732,13 +1774,15 @@ Table of Contents
    *  MUST validate that the submission is based on a requestable
       denial.
 
-   *  MUST verify the integrity of any
-      denial.access_request.request_context value submitted by the PEP.
-      When the value is a JWS, the service MUST verify the signature
-      using a key bound to the PDP identity advertised in PDP metadata.
-      The service MUST reject submissions whose request_context
-      integrity cannot be verified or whose claims do not bind to the
-      submitted denial.
+   *  MUST verify the denial-binding material for every requested item.
+      When denial.access_request.request_context is present, the service
+      MUST verify its integrity.  When the value is a JWS, the service
+      MUST verify the signature using a key bound to the PDP identity
+      advertised in PDP metadata.  When
+      denial.access_request.request_context is absent, the service MUST
+      resolve or validate denial.evaluation_id.  The service MUST reject
+      submissions whose binding material cannot be verified or whose
+      claims do not bind to the submitted denial.
 
    *  MUST bind the task to the submitted Subject, Resource, Action,
       Context, denial, requester, and client.
@@ -1918,7 +1962,11 @@ Table of Contents
 
 22.  IANA Considerations
 
-22.1.  AuthZEN Policy Decision Point Metadata Registry
+   This document has no IANA actions.
+
+23.  OpenID Foundation Registry Considerations
+
+23.1.  AuthZEN Policy Decision Point Metadata Registry
 
    This specification requests registration of the following PDP
    metadata parameter in the AuthZEN Policy Decision Point Metadata
@@ -1933,7 +1981,7 @@ Table of Contents
 
    Specification Document:  This document.
 
-22.2.  AuthZEN Policy Decision Point Capabilities Registry
+23.2.  AuthZEN Policy Decision Point Capabilities Registry
 
    This specification requests registration of the following PDP
    capabilities in the AuthZEN Policy Decision Point Capabilities
@@ -1951,7 +1999,7 @@ Table of Contents
 
    Specification Document:  This document.
 
-22.3.  AuthZEN Access Request Member Names Registry
+23.3.  AuthZEN Access Request Member Names Registry
 
    This specification requests creation of a new registry: the AuthZEN
    Access Request Member Names registry.
@@ -2031,6 +2079,9 @@ Table of Contents
    |                    |                  | review or act on the      |
    |                    |                  | request.                  |
    +--------------------+------------------+---------------------------+
+   | cancel             | task.links       | URL where the PEP can     |
+   |                    |                  | cancel the request.       |
+   +--------------------+------------------+---------------------------+
 
                                   Table 2
 
@@ -2038,11 +2089,11 @@ Table of Contents
    Working Group.  Specification Document for all initial entries: This
    document.
 
-23.  Examples
+24.  Examples
 
-23.1.  End-to-End Manager Approval
+24.1.  End-to-End Manager Approval
 
-23.1.1.  Initial Evaluation Request
+24.1.1.  Initial Evaluation Request
 
    POST /access/v1/evaluation HTTP/1.1
    Host: pdp.example.com
@@ -2066,7 +2117,7 @@ Table of Contents
      }
    }
 
-23.1.2.  Requestable Denial
+24.1.2.  Requestable Denial
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -2088,7 +2139,7 @@ Table of Contents
      }
    }
 
-23.1.3.  Submitting the Access Request
+24.1.3.  Submitting the Access Request
 
    POST /access/v1/requests HTTP/1.1
    Host: pdp.example.com
@@ -2129,7 +2180,7 @@ Table of Contents
      }
    }
 
-23.1.4.  Task Handle
+24.1.4.  Task Handle
 
    HTTP/1.1 202 Accepted
    Content-Type: application/json
@@ -2144,7 +2195,7 @@ Table of Contents
      }
    }
 
-23.1.5.  Completed Task
+24.1.5.  Completed Task
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -2166,7 +2217,7 @@ Table of Contents
      }
    }
 
-23.1.6.  Re-evaluation After Approval
+24.1.6.  Re-evaluation After Approval
 
    POST /access/v1/evaluation HTTP/1.1
    Host: pdp.example.com
@@ -2193,7 +2244,7 @@ Table of Contents
      }
    }
 
-23.1.7.  Final Decision
+24.1.7.  Final Decision
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -2208,9 +2259,9 @@ Table of Contents
      }
    }
 
-24.  References
+25.  References
 
-24.1.  Normative References
+25.1.  Normative References
 
    [AuthZEN]  Gazitt, O., Brossard, D., and A. Tulshibagwale,
               "Authorization API 1.0", 29 April 2026,
@@ -2269,7 +2320,7 @@ Table of Contents
               for HTTP APIs", RFC 9457, DOI 10.17487/RFC9457, July 2023,
               <https://www.rfc-editor.org/rfc/rfc9457>.
 
-24.2.  Informative References
+25.2.  Informative References
 
    [I-D.mcguinness-oauth-actor-profile]
               McGuinness, K., "OAuth Actor Profile for Delegation", Work
