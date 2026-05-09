@@ -4,8 +4,8 @@
 
 Network Working Group                                      K. McGuinness
 Internet-Draft                                               Independent
-Intended status: Standards Track                              8 May 2026
-Expires: 9 November 2026
+Intended status: Standards Track                              9 May 2026
+Expires: 10 November 2026
 
 
               AuthZEN Access Request and Approval Profile
@@ -38,7 +38,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 9 November 2026.
+   This Internet-Draft will expire on 10 November 2026.
 
 Copyright Notice
 
@@ -78,6 +78,7 @@ Table of Contents
        11.1.1.  Mapping Backend States
      11.2.  Pending Task Response
      11.3.  Completed Task Response
+     11.4.  Cancellation
    12. Completion Semantics
      12.1.  Re-evaluation Mode
      12.2.  Decision Result Mode
@@ -90,43 +91,53 @@ Table of Contents
      14.4.  Relationship to Per-Task Callback
      14.5.  SSF Binding Discovery
    15. Error Responses
-   16. PEP Processing Rules
-   17. PDP Processing Rules
-   18. Access Request Service Processing Rules
-   19. Authorization and Authentication
-   20. Privacy Considerations
-   21. Security Considerations
-     21.1.  Denial Remains Denial
-     21.2.  Confused Deputy and Request Substitution
-     21.3.  Request Context Integrity
-     21.4.  Approval Replay
-     21.5.  Overbroad Approval
-     21.6.  Trusting URLs from the Requestable Denial
-     21.7.  Catalog Disclosure
-     21.8.  Task Handle Leakage
-     21.9.  Callback Security
-     21.10. Shared Signals Framework Binding Security
-     21.11. PEP Acting on Behalf of the Subject
-     21.12. Idempotency Key Abuse
-     21.13. Availability
-   22. IANA Considerations
-     22.1.  AuthZEN Policy Decision Point Metadata Registry
-     22.2.  AuthZEN Policy Decision Point Capabilities Registry
-     22.3.  Security Event Type Identifiers Registry
-   23. Examples
-     23.1.  End-to-End Manager Approval
-       23.1.1.  Initial Evaluation Request
-       23.1.2.  Requestable Denial
-       23.1.3.  Submitting the Access Request
-       23.1.4.  Task Handle
-       23.1.5.  Completed Task
-       23.1.6.  Re-evaluation After Approval
-       23.1.7.  Final Decision
-   24. References
-     24.1.  Normative References
-     24.2.  Informative References
-   Appendix A.  Acknowledgements
-   Appendix B.  Document History
+   16. Extensibility and Profiles
+     16.1.  Extension Points
+     16.2.  Naming Extensions
+     16.3.  Forward Compatibility
+     16.4.  Profiles
+   17. PEP Processing Rules
+   18. PDP Processing Rules
+   19. Access Request Service Processing Rules
+   20. Authorization and Authentication
+   21. Privacy Considerations
+   22. Security Considerations
+     22.1.  Denial Remains Denial
+     22.2.  Confused Deputy and Request Substitution
+     22.3.  Request Context Integrity
+     22.4.  Approval Replay
+     22.5.  Overbroad Approval
+     22.6.  Trusting URLs from the Requestable Denial
+     22.7.  Catalog Disclosure
+     22.8.  Task Handle Leakage
+     22.9.  Callback Security
+     22.10. Shared Signals Framework Binding Security
+     22.11. PEP Acting on Behalf of the Subject
+     22.12. Idempotency Key Abuse
+     22.13. Availability
+   23. IANA Considerations
+     23.1.  AuthZEN Policy Decision Point Metadata Registry
+     23.2.  AuthZEN Policy Decision Point Capabilities Registry
+     23.3.  AuthZEN Access Request Member Names Registry
+     23.4.  Security Event Type Identifiers Registry
+   24. Examples
+     24.1.  End-to-End Manager Approval
+       24.1.1.  Initial Evaluation Request
+       24.1.2.  Requestable Denial
+       24.1.3.  Submitting the Access Request
+       24.1.4.  Task Handle
+       24.1.5.  Completed Task
+       24.1.6.  Re-evaluation After Approval
+       24.1.7.  Final Decision
+   25. References
+     25.1.  Normative References
+     25.2.  Informative References
+   Appendix A.  Implementation Considerations
+     A.1.  Identity Governance and Approval Platforms
+     A.2.  Form and Catalog Translation
+     A.3.  Notification Channels
+   Appendix B.  Acknowledgements
+   Appendix C.  Document History
    Author's Address
 
 1.  Introduction
@@ -318,9 +329,11 @@ Table of Contents
       access_request_endpoint from PDP metadata.
 
    template:  OPTIONAL.  String.  An opaque template identifier that can
-      guide the Access Request Service.  The value is not a policy
-      language and MUST NOT be interpreted by the PEP except for display
-      or request submission.
+      guide the Access Request Service.  Implementations typically map
+      template to a stable identifier of the approval workflow, request
+      schema, or governance policy that applies to this denial.  The
+      value is not a policy language and MUST NOT be interpreted by the
+      PEP except for display or request submission.
 
    reason:  OPTIONAL.  String.  A stable, machine-readable reason code
       for the requestable denial.
@@ -667,22 +680,56 @@ Table of Contents
 
    subject:  REQUIRED.  The AuthZEN Subject from the denied evaluation.
 
-   resource:  REQUIRED.  The AuthZEN Resource from the denied
-      evaluation.
+   resource:  REQUIRED when items is absent; MUST be omitted when items
+      is present.  The AuthZEN Resource from the denied evaluation.
 
-   action:  REQUIRED.  The AuthZEN Action from the denied evaluation.
+   action:  REQUIRED when items is absent; MUST be omitted when items is
+      present.  The AuthZEN Action from the denied evaluation.
+
+   items:  OPTIONAL.  Array.  Multiple (resource, action) items
+      submitted as a single bundled Access Request.  When present,
+      resource and action MUST be omitted at the top level.  Each item
+      is an object with the following members:
+
+      *  resource: REQUIRED.  The AuthZEN Resource for this item.
+
+      *  action: REQUIRED.  The AuthZEN Action for this item.
+
+      *  requested_access: OPTIONAL.  Per-item requested_access
+         overrides; merged with the top-level requested_access with item
+         values taking precedence.
+
+      *  denial: OPTIONAL.  Per-item denial binding when items came from
+         separate AuthZEN evaluations.  When omitted, the top-level
+         denial applies to the item.
 
    context:  OPTIONAL.  The AuthZEN Context from the denied evaluation,
       augmented with submission-time fields such as business
       justification.
 
-   denial:  REQUIRED.  Object binding the Access Request to the denied
-      AuthZEN Decision.
+   denial:  REQUIRED when items is absent; OPTIONAL when items is
+      present.  Object binding the Access Request to the denied AuthZEN
+      Decision.  When items is present, every item MUST be covered by
+      either a per-item denial or this top-level denial.  An Access
+      Request with items for which any item lacks a covering denial is
+      malformed and MUST be rejected with urn:openid:authzen:access-
+      request:error:invalid_denial_binding.
 
    requested_access:  OPTIONAL.  Object containing request-specific
       information such as requested duration, requested role, requested
       entitlement, or requested scope.  This object does not define
       policy semantics and is interpreted by the Access Request Service.
+      The following well-known optional members are defined; additional
+      members MAY be included subject to Section 16.2:
+
+      *  requested_duration: String.  ISO 8601 duration (for example,
+         PT4H or P30D) requesting time-bounded access.
+
+      *  requested_until: String.  [RFC3339] timestamp requesting access
+         through a specific absolute time.
+
+      *  emergency: Boolean.  When true, requests an expedited or
+         emergency-access path subject to additional auditing.
 
    callback:  OPTIONAL.  Object describing a callback endpoint where the
       Access Request Service can send completion notifications.
@@ -801,6 +848,49 @@ Table of Contents
      }
    }
 
+   Non-normative bulk-submission example:
+
+   POST /access/v1/requests HTTP/1.1
+   Host: pdp.example.com
+   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+   Content-Type: application/json
+   Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d14
+
+   {
+     "subject": {
+       "type": "user",
+       "id": "alice@example.com"
+     },
+     "items": [
+       {
+         "resource": {"type": "document", "id": "q4-plan"},
+         "action": {"name": "can_read"}
+       },
+       {
+         "resource": {"type": "channel", "id": "engineering"},
+         "action": {"name": "can_post"}
+       }
+     ],
+     "context": {
+       "business_justification": "Onboarding to the renewal review project"
+     },
+     "requested_access": {
+       "requested_duration": "P14D"
+     },
+     "denial": {
+       "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M2",
+       "evaluated_at": "2026-04-30T20:15:00Z",
+       "decision": {
+         "decision": false,
+         "context": {"reason": "approval_required"}
+       },
+       "access_request": {
+         "requestable": true,
+         "template": "onboarding_bundle"
+       }
+     }
+   }
+
 10.2.  Access Request Response
 
    A successful Access Request submission returns HTTP status code 201
@@ -808,6 +898,15 @@ Table of Contents
    The task.status_endpoint member is authoritative for subsequent
    status retrieval.  A response MAY also include an HTTP Location
    header equal to task.status_endpoint.
+
+   When the Access Request Service is able to resolve the request
+   synchronously (for example, when policy auto-approves and
+   provisioning completes within the request), the Access Request
+   Service SHOULD return 201 Created with task.status already set to a
+   terminal value and a populated result member (Section 12).  PEPs MUST
+   handle this synchronous-completion case without polling; the Task
+   Status Endpoint remains usable for later retrieval but is not
+   required for completion in this case.
 
    The task object has the following members:
 
@@ -818,6 +917,29 @@ Table of Contents
       Section 11.1.
 
    status_endpoint:  REQUIRED.  HTTPS URI used to retrieve task status.
+      An intermediate enforcer (such as an OAuth Authorization Server or
+      other gateway acting as PEP) MAY proxy or re-present this endpoint
+      to its own callers; the value advertised to such callers MAY
+      differ from the value the PEP itself uses, provided the proxied
+      endpoint observes the authorization rules defined for the original
+      endpoint.
+
+   progress:  OPTIONAL.  Object describing approval workflow progress
+      for tasks with multi-step approvals.  The following members are
+      defined:
+
+      *  current_step: OPTIONAL.  Integer.  One-based index of the step
+         currently in progress.
+
+      *  total_steps: OPTIONAL.  Integer.  Total number of approval
+         steps configured for the task.
+
+      *  step_name: OPTIONAL.  String.  Short identifier of the current
+         step (for example, manager_approval or resource_owner_review).
+
+      *  awaiting: OPTIONAL.  Array.  Identifiers of approvers whose
+         action is currently expected.  Implementations SHOULD apply
+         privacy controls before populating this member; see Section 21.
 
    expires_at:  OPTIONAL.  [RFC3339] timestamp after which the task
       handle is no longer valid.
@@ -836,6 +958,28 @@ Table of Contents
       *  review: URL where an approver or administrator can review or
          act on the request.
 
+   items:  OPTIONAL.  Array.  Per-item progress when the original
+      submission carried an items array.  Each element corresponds
+      positionally to the submission's items member and has the
+      following members:
+
+      *  resource: REQUIRED.  The AuthZEN Resource for this item,
+         echoing the submission.
+
+      *  action: REQUIRED.  The AuthZEN Action for this item.
+
+      *  status: REQUIRED.  Per-item status using the values defined in
+         Section 11.1.
+
+      *  result: OPTIONAL.  Per-item completion result with the same
+         shape as the top-level result (Section 12).
+
+   When the items member is present, the aggregate task.status reflects
+   deployment-defined aggregation across per-item statuses.  A PEP
+   processing a bundled task MUST consult task.items[].status and
+   task.items[].result to determine per-item outcomes; the PEP MUST NOT
+   infer per-item outcomes from the aggregate task.status alone.
+
    Non-normative example:
 
    HTTP/1.1 202 Accepted
@@ -851,6 +995,31 @@ Table of Contents
        "display": {
          "title": "Access request submitted",
          "description": "Your manager has been asked to approve access."
+       }
+     }
+   }
+
+   Non-normative synchronous-completion example, where policy auto-
+   approved the request:
+
+   HTTP/1.1 201 Created
+   Content-Type: application/json
+   Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V5
+
+   {
+     "task": {
+       "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V5",
+       "status": "approved",
+       "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V5"
+     },
+     "result": {
+       "mode": "reevaluate",
+       "approval": {
+         "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVJ",
+         "approved_until": "2026-05-01T00:42:00Z"
+       },
+       "approval_context": {
+         "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVJ"
        }
      }
    }
@@ -959,12 +1128,10 @@ Table of Contents
    return urn:openid:authzen:access-request:error:task_expired or
    urn:openid:authzen:access-request:error:unknown_task as appropriate.
 
-   Cancellation of a pending Access Request is administrative and is
-   performed by the Access Request Service, the requester through a
-   separate user interface, or an approver.  This profile does not
-   define a PEP-initiated cancellation API; PEPs that need to abandon an
-   outstanding request stop polling and rely on task.expires_at and
-   Access Request Service expiry to release resources.
+   Cancellation of a pending Access Request MAY be performed by the
+   Access Request Service, the requester through a separate user
+   interface, an approver, or the PEP using the cancellation endpoint
+   defined in Section 11.4.
 
    Non-normative example using a re-evaluation requirement:
 
@@ -988,6 +1155,38 @@ Table of Contents
        }
      }
    }
+
+11.4.  Cancellation
+
+   An Access Request Service MAY support PEP-initiated cancellation of a
+   pending Access Request.  When supported, the PEP cancels by issuing
+   an HTTP POST to {status_endpoint}/cancel; implementations MAY also
+   accept HTTP DELETE against the status endpoint as an equivalent
+   cancellation request.
+
+   The cancellation request body is an OPTIONAL JSON object with the
+   following members:
+
+   reason:  OPTIONAL.  String.  Stable, machine-readable reason code.
+
+   comment:  OPTIONAL.  String.  Human-readable cancellation note for
+      audit.
+
+   A successful cancellation returns 200 OK and the updated task object
+   whose status is cancelled.  Cancellation of a task that has already
+   reached a terminal status returns 409 Conflict using the
+   urn:openid:authzen:access-request:error:invalid_task_state problem
+   type.
+
+   The Access Request Service MUST authenticate the PEP and MUST verify
+   the PEP is authorized to cancel the request, typically by confirming
+   the PEP submitted the request or that the PEP is authorized to act
+   for the original Subject.  An Access Request Service that does not
+   support PEP-initiated cancellation returns 405 Method Not Allowed.
+
+   PEPs that need to abandon an outstanding request without using this
+   endpoint MAY stop polling and rely on task.expires_at and Access
+   Request Service expiry to release resources.
 
 12.  Completion Semantics
 
@@ -1022,6 +1221,13 @@ Table of Contents
    approval reference.  The PDP MAY still deny access if policy,
    subject, resource, action, context, approval lifetime, or risk state
    no longer permits access.
+
+   When the re-evaluation response indicates an approval expiry
+   (typically as context.approval.approved_until), the PEP MUST NOT
+   enforce access past that timestamp.  PEPs that issue downstream
+   credentials on the basis of the approved evaluation (for example, an
+   OAuth Authorization Server issuing access tokens) MUST bound the
+   lifetime of those credentials by the approval expiry.
 
    Non-normative re-evaluation request:
 
@@ -1220,6 +1426,16 @@ Table of Contents
    Endpoint remains authoritative unless the callback contains an
    enforceable completion result under Section 12.
 
+   Implementations MAY satisfy completion notification through
+   deployment-level event subscriptions (for example, organization-
+   scoped webhooks or the Shared Signals Framework binding defined in
+   Section 14) rather than per-task callbacks.  When a deployment relies
+   on such a subscription, the PEP MAY omit the callback member from the
+   Access Request submission.  Deployment-level event subscriptions
+   deliver the same Task Handle and lifecycle information to subscribed
+   receivers; they are a notification channel and MUST NOT be treated as
+   enforcement unless paired with a separate enforceable result.
+
    Non-normative callback example:
 
    POST /callbacks/access-requests HTTP/1.1
@@ -1398,6 +1614,11 @@ Table of Contents
    urn:openid:authzen:access-request:error:task_expired:  HTTP 410 Gone.
       The task handle has expired.
 
+   urn:openid:authzen:access-request:error:invalid_task_state:  HTTP 409
+      Conflict.  The requested operation cannot be performed in the
+      current task state (for example, cancellation of a task that has
+      already reached a terminal status).
+
    Non-normative example:
 
    HTTP/1.1 400 Bad Request
@@ -1410,7 +1631,109 @@ Table of Contents
      "detail": "The denied decision did not contain context.access_request.requestable=true."
    }
 
-16.  PEP Processing Rules
+16.  Extensibility and Profiles
+
+   This specification defines a base wire format.  Several of its
+   objects are intentionally extensible so that profiles, deployments,
+   and implementations can adapt the model to specific upstream
+   protocols, governance platforms, and request user interfaces without
+   breaking interoperability.
+
+16.1.  Extension Points
+
+   Additional members beyond those defined in this document MAY appear
+   at the following locations.  No other object members may be extended
+   without a revision of this specification or a profile that explicitly
+   redefines them.
+
+   *  context.access_request.display: user-interface hints in a
+      requestable denial.
+
+   *  context in an Access Request submission: augments the AuthZEN
+      Context.
+
+   *  requested_access in an Access Request submission.
+
+   *  client and client.source in an Access Request submission.
+
+   *  A Catalog Item within a Catalog Response.
+
+   *  task.display: user-interface hints attached to a Task Handle.
+
+   *  task.links: link relations to related URLs.
+
+   *  result and the additions defined under each result.mode.
+
+   This specification also defines extensibility for enumerated values:
+
+   *  New values for task.status (Section 11.1).
+
+   *  New values for result.mode (Section 12).
+
+   *  New event types for the Shared Signals Framework binding
+      (Section 14).
+
+   *  New problem types for [RFC9457]-style error responses
+      (Section 15).
+
+16.2.  Naming Extensions
+
+   A member name or value added at an extension point MUST be one of the
+   following:
+
+   1.  A name registered in the AuthZEN Access Request Member Names
+       registry (Section 23.3).  Registry-eligible names are short,
+       lowercase, snake_case identifiers carrying semantics that are
+       useful across multiple implementations.
+
+   2.  An absolute URI (HTTPS or URN) when the member is profile-
+       specific and not appropriate for the registry.  Profiles SHOULD
+       use a stable URI under the profile's change controller.
+
+   3.  A reverse-DNS-prefixed identifier (for example,
+       vendor.example.com/foo) when the member is private to a single
+       deployment and not intended for cross-implementation use.
+
+16.3.  Forward Compatibility
+
+   An implementation receiving a member or value it does not recognize
+   at an extension point MUST ignore it and MUST NOT fail processing on
+   the basis of the unrecognized name.  An implementation MAY surface
+   unrecognized members in audit records or pass them through unchanged
+   when echoing wire content (for example, in callbacks or SSF events).
+
+16.4.  Profiles
+
+   A profile of this specification is a separate document that defines a
+   coherent set of extensions for a particular use case.  Examples
+   include a profile binding this specification to OAuth 2.0 token
+   requests, a profile carrying Rich Authorization Requests [RFC9396],
+   or a profile describing integration with a specific governance
+   platform.
+
+   A profile SHOULD:
+
+   *  Identify itself with a stable URI.
+
+   *  Specify the extension points it populates and the member names or
+      enumerated values it introduces.
+
+   *  Register registry-eligible names in the AuthZEN Access Request
+      Member Names registry (Section 23.3) or in the relevant
+      enumeration registry.
+
+   *  Define semantics, validation rules, and any normative requirements
+      for its members.
+
+   *  Enumerate any constraints it places on members or behaviors
+      defined by this base specification.
+
+   This base specification does not enumerate profiles.  Conformance to
+   a profile is determined by the presence and processing of the
+   profile's registered or namespaced members; this specification does
+   not require declarative profile negotiation.
+
+17.  PEP Processing Rules
 
    A PEP implementing this profile:
 
@@ -1461,7 +1784,7 @@ Table of Contents
    *  SHOULD re-evaluate access after approval unless the deployment
       explicitly supports Decision Result Mode or Token Result Mode.
 
-17.  PDP Processing Rules
+18.  PDP Processing Rules
 
    A PDP implementing this profile:
 
@@ -1499,7 +1822,7 @@ Table of Contents
       resource sensitivity, action constraints, environmental risk, and
       approval expiry.
 
-18.  Access Request Service Processing Rules
+19.  Access Request Service Processing Rules
 
    An Access Request Service implementing this profile:
 
@@ -1539,7 +1862,7 @@ Table of Contents
       to see in the context of the original Subject, Resource, and
       Action.
 
-19.  Authorization and Authentication
+20.  Authorization and Authentication
 
    The Access Request Endpoint and Task Status Endpoint are protected
    APIs.  Support for OAuth 2.0 [RFC6749] is RECOMMENDED.  When OAuth
@@ -1554,7 +1877,7 @@ Table of Contents
    identities, policy identifiers, or resource metadata to a caller that
    is not authorized to receive them.
 
-20.  Privacy Considerations
+21.  Privacy Considerations
 
    Access Requests may contain sensitive information, including user
    identifiers, resource identifiers, business justifications, approval
@@ -1570,23 +1893,23 @@ Table of Contents
    Approval records SHOULD be retained only as long as required by
    business, security, and compliance policy.
 
-21.  Security Considerations
+22.  Security Considerations
 
-21.1.  Denial Remains Denial
+22.1.  Denial Remains Denial
 
    The presence of context.access_request does not weaken the AuthZEN
    decision.  A PEP MUST NOT grant access based on a requestable denial.
    Access is permitted only after an approved completion result is
    enforced according to this profile.
 
-21.2.  Confused Deputy and Request Substitution
+22.2.  Confused Deputy and Request Substitution
 
    An attacker could attempt to obtain approval for one resource and
    apply it to another.  Implementations MUST bind Access Requests and
    approval results to the Subject, Resource, Action, Context, task, and
    requester.  PDPs MUST validate this binding during re-evaluation.
 
-21.3.  Request Context Integrity
+22.3.  Request Context Integrity
 
    The request_context member round-trips PDP-issued state through the
    PEP to the Access Request Service.  Without integrity protection, a
@@ -1602,14 +1925,14 @@ Table of Contents
    Service confirm that the requestable-denial state was issued by the
    PDP and not fabricated or altered by the PEP.
 
-21.4.  Approval Replay
+22.4.  Approval Replay
 
    Approval references and tokens can be replayed if not time-bounded
    and audience-restricted.  Approval results MUST expire.  Token Result
    Mode MUST use short-lived, audience-restricted tokens.  Re-evaluation
    Mode SHOULD bind approval references to the original request tuple.
 
-21.5.  Overbroad Approval
+22.5.  Overbroad Approval
 
    This profile does not define an approval policy language.
    Implementations MUST NOT treat the template, reason,
@@ -1617,7 +1940,7 @@ Table of Contents
    policy.  Actual approval scope and enforcement semantics are
    determined by the PDP and Access Request Service.
 
-21.6.  Trusting URLs from the Requestable Denial
+22.6.  Trusting URLs from the Requestable Denial
 
    The endpoint, form_url, form_schema_url, form_catalogs_url, and the
    catalog endpoint values inside a Catalogs Document are all delivered
@@ -1635,7 +1958,7 @@ Table of Contents
    MUST NOT submit credentials to a host that is not trusted to receive
    them.
 
-21.7.  Catalog Disclosure
+22.7.  Catalog Disclosure
 
    Catalog Endpoints (Section 9) can leak sensitive information about
    applications, entitlements, organizational structure, or finance
@@ -1649,7 +1972,7 @@ Table of Contents
    expose.  PEPs SHOULD prefer searching with search_param over bulk
    enumeration.
 
-21.8.  Task Handle Leakage
+22.8.  Task Handle Leakage
 
    Task handles can reveal workflow state or be used to poll for
    sensitive information.  Task handles MUST be opaque, unguessable, and
@@ -1657,7 +1980,7 @@ Table of Contents
    handle MUST NOT be sufficient to retrieve task status without caller
    authorization.
 
-21.9.  Callback Security
+22.9.  Callback Security
 
    Callback endpoints can be abused for spoofing, replay, and request
    forgery.  Callback notifications MUST be authenticated.  PEPs SHOULD
@@ -1665,7 +1988,7 @@ Table of Contents
    and state values, and treat callbacks as notifications unless they
    contain an enforceable result under this profile.
 
-21.10.  Shared Signals Framework Binding Security
+22.10.  Shared Signals Framework Binding Security
 
    When the SSF binding (Section 14) is used, SETs carry information
    about denied evaluations, approval outcomes, subjects, and resources.
@@ -1678,7 +2001,7 @@ Table of Contents
    decision; the Task Status Endpoint or per-task callback remains
    authoritative for enforcement.
 
-21.11.  PEP Acting on Behalf of the Subject
+22.11.  PEP Acting on Behalf of the Subject
 
    A PEP submitting an Access Request typically acts on behalf of the
    Subject identified in the original AuthZEN evaluation.  The Access
@@ -1690,22 +2013,22 @@ Table of Contents
    [RFC8693] so the PEP presents a token that names the Subject as the
    on-behalf-of party.
 
-21.12.  Idempotency Key Abuse
+22.12.  Idempotency Key Abuse
 
    Idempotency keys can be used to correlate requests.  Implementations
    SHOULD scope idempotency keys to the authenticated caller and avoid
    storing them longer than necessary.
 
-21.13.  Availability
+22.13.  Availability
 
    Approval workflows can introduce latency and dependency on external
    systems.  PEPs SHOULD fail closed when task status cannot be
    determined.  Access Request Services SHOULD apply rate limits and
    abuse detection to request submission and polling endpoints.
 
-22.  IANA Considerations
+23.  IANA Considerations
 
-22.1.  AuthZEN Policy Decision Point Metadata Registry
+23.1.  AuthZEN Policy Decision Point Metadata Registry
 
    This specification requests registration of the following PDP
    metadata parameter in the AuthZEN Policy Decision Point Metadata
@@ -1720,7 +2043,7 @@ Table of Contents
 
    Specification Document:  This document.
 
-22.2.  AuthZEN Policy Decision Point Capabilities Registry
+23.2.  AuthZEN Policy Decision Point Capabilities Registry
 
    This specification requests registration of the following PDP
    capabilities in the AuthZEN Policy Decision Point Capabilities
@@ -1750,7 +2073,94 @@ Table of Contents
 
    Specification Document:  This document.
 
-22.3.  Security Event Type Identifiers Registry
+23.3.  AuthZEN Access Request Member Names Registry
+
+   This specification requests creation of a new registry: the AuthZEN
+   Access Request Member Names registry.
+
+   The registry tracks well-known member names that may appear at the
+   extension points defined in Section 16.  Registration policy is
+   Specification Required.  Each entry has the following fields:
+
+   Name:  The member name as it appears on the wire.
+
+   Extension Point:  One of the extension points listed in Section 16.
+
+   Description:  A short description of the member's semantics.
+
+   Change Controller:  The registering specification's change
+      controller.
+
+   Specification Document:  The document defining the member.
+
+   Initial entries registered by this specification:
+
+   +====================+==================+===========================+
+   | Name               | Extension Point  | Description               |
+   +====================+==================+===========================+
+   | requested_duration | requested_access | ISO 8601 duration         |
+   |                    |                  | requesting time-          |
+   |                    |                  | bounded access.           |
+   +--------------------+------------------+---------------------------+
+   | requested_until    | requested_access | RFC 3339 timestamp        |
+   |                    |                  | requesting access         |
+   |                    |                  | through a specific        |
+   |                    |                  | absolute time.            |
+   +--------------------+------------------+---------------------------+
+   | emergency          | requested_access | Boolean requesting an     |
+   |                    |                  | expedited or              |
+   |                    |                  | emergency-access          |
+   |                    |                  | path.                     |
+   +--------------------+------------------+---------------------------+
+   | conversation_id    | client.source    | Identifier of a chat      |
+   |                    |                  | or agent conversation     |
+   |                    |                  | that produced the         |
+   |                    |                  | request.                  |
+   +--------------------+------------------+---------------------------+
+   | external_url       | client.source    | URL of an external        |
+   |                    |                  | system that motivated     |
+   |                    |                  | the request.              |
+   +--------------------+------------------+---------------------------+
+   | integration_id     | client.source    | Identifier of an          |
+   |                    |                  | upstream integration      |
+   |                    |                  | or workflow that          |
+   |                    |                  | produced the request.     |
+   +--------------------+------------------+---------------------------+
+   | description        | Catalog Item     | Human-readable            |
+   |                    |                  | description of the        |
+   |                    |                  | catalog item.             |
+   +--------------------+------------------+---------------------------+
+   | risk_level         | Catalog Item     | Risk classification       |
+   |                    |                  | used by the               |
+   |                    |                  | deployment.               |
+   +--------------------+------------------+---------------------------+
+   | granted            | Catalog Item     | Boolean indicating        |
+   |                    |                  | the requester already     |
+   |                    |                  | has access to the         |
+   |                    |                  | item.                     |
+   +--------------------+------------------+---------------------------+
+   | owner              | Catalog Item     | Identifier or             |
+   |                    |                  | reference for the         |
+   |                    |                  | item's owner.             |
+   +--------------------+------------------+---------------------------+
+   | ticket             | task.links       | URL where the             |
+   |                    |                  | requester can view        |
+   |                    |                  | the request and its       |
+   |                    |                  | status.                   |
+   +--------------------+------------------+---------------------------+
+   | review             | task.links       | URL where an approver     |
+   |                    |                  | or administrator can      |
+   |                    |                  | review or act on the      |
+   |                    |                  | request.                  |
+   +--------------------+------------------+---------------------------+
+
+                                  Table 2
+
+   Change Controller for all initial entries: OpenID Foundation AuthZEN
+   Working Group.  Specification Document for all initial entries: This
+   document.
+
+23.4.  Security Event Type Identifiers Registry
 
    This specification requests registration of the following event type
    in the IANA "Security Event Type Identifiers" registry established by
@@ -1767,11 +2177,11 @@ Table of Contents
 
    Specification Document:  This document.
 
-23.  Examples
+24.  Examples
 
-23.1.  End-to-End Manager Approval
+24.1.  End-to-End Manager Approval
 
-23.1.1.  Initial Evaluation Request
+24.1.1.  Initial Evaluation Request
 
    POST /access/v1/evaluation HTTP/1.1
    Host: pdp.example.com
@@ -1795,7 +2205,7 @@ Table of Contents
      }
    }
 
-23.1.2.  Requestable Denial
+24.1.2.  Requestable Denial
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -1809,13 +2219,15 @@ Table of Contents
          "template": "manager_approval",
          "reason": "manager_approval_required",
          "expires_in": 600,
+         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
          "form_url": "https://requests.example.com/forms/manager_approval",
-         "form_schema_url": "https://requests.example.com/schemas/manager_approval.json"
+         "form_schema_url": "https://requests.example.com/schemas/manager_approval.json",
+         "form_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json"
        }
      }
    }
 
-23.1.3.  Submitting the Access Request
+24.1.3.  Submitting the Access Request
 
    POST /access/v1/requests HTTP/1.1
    Host: pdp.example.com
@@ -1850,12 +2262,13 @@ Table of Contents
        "access_request": {
          "requestable": true,
          "template": "manager_approval",
-         "reason": "manager_approval_required"
+         "reason": "manager_approval_required",
+         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl"
        }
      }
    }
 
-23.1.4.  Task Handle
+24.1.4.  Task Handle
 
    HTTP/1.1 202 Accepted
    Content-Type: application/json
@@ -1870,7 +2283,7 @@ Table of Contents
      }
    }
 
-23.1.5.  Completed Task
+24.1.5.  Completed Task
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -1892,7 +2305,7 @@ Table of Contents
      }
    }
 
-23.1.6.  Re-evaluation After Approval
+24.1.6.  Re-evaluation After Approval
 
    POST /access/v1/evaluation HTTP/1.1
    Host: pdp.example.com
@@ -1919,7 +2332,7 @@ Table of Contents
      }
    }
 
-23.1.7.  Final Decision
+24.1.7.  Final Decision
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -1934,9 +2347,9 @@ Table of Contents
      }
    }
 
-24.  References
+25.  References
 
-24.1.  Normative References
+25.1.  Normative References
 
    [AuthZEN]  Gazitt, O., Brossard, D., and A. Tulshibagwale,
               "Authorization API 1.0", 29 April 2026,
@@ -1956,6 +2369,13 @@ Table of Contents
               json-schema-validation-01, 10 June 2022,
               <https://datatracker.ietf.org/doc/html/draft-bhutton-json-
               schema-validation-01>.
+
+   [I-D.ietf-httpapi-idempotency-key-header]
+              Jena, J. and S. Dalal, "The Idempotency-Key HTTP Header
+              Field", Work in Progress, Internet-Draft, draft-ietf-
+              httpapi-idempotency-key-header-07, 15 October 2025,
+              <https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-
+              idempotency-key-header-07>.
 
    [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
               Requirement Levels", BCP 14, RFC 2119,
@@ -1998,14 +2418,7 @@ Table of Contents
               Specification 1.0", 2024, <https://openid.net/specs/
               openid-sharedsignals-framework-1_0.html>.
 
-24.2.  Informative References
-
-   [I-D.ietf-httpapi-idempotency-key-header]
-              Jena, J. and S. Dalal, "The Idempotency-Key HTTP Header
-              Field", Work in Progress, Internet-Draft, draft-ietf-
-              httpapi-idempotency-key-header-07, 15 October 2025,
-              <https://datatracker.ietf.org/doc/html/draft-ietf-httpapi-
-              idempotency-key-header-07>.
+25.2.  Informative References
 
    [RFC6901]  Bryan, P., Ed., Zyp, K., and M. Nottingham, Ed.,
               "JavaScript Object Notation (JSON) Pointer", RFC 6901,
@@ -2029,16 +2442,72 @@ Table of Contents
               DOI 10.17487/RFC8693, January 2020,
               <https://www.rfc-editor.org/rfc/rfc8693>.
 
+   [RFC9396]  Lodderstedt, T., Richer, J., and B. Campbell, "OAuth 2.0
+              Rich Authorization Requests", RFC 9396,
+              DOI 10.17487/RFC9396, May 2023,
+              <https://www.rfc-editor.org/rfc/rfc9396>.
+
    [XACML]    OASIS, "eXtensible Access Control Markup Language (XACML)
               Version 3.0", January 2013, <https://docs.oasis-
               open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html>.
 
-Appendix A.  Acknowledgements
+Appendix A.  Implementation Considerations
+
+   This appendix describes common deployment patterns and is non-
+   normative.
+
+A.1.  Identity Governance and Approval Platforms
+
+   Many implementations sit on top of an existing identity-governance,
+   ITSM, or approval platform that already has catalogs, policy engines,
+   approval workflows, and provisioning pipelines.  A useful mapping
+   pattern is:
+
+   *  The platform itself acts as the Access Request Service.  Its task
+      or request entity becomes the Task Handle and its approval
+      workflow runs unchanged.
+
+   *  A thin AuthZEN Policy Decision Point is deployed alongside the
+      platform.  It produces AuthZEN evaluations from current platform
+      state and emits requestable denials when access is missing and an
+      approval workflow exists for it.
+
+   *  The Policy Enforcement Point is either an enforcing application
+      (reactive: a gateway calls AuthZEN when a user attempts an
+      operation) or a request user interface or agent (proactive: the
+      user opens a request portal).  Both are valid PEPs under this
+      profile.
+
+   Re-evaluation Mode is the natural completion mode for this pattern:
+   provisioning changes platform state, and a subsequent AuthZEN
+   evaluation reflects that state.
+
+A.2.  Form and Catalog Translation
+
+   Most existing platforms have proprietary form description languages
+   with field types beyond JSON Schema's native vocabulary, and
+   proprietary catalog APIs with vendor-specific request and response
+   shapes.  Implementations translate to the JSON Schema referenced by
+   form_schema_url and to the Catalogs Document and Catalog Endpoint
+   protocol defined in Section 9.  Translation may be lossy for vendor-
+   specific widgets and metadata; richer rendering details belong behind
+   form_url, while the JSON Schema and Catalogs Document provide enough
+   information for an autonomous PEP.
+
+A.3.  Notification Channels
+
+   Implementations frequently already have webhook subscriptions or
+   other deployment-level event channels.  Per-task callbacks
+   (Section 13) are an alternative; deployments may rely on existing
+   webhook infrastructure or the Shared Signals Framework binding
+   (Section 14) for completion notification.
+
+Appendix B.  Acknowledgements
 
    The author thanks the OpenID AuthZEN Working Group for discussion and
    review.
 
-Appendix B.  Document History
+Appendix C.  Document History
 
    -00  Initial version defining requestable denials, the Access Request
       Endpoint, task handles, task completion, re-evaluation, the
