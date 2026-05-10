@@ -155,7 +155,7 @@ The access evaluation in step 1 uses the existing AuthZEN Access Evaluation API.
 
 The Access Request Service MAY additionally publish lifecycle events for governance, audit, and analytics consumers through deployment-level event subscriptions defined by companion specifications.  Such channels are independent of the per-task callback and are not used for enforcement.
 
-# Discovery
+# Discovery {#discovery}
 
 A PDP supporting this profile MUST publish an `access_request_endpoint` in PDP metadata.  The endpoint value MUST be an HTTPS URI.
 
@@ -201,12 +201,13 @@ The `access_request` object has the following members:
 : OPTIONAL.  String containing an {{RFC3339}} timestamp.  Indicates when the requestable denial hint expires.
 
 `expires_in`:
-: OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.
+: OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP determines this time from an explicit evaluation timestamp when available, otherwise from the HTTP `Date` response header.  If neither time source is available, the PEP MUST treat the hint as expired.  PDPs SHOULD use `expires_at` instead of `expires_in` when precise expiry handling is required.
 
 `request_context`:
 : OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged inside `denial.access_request.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{?RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
 
-The PDP MUST provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore MUST either include an integrity-protected `request_context`, or be associated with a stable evaluation identifier that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP MUST NOT return `requestable` with a value of `true`.
+`display`:
+: OPTIONAL.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP MAY ignore this member.
 
 `form_url`:
 : OPTIONAL.  HTTPS URI.  URL of a form, hosted by the Access Request Service or another service trusted by the deployment, where the requester can supply additional information required for the Access Request.  Suitable for PEPs that render the form for a human user.  See {{machine-readable-forms}}.
@@ -217,12 +218,11 @@ The PDP MUST provide enough denial-binding material for the Access Request Servi
 `form_catalogs_url`:
 : OPTIONAL.  HTTPS URI.  URL of a Catalogs Document describing how the PEP resolves form fields whose values are selected from a backing catalog.  See {{catalog-references}}.
 
-`display`:
-: OPTIONAL.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP MAY ignore this member.
-
 If both `expires_at` and `expires_in` are present, `expires_at` takes precedence and the PEP MUST ignore `expires_in`.
 
 The `reason` member of the `access_request` object is independent of any `reason` member that the PDP may include directly in `context`.  The outer `context.reason` describes why the Decision was denied; `context.access_request.reason` describes why the denial is requestable and which approval flow applies.
+
+The PDP MUST provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore MUST either include an integrity-protected `request_context`, or be associated with a stable evaluation identifier outside the `access_request` object, such as in the Decision Context or a response header, that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP MUST NOT return `requestable` with a value of `true`.
 
 The following is a non-normative example:
 
@@ -252,6 +252,8 @@ The following is a non-normative example:
 
 # Machine-Readable Forms {#machine-readable-forms}
 
+This section describes how PEPs use the OPTIONAL `form_url` and `form_schema_url` members of the `access_request` object ({{requestable-denial-context}}).  A deployment supports this feature simply by including these members in requestable denials; PEPs interacting with deployments that do not include them MAY omit form-schema processing entirely.
+
 When the Access Request Service expects additional submission fields beyond those produced by the original AuthZEN evaluation, the requestable denial describes those fields using `form_url`, `form_schema_url`, or both:
 
 * `form_url` identifies a form hosted by the Access Request Service or a service it trusts.  It is suitable for PEPs that render the form for a human user.
@@ -268,6 +270,8 @@ This profile does not define a UI rendering vocabulary.  Deployments that need r
 This profile does not define an agent protocol surface.  Deployments serving agentic PEPs MAY additionally expose Access Request submission through an agent protocol where the tool input schema corresponds to the JSON Schema referenced by `form_schema_url`.  Discovery of such surfaces is out of scope for this specification.
 
 # Catalog References {#catalog-references}
+
+This section describes how PEPs use the OPTIONAL `form_catalogs_url` member of the `access_request` object ({{requestable-denial-context}}).  A deployment supports this feature simply by including this member in requestable denials; PEPs interacting with deployments that do not include it MAY omit Catalog Endpoint resolution.  This feature is typically paired with the form-schema feature ({{machine-readable-forms}}).
 
 The Access Request Service MAY publish a Catalogs Document that tells PEPs how to resolve form fields whose values come from backing catalogs (for example, applications, entitlements, roles, or cost centers).  The Catalogs Document is a sibling artifact to the form schema; it does not modify or extend the JSON Schema referenced by `form_schema_url`.
 
@@ -427,13 +431,13 @@ The request body is a JSON object with the following members:
   * `resource`: REQUIRED.  The AuthZEN Resource for this item.
   * `action`: REQUIRED.  The AuthZEN Action for this item.
   * `requested_access`: OPTIONAL.  Per-item `requested_access` overrides; merged with the top-level `requested_access` with item values taking precedence.
-  * `denial`: OPTIONAL.  Per-item denial binding when items came from separate AuthZEN evaluations.  When omitted, the top-level `denial` applies to the item only if the top-level denial is a bundle denial whose binding material covers every item in the `items` array.  A per-item `denial` uses the same members as the top-level `denial` object.
+  * `denial`: OPTIONAL.  Per-item denial binding when items came from separate AuthZEN evaluations.  A per-item `denial` uses the same members as the top-level `denial` object.  Coverage rules (when a per-item `denial` is required versus when the top-level `denial` applies) are specified by the top-level `denial` member definition below.
 
 `context`:
 : OPTIONAL.  The AuthZEN Context from the denied evaluation, augmented with submission-time fields such as business justification.
 
 `denial`:
-: REQUIRED when `items` is absent; OPTIONAL when `items` is present.  Object binding the Access Request to the denied AuthZEN Decision.  When `items` is present, every item MUST be covered by either a per-item `denial` or a top-level bundle denial whose verifiable binding material covers every item in the `items` array.  An Access Request with `items` for which any item lacks a covering denial is malformed and MUST be rejected with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
+: REQUIRED when `items` is absent; OPTIONAL when `items` is present.  Object binding the Access Request to the denied AuthZEN Decision.  When `items` is present, every item MUST be covered by either a per-item `denial` or a top-level bundle denial whose verifiable binding material covers the submitted Subject and every Resource and Action in the `items` array.  An Access Request with `items` for which any item lacks a covering denial is malformed and MUST be rejected with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
 
 `requested_access`:
 : OPTIONAL.  Object containing request-specific information such as requested duration, requested role, requested entitlement, or requested scope.  This object does not define policy semantics and is interpreted by the Access Request Service.  The following well-known optional members are defined; additional members MAY be included subject to {{extension-naming}}:
@@ -478,7 +482,7 @@ A PEP MUST submit an Access Request only for an AuthZEN Decision with `decision`
 
 The submitted `denial` object for each requested item MUST include either `denial.access_request.request_context` or `denial.evaluation_id`.  The Access Request Service MUST reject a submission that lacks verifiable denial-binding material with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
 
-A PEP SHOULD include an `Idempotency-Key` header, following the conventions described in {{!I-D.ietf-httpapi-idempotency-key-header}}.  The Access Request Service SHOULD treat repeated submissions with the same `Idempotency-Key`, requester, subject, action, resource, and denial binding as the same request and return the same Task Handle while the original request remains available.
+A PEP SHOULD include an `Idempotency-Key` header, following the conventions described in {{!I-D.ietf-httpapi-idempotency-key-header}}.  The Idempotency-Key covers the entire submission body, including all members of the `items` array when present; the Access Request Service SHOULD treat a repeated submission with the same `Idempotency-Key`, the same authenticated requester, and an equivalent submission body as the same request and return the same Task Handle while the original request remains available.  A submission with the same `Idempotency-Key` and authenticated requester but a materially different submission body MUST be rejected with `urn:openid:authzen:access-request:error:duplicate_request`.
 
 Non-normative example:
 
@@ -618,7 +622,13 @@ The `task` object has the following members:
   * `status`: REQUIRED.  Per-item status using the values defined in {{task-status}}.
   * `result`: OPTIONAL before the item reaches a terminal status; REQUIRED when the item status is `approved`.  Per-item completion result with the same shape as the top-level `result` ({{completion-semantics}}).
 
-When the `items` member is present, the aggregate `task.status` reflects deployment-defined aggregation across per-item statuses.  A PEP processing a bundled task MUST consult `task.items[].status` and `task.items[].result` to determine per-item outcomes; the PEP MUST NOT infer per-item outcomes from the aggregate `task.status` alone.  A top-level `result` MUST NOT be used to authorize any individual item in a bundled task unless the same result is also present in that item's `result` member.
+When the `items` member is present, the aggregate `task.status` is computed from per-item statuses as follows:
+
+* If any item is `pending`, the aggregate is `pending`.
+* Otherwise, if all items share the same terminal status, the aggregate is that status.
+* Otherwise, with two or more distinct terminal statuses present across items, the aggregate is `partial`.
+
+A PEP processing a bundled task MUST consult `task.items[].status` and `task.items[].result` to determine per-item outcomes; the PEP MUST NOT infer per-item outcomes from the aggregate `task.status` alone.  A top-level `result` MUST NOT be used to authorize any individual item in a bundled task unless the same result is also present in that item's `result` member.
 
 Non-normative example:
 
@@ -676,6 +686,8 @@ The Task Status Endpoint allows the PEP to retrieve the state of a previously su
 
 The PEP calls the `status_endpoint` using the HTTP `GET` method as defined in {{RFC9110}}.
 
+The Task Handle is portable across PEP instances and process lifetimes.  A caller MAY interact with the Task Handle, such as polling status or initiating cancellation, even if that caller is not the original submitting PEP, provided the caller is authorized for the original Subject, Resource, Action, task, and requested operation.  This supports PEP restart, replacement, and agent-runtime handoff, where the Task Handle flows through application context (such as a conversation thread, a session store, or a workflow orchestrator).  This profile does not define an enumeration API for tasks belonging to a Subject; Task Handles are exchanged through the channels by which the original Access Request response was delivered.
+
 Non-normative example:
 
 ~~~ http
@@ -685,7 +697,7 @@ Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
 Accept: application/json
 ~~~
 
-A successful response returns a JSON object containing a `task` member and, when the task is complete, MAY include a `result` member.
+A successful response returns a JSON object containing a `task` member.  Completed task responses include a `result` member according to the rules in {{completed-task-response}}.
 
 ## Task Status Values {#task-status}
 
@@ -709,6 +721,9 @@ The following task status values are defined:
 `failed`:
 : The request could not be completed due to an error.
 
+`partial`:
+: All items in a bulk task ({{access-request-response}}) reached terminal status, but with mixed outcomes (for example, some items approved while others denied).  This status is only valid for tasks containing an `items` array.  A PEP receiving `partial` MUST consult `task.items[].status` to determine per-item outcomes and MUST NOT infer aggregate access permission.
+
 Implementations MAY define additional status values.  A PEP that receives an unknown status value MUST treat the task as not approved.
 
 ### Mapping Backend States {#status-mapping}
@@ -725,6 +740,7 @@ The following non-normative mapping illustrates one such collapse and may be use
 | Closed, time-bounded request elapsed before completion | `expired` |
 | Closed, requester or administrator stopped the request | `cancelled` |
 | Closed, system error prevented completion | `failed` |
+| Closed, items in a bulk task reached two or more distinct terminal statuses | `partial` |
 
 Implementations SHOULD document the mapping they apply so that PEP behavior remains predictable across upgrades and operational changes.
 
@@ -748,7 +764,7 @@ Content-Type: application/json
 
 ## Completed Task Response
 
-A completed task response MAY include a `result` object.  The `result` object MUST use one of the completion forms defined in {{completion-semantics}}.
+A completed task response with `task.status` equal to `approved` MUST include a `result` object.  A completed task response with any other terminal status MAY include a `result` object for diagnostic or workflow information, but the PEP MUST NOT treat it as approval.  When present, the `result` object MUST use one of the completion forms defined in {{completion-semantics}}.
 
 A task remains retrievable from the Task Status Endpoint after it has reached a terminal status, until `task.expires_at` is reached or the Access Request Service removes it according to local retention policy.  After expiry or removal, the Task Status Endpoint MUST return `urn:openid:authzen:access-request:error:task_expired` or `urn:openid:authzen:access-request:error:unknown_task` as appropriate.
 
@@ -793,15 +809,19 @@ The cancellation request body is an OPTIONAL JSON object with the following memb
 
 A successful cancellation returns `200 OK` and the updated `task` object whose `status` is `cancelled`.  Cancellation of a task that has already reached a terminal status returns `409 Conflict` using the `urn:openid:authzen:access-request:error:invalid_task_state` problem type.
 
-The Access Request Service MUST authenticate the PEP and MUST verify the PEP is authorized to cancel the request, typically by confirming the PEP submitted the request or that the PEP is authorized to act for the original Subject.  An Access Request Service that does not support PEP-initiated cancellation omits `links.cancel`.  If a PEP nevertheless attempts cancellation at a cancellation endpoint, the Access Request Service returns `405 Method Not Allowed`.
+The Access Request Service MUST authenticate the PEP and MUST verify the PEP is authorized for the original Subject, Resource, Action, task, and cancellation operation.  Confirmation that the PEP submitted the request or is authorized to act for the original Subject is not sufficient unless the Access Request Service also verifies authorization for the bound Resource, Action, task, and operation.  An Access Request Service that does not support PEP-initiated cancellation omits `links.cancel`.  If a PEP nevertheless attempts cancellation at a cancellation endpoint, the Access Request Service returns `405 Method Not Allowed`.
+
+For a task containing an `items` array, cancellation cancels every item currently in `pending` status; items already in a terminal status remain unchanged.  The aggregate `task.status` is recomputed according to the aggregation rule defined in {{access-request-response}}, which yields `cancelled` when no item completed before cancellation, or `partial` when some items reached other terminal statuses first.  Cancellation of a bulk task in which every item is already in a terminal status returns `409 Conflict` with `urn:openid:authzen:access-request:error:invalid_task_state`.
 
 PEPs that need to abandon an outstanding request without using this endpoint MAY stop polling and rely on `task.expires_at` and Access Request Service expiry to release resources.
 
 # Completion Semantics {#completion-semantics}
 
-This profile defines three completion modes, identified by `result.mode`: `reevaluate`, `decision`, and `token`.  Implementations MAY define additional completion modes.  A PEP that receives an unknown `result.mode` value MUST treat the task as not approved and MUST NOT permit access on the basis of that result.
+This profile defines two completion modes, identified by `result.mode`: `reevaluate` and `decision`.  Implementations MAY define additional completion modes; in particular, profiles of this specification (such as a profile binding the Access Request Service to OAuth 2.0 token issuance) MAY define new modes such as `token`.  A PEP that receives an unknown `result.mode` value MUST treat the task as not approved and MUST NOT permit access on the basis of that result.
 
-Most existing approval, IGA, and ITSM systems map naturally onto Re-evaluation Mode: approval changes state in a backing system, and a subsequent AuthZEN evaluation reflects that state.  Decision Result Mode and Token Result Mode address narrower deployment patterns and are not expected to be supported by every Access Request Service.
+Most existing approval, IGA, and ITSM systems map naturally onto Re-evaluation Mode: approval changes state in a backing system, and a subsequent AuthZEN evaluation reflects that state.  Decision Result Mode addresses narrower deployment patterns and is not expected to be supported by every Access Request Service.
+
+For a task containing an `items` array ({{access-request-response}}), each approved item MUST include a per-item `result` that is independently enforceable according to its own `result.mode`.  Different approved items MAY use different `result.mode` values.
 
 ## Re-evaluation Mode
 
@@ -809,13 +829,13 @@ In re-evaluation mode, the Access Request Service returns an approval reference 
 
 The `result.mode` value is `reevaluate`.
 
-The result MAY include an `approval_context` member.  `approval_context` is an opaque object populated by the Access Request Service or PDP.  When present, the PEP MUST include it as a member named `authzen_access_request_approval` inside the AuthZEN request `context` when re-evaluating.  The PEP MUST NOT modify or interpret the contents of `approval_context`.
+The result MAY include an `approval_context` member.  `approval_context` is an opaque object populated by the Access Request Service or PDP.  When present, the PEP MUST include it as a member named `authzen_access_request_approval` inside the AuthZEN request `context` when re-evaluating.  When absent, the PEP re-evaluates without `authzen_access_request_approval` and relies on current PDP policy and backing state to reflect the approval.  The PEP MUST NOT modify or interpret the contents of `approval_context`.
 
 The PDP MUST evaluate the new request using current policy and the approval reference.  The PDP MAY still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.
 
 When the re-evaluation response indicates an approval expiry (typically as `context.approval.approved_until`), the PEP MUST NOT enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) MUST bound the lifetime of those credentials by the approval expiry.
 
-When the original submission carried an `items` array, the PEP re-evaluates each approved item separately using the per-item `task.items[].result.approval_context`; this profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.
+When the original submission carried an `items` array, the PEP re-evaluates each approved item separately.  If the per-item `task.items[].result` contains `approval_context`, the PEP includes it in that item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.
 
 Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.
 
@@ -877,6 +897,7 @@ A `result` with `mode` equal to `decision` MUST include a `binding` member.  The
 The PEP MAY enforce the returned Decision only if all of the following are true:
 
 * The response was retrieved over an authenticated channel from the Access Request Service identified in PDP metadata or the requestable denial.
+* `result.decision.decision` is `true`.
 * The `binding.task_id` equals the task identifier the PEP submitted, and the `binding.subject`, `binding.resource`, and `binding.action` equal the values the PEP submitted in the Access Request.
 * The current time is at or before `binding.expires_at`.
 * The PEP understands all obligations required for enforcement.
@@ -930,33 +951,6 @@ Non-normative example:
 }
 ~~~
 
-## Token Result Mode
-
-In token result mode, the completed task response returns a token or token reference that the PEP can use to call a downstream resource server, or to exchange for a downstream credential, in order to perform the approved operation.  The PEP MUST NOT treat receipt of the token as itself an authorization decision; the token is consumed by the system that the token is audience-restricted to, and that system performs its own authorization checks.
-
-The `result.mode` value is `token`.
-
-This profile does not define the token format.  When OAuth 2.0 access tokens are used, the token response and token usage MUST follow the applicable OAuth specifications, including {{RFC6749}} and {{RFC6750}}.
-
-The token MUST be audience-restricted to the intended recipient, time-bounded, and bound to the approved subject, resource, action, and task to the extent supported by the token format.
-
-Non-normative example:
-
-~~~ json
-{
-  "task": {
-    "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-    "status": "approved"
-  },
-  "result": {
-    "mode": "token",
-    "token_type": "Bearer",
-    "access_token": "eyJhbGciOi...",
-    "expires_in": 900
-  }
-}
-~~~
-
 # Callback Completion {#callback-completion}
 
 A PEP MAY request callback notification by including a `callback` object in the Access Request submission.
@@ -970,9 +964,9 @@ The `callback` object has the following members:
 : OPTIONAL.  Opaque value supplied by the PEP and returned unmodified in the callback.
 
 `events`:
-: OPTIONAL.  Array of event names requested by the PEP.  Defined event names are `approved`, `denied`, `expired`, `cancelled`, and `failed`.
+: OPTIONAL.  Array of event names requested by the PEP.  Defined event names are `approved`, `denied`, `expired`, `cancelled`, `failed`, and `partial`.
 
-Callback notifications MUST contain a `task` member and MAY contain a `result` member.  When present, the `result` object MUST use one of the completion forms defined in {{completion-semantics}}.
+Callback notifications MUST contain a `task` member and MAY contain a `result` member.  When present, the `result` object MUST use one of the completion forms defined in {{completion-semantics}}.  A callback whose `task.status` is `approved` but that does not contain an enforceable `result` is only a notification; the PEP MUST retrieve the Task Status Endpoint response before enforcing access.
 
 The Access Request Service MUST authenticate to the callback endpoint using a mechanism agreed between the PEP and Access Request Service.  This specification does not mandate a single callback authentication mechanism, but implementations SHOULD use one of the following: an OAuth 2.0 bearer token {{RFC6750}} issued to the Access Request Service, mutual TLS, or an HMAC signature over the request body using a pre-shared key.  Unauthenticated callbacks MUST NOT be accepted.
 
@@ -980,7 +974,7 @@ Callback delivery is a notification optimization.  The Task Status Endpoint rema
 
 Implementations MAY satisfy completion notification through deployment-level event subscriptions (for example, organization-scoped webhooks or event-streaming bindings defined by companion specifications) rather than per-task callbacks.  When a deployment relies on such a subscription, the PEP MAY omit the `callback` member from the Access Request submission.  Deployment-level event subscriptions deliver the same Task Handle and lifecycle information to subscribed receivers; they are a notification channel and MUST NOT be treated as enforcement unless paired with a separate enforceable result.
 
-Non-normative callback example:
+Non-normative callback example.  This callback is notification-only because it does not include a `result`; the PEP polls the Task Status Endpoint before enforcing access.
 
 ~~~ http
 POST /callbacks/access-requests HTTP/1.1
@@ -1062,6 +1056,8 @@ This specification also defines extensibility for enumerated values:
 * New values for `result.mode` ({{completion-semantics}}).
 * New problem types for {{RFC9457}}-style error responses ({{error-responses}}).
 
+This specification does not create registries for these enumerated values.  Specifications that define new values for `task.status`, `result.mode`, or problem types SHOULD define stable names or URIs and processing rules for those values.  Short, unqualified names for `result.mode` are reserved for values defined by this base specification or by a future registry; profile-defined `result.mode` values SHOULD use absolute URIs unless such a registry exists.
+
 ## Naming Extensions {#extension-naming}
 
 A member name or value added at an extension point MUST be one of the following:
@@ -1082,7 +1078,7 @@ A profile SHOULD:
 
 * Identify itself with a stable URI.
 * Specify the extension points it populates and the member names or enumerated values it introduces.
-* Register registry-eligible names in the AuthZEN Access Request Member Names registry ({{iana-member-names}}) or in the relevant enumeration registry.
+* Register registry-eligible member names in the AuthZEN Access Request Member Names registry ({{iana-member-names}}).
 * Define semantics, validation rules, and any normative requirements for its members.
 * Enumerate any constraints it places on members or behaviors defined by this base specification.
 
@@ -1106,7 +1102,7 @@ A PEP implementing this profile:
 * MUST treat unknown `result.mode` values as not approved.
 * When using Re-evaluation Mode, MUST include any returned `approval_context` unchanged as a member named `authzen_access_request_approval` inside the AuthZEN request `context`.
 * When using Decision Result Mode, MUST verify the `result.binding` matches the originally submitted task identifier, Subject, Resource, and Action, and MUST NOT enforce the Decision after `binding.expires_at`.
-* SHOULD re-evaluate access after approval unless the deployment explicitly supports Decision Result Mode or Token Result Mode.
+* SHOULD re-evaluate access after approval unless the deployment explicitly supports Decision Result Mode or a profile-defined completion mode (for example, a profile that returns an OAuth access token).
 
 # PDP Processing Rules
 
@@ -1130,7 +1126,7 @@ An Access Request Service implementing this profile:
 
 * MUST authenticate and authorize the PEP before accepting Access Request submissions.
 * MUST validate that the submission is based on a requestable denial.
-* MUST verify the denial-binding material for every requested item.  When `denial.access_request.request_context` is present, the service MUST verify its integrity.  When the value is a JWS, the service MUST verify the signature using a key bound to the PDP identity advertised in PDP metadata.  When `denial.access_request.request_context` is absent, the service MUST resolve or validate `denial.evaluation_id`.  The service MUST reject submissions whose binding material cannot be verified or whose claims do not bind to the submitted denial.
+* MUST verify the denial-binding material for every requested item.  When `denial.access_request.request_context` is present, the service MUST verify its integrity.  When the value is a JWS, the service MUST verify the signature using a key bound to the PDP identity advertised in PDP metadata.  This profile does not define PDP signing key discovery; deployments MUST provision or discover verification keys through a trusted mechanism such as local configuration, deployment metadata, or a companion specification.  When `denial.access_request.request_context` is absent, the service MUST resolve or validate `denial.evaluation_id`.  The service MUST reject submissions whose binding material cannot be verified or whose claims do not bind to the submitted denial.
 * MUST bind the task to the submitted Subject, Resource, Action, Context, denial, requester, and client.
 * MUST return an opaque Task Handle for accepted requests.
 * SHOULD support idempotent request submission using the `Idempotency-Key` header.
@@ -1144,6 +1140,8 @@ An Access Request Service implementing this profile:
 The Access Request Endpoint and Task Status Endpoint are protected APIs.  Support for OAuth 2.0 {{RFC6749}} is RECOMMENDED.  When OAuth 2.0 bearer tokens are used, the endpoints MUST follow {{RFC6750}}.  Catalog Endpoints ({{catalog-references}}) and the Cancellation endpoint ({{cancellation}}) are similarly protected; their authorization rules are defined in their respective sections.
 
 The Access Request Service MUST authenticate the PEP or caller before accepting a submission or returning task status.  The service MUST verify that the caller is authorized to submit or view the request for the supplied Subject, Resource, and Action.
+
+Authorization for Task Handle interactions, such as status retrieval and cancellation, is bound to the original Subject, Resource, Action, task, and requested operation rather than to a specific access token, session, or PEP instance.  Refresh of a calling identity's underlying token does not invalidate Task Handle access as long as the caller remains authorized for that bound task; a different PEP instance or agent process that can authenticate as authorized for the bound task MAY interact with the Task Handle.
 
 A task status response MUST NOT disclose approval details, approver identities, policy identifiers, or resource metadata to a caller that is not authorized to receive them.
 
@@ -1171,7 +1169,7 @@ The `request_context` member round-trips PDP-issued state through the PEP to the
 
 ## Approval Replay
 
-Approval references and tokens can be replayed if not time-bounded and audience-restricted.  Approval results MUST expire.  Token Result Mode MUST use short-lived, audience-restricted tokens.  Re-evaluation Mode SHOULD bind approval references to the original request tuple.
+Approval references can be replayed if not time-bounded.  Approval results MUST expire.  Re-evaluation Mode SHOULD bind approval references to the original request tuple.  Profiles of this specification that define token-based completion modes are responsible for defining the token's audience restriction, lifetime, and binding to the approved request.
 
 ## Overbroad Approval
 
@@ -1525,4 +1523,4 @@ The author thanks the OpenID AuthZEN Working Group for discussion and review.
 # Document History
 
 -00
-: Initial version.  Defines requestable denials, the Access Request Endpoint, Task Handles, Task Status Endpoint, three completion modes (re-evaluation, decision result, token result), per-task callbacks, machine-readable form schemas, sibling Catalogs Document and Catalog Endpoint protocol, integrity-protected `request_context`, bulk submission with per-item progress, multi-step `progress` reporting, PEP-initiated cancellation, synchronous-completion response, the Extensibility and Profiles framework with the AuthZEN Access Request Member Names registry, an Implementation Considerations appendix covering identity governance platforms, subjects/principals/actors, form and catalog translation, notification channels, and approval-volume workflow design, and PDP / PEP / Access Request Service processing rules.
+: Initial version.  Defines requestable denials, the Access Request Endpoint, Task Handles, Task Status Endpoint, two completion modes (re-evaluation and decision result), per-task callbacks, machine-readable form schemas, sibling Catalogs Document and Catalog Endpoint protocol, integrity-protected `request_context`, bulk submission with per-item progress and aggregation rules, multi-step `progress` reporting, PEP-initiated cancellation, synchronous-completion response, the Extensibility and Profiles framework with the AuthZEN Access Request Member Names registry, an Implementation Considerations appendix covering identity governance platforms, subjects/principals/actors, form and catalog translation, notification channels, and approval-volume workflow design, and PDP / PEP / Access Request Service processing rules.
