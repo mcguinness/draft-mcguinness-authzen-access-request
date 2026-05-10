@@ -1631,7 +1631,7 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 <dt id="section-7-3.11">
 <code>expires_in</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-3.12">
-          <p id="section-7-3.12.1"><span class="bcp14">OPTIONAL</span>.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP <span class="bcp14">MUST</span> compute the hint's expiry by adding <code>expires_in</code> to the time the Decision was produced; that production time is taken from an explicit evaluation timestamp when available, otherwise from the HTTP <code>Date</code> response header.  If neither time source is available, the PEP <span class="bcp14">MUST</span> treat the hint as expired.  PDPs <span class="bcp14">SHOULD</span> use <code>expires_at</code> instead of <code>expires_in</code> when precise expiry handling is required.<a href="#section-7-3.12.1" class="pilcrow">¶</a></p>
+          <p id="section-7-3.12.1"><span class="bcp14">OPTIONAL</span>.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP <span class="bcp14">MUST</span> compute the hint's expiry by adding <code>expires_in</code> to the time the Decision was produced; that production time is taken from <code>context.evaluated_at</code> when present, otherwise from the HTTP <code>Date</code> response header.  If neither time source is available, the PEP <span class="bcp14">MUST</span> treat the hint as expired.  PDPs <span class="bcp14">SHOULD</span> use <code>expires_at</code> instead of <code>expires_in</code> when precise expiry handling is required.<a href="#section-7-3.12.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-3.13">
@@ -1674,6 +1674,8 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 {
   "decision": false,
   "context": {
+    "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+    "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
     "access_request": {
       "requestable": true,
@@ -1703,6 +1705,7 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 <p id="section-7.1-2">A PDP returns <code>evaluation_id</code> as a member of the AuthZEN Decision Context: <code>context.evaluation_id</code>, a string.  The PEP echoes the captured identifier as <code>denial.evaluation_id</code> when submitting an Access Request.<a href="#section-7.1-2" class="pilcrow">¶</a></p>
 <p id="section-7.1-3"><code>evaluation_id</code> <span class="bcp14">MUST</span> be stable for a given evaluation: subsequent retrievals or echoes of the same evaluation <span class="bcp14">MUST</span> return the same identifier.  PDPs <span class="bcp14">SHOULD</span> generate identifiers that are unique within the PDP's namespace (for example, ULIDs or UUIDs).  An identifier <span class="bcp14">MAY</span> be reused across distinct evaluations only after the original evaluation's binding window has expired.<a href="#section-7.1-3" class="pilcrow">¶</a></p>
 <p id="section-7.1-4">A PDP that returns <code>requestable=true</code> without an integrity-protected <code>request_context</code> <span class="bcp14">MUST</span> include <code>evaluation_id</code> so the Access Request Service has verifiable denial-binding material.<a href="#section-7.1-4" class="pilcrow">¶</a></p>
+<p id="section-7.1-5">A PDP <span class="bcp14">MAY</span> return <code>evaluated_at</code> as a member of the AuthZEN Decision Context: <code>context.evaluated_at</code>, an <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the Decision was produced.  The PEP echoes the captured timestamp as <code>denial.evaluated_at</code> when submitting an Access Request.<a href="#section-7.1-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -2543,16 +2546,19 @@ Content-Type: application/json
         <h3 id="name-completed-task-response">
 <a href="#section-11.3" class="section-number selfRef">11.3. </a><a href="#name-completed-task-response" class="section-name selfRef">Completed Task Response</a>
         </h3>
-<p id="section-11.3-1">A completed task response includes a <code>result</code> object as follows:<a href="#section-11.3-1" class="pilcrow">¶</a></p>
+<p id="section-11.3-1">A completed task response includes result information as follows:<a href="#section-11.3-1" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-11.3-2.1">
-            <p id="section-11.3-2.1.1">When <code>task.status</code> is <code>approved</code>, the response <span class="bcp14">MUST</span> include a <code>result</code> object.<a href="#section-11.3-2.1.1" class="pilcrow">¶</a></p>
+            <p id="section-11.3-2.1.1">When <code>task.status</code> is <code>approved</code> and the task does not contain an <code>items</code> array, the response <span class="bcp14">MUST</span> include a top-level <code>result</code> object.<a href="#section-11.3-2.1.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-11.3-2.2">
-            <p id="section-11.3-2.2.1">For any other terminal status, the response <span class="bcp14">MAY</span> include a <code>result</code> object for diagnostic or workflow information, but the PEP <span class="bcp14">MUST NOT</span> treat it as approval.<a href="#section-11.3-2.2.1" class="pilcrow">¶</a></p>
+            <p id="section-11.3-2.2.1">When <code>task.status</code> is <code>approved</code> and the task contains an <code>items</code> array, each approved item in <code>task.items[]</code> <span class="bcp14">MUST</span> include its own <code>result</code> object.  The response <span class="bcp14">MAY</span> also include a top-level <code>result</code> object for aggregate workflow information, but a PEP <span class="bcp14">MUST NOT</span> use that top-level <code>result</code> to authorize an individual item unless the same result is also present in that item's <code>result</code> member.<a href="#section-11.3-2.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-11.3-2.3">
-            <p id="section-11.3-2.3.1">When present, the <code>result</code> object <span class="bcp14">MUST</span> use one of the completion forms defined in <a href="#completion-semantics" class="auto internal xref">Section 12</a>.<a href="#section-11.3-2.3.1" class="pilcrow">¶</a></p>
+            <p id="section-11.3-2.3.1">For any other terminal status, the response <span class="bcp14">MAY</span> include a <code>result</code> object for diagnostic or workflow information, but the PEP <span class="bcp14">MUST NOT</span> treat it as approval.<a href="#section-11.3-2.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-11.3-2.4">
+            <p id="section-11.3-2.4.1">When present, the <code>result</code> object <span class="bcp14">MUST</span> use one of the completion forms defined in <a href="#completion-semantics" class="auto internal xref">Section 12</a>.<a href="#section-11.3-2.4.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 <p id="section-11.3-3">A task remains retrievable from the Task Status Endpoint after it has reached a terminal status, until <code>task.expires_at</code> is reached or the Access Request Service removes it according to local retention policy.  After expiry or removal, the Task Status Endpoint <span class="bcp14">MUST</span> return <code>urn:openid:authzen:access-request:error:task_expired</code> or <code>urn:openid:authzen:access-request:error:unknown_task</code> as appropriate.<a href="#section-11.3-3" class="pilcrow">¶</a></p>
@@ -2629,13 +2635,25 @@ Content-Type: application/json
         </h3>
 <p id="section-12.1-1">In re-evaluation mode, the Access Request Service returns an approval reference and instructs the PEP to perform a new AuthZEN Access Evaluation.<a href="#section-12.1-1" class="pilcrow">¶</a></p>
 <p id="section-12.1-2">The <code>result.mode</code> value is <code>reevaluate</code>.<a href="#section-12.1-2" class="pilcrow">¶</a></p>
-<p id="section-12.1-3">The result <span class="bcp14">MAY</span> include an <code>approval_context</code> member.  <code>approval_context</code> is an opaque object populated by the Access Request Service or PDP.  When present, the PEP <span class="bcp14">MUST</span> include it as a member named <code>authzen_access_request_approval</code> inside the AuthZEN request <code>context</code> when re-evaluating.  When absent, the PEP re-evaluates without <code>authzen_access_request_approval</code> and relies on current PDP policy and backing state to reflect the approval.  The PEP <span class="bcp14">MUST NOT</span> modify or interpret the contents of <code>approval_context</code>.<a href="#section-12.1-3" class="pilcrow">¶</a></p>
-<p id="section-12.1-4">The PDP <span class="bcp14">MUST</span> evaluate the new request using current policy and the approval reference.  The PDP <span class="bcp14">MAY</span> still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.<a href="#section-12.1-4" class="pilcrow">¶</a></p>
-<p id="section-12.1-5">When the re-evaluation response indicates an approval expiry (typically as <code>context.approval.approved_until</code>), the PEP <span class="bcp14">MUST NOT</span> enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) <span class="bcp14">MUST</span> bound the lifetime of those credentials by the approval expiry.<a href="#section-12.1-5" class="pilcrow">¶</a></p>
-<p id="section-12.1-6">When the original submission carried an <code>items</code> array, the PEP re-evaluates each approved item separately.  If the per-item <code>task.items[].result</code> contains <code>approval_context</code>, the PEP includes it in that item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.<a href="#section-12.1-6" class="pilcrow">¶</a></p>
-<p id="section-12.1-7">Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.<a href="#section-12.1-7" class="pilcrow">¶</a></p>
-<p id="section-12.1-8">Non-normative re-evaluation request:<a href="#section-12.1-8" class="pilcrow">¶</a></p>
-<div class="lang-json sourcecode" id="section-12.1-9">
+<p id="section-12.1-3">The result <span class="bcp14">MUST</span> include an <code>approval</code> member.  The <code>approval</code> object identifies the approval that completed the Access Request task and has the following members:<a href="#section-12.1-3" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-12.1-4.1">
+            <p id="section-12.1-4.1.1"><code>id</code>: <span class="bcp14">REQUIRED</span>.  String.  Stable identifier of the approval.<a href="#section-12.1-4.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-12.1-4.2">
+            <p id="section-12.1-4.2.1"><code>approved_at</code>: <span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the approval completed.<a href="#section-12.1-4.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-12.1-4.3">
+            <p id="section-12.1-4.3.1"><code>approved_until</code>: <span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating the latest time through which the approval remains valid.  When present, the PEP <span class="bcp14">MUST NOT</span> use the approval for re-evaluation after this timestamp.<a href="#section-12.1-4.3.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-12.1-5">The result <span class="bcp14">MAY</span> include an <code>approval_context</code> member.  <code>approval_context</code> is an opaque object populated by the Access Request Service or PDP.  When present, the PEP <span class="bcp14">MUST</span> include it as a member named <code>authzen_access_request_approval</code> inside the AuthZEN request <code>context</code> when re-evaluating.  When absent, the PEP re-evaluates without <code>authzen_access_request_approval</code> and relies on current PDP policy and backing state to reflect the approval.  The PEP <span class="bcp14">MUST NOT</span> modify or interpret the contents of <code>approval_context</code>.<a href="#section-12.1-5" class="pilcrow">¶</a></p>
+<p id="section-12.1-6">The PDP <span class="bcp14">MUST</span> evaluate the new request using current policy and the approval reference.  The PDP <span class="bcp14">MAY</span> still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.<a href="#section-12.1-6" class="pilcrow">¶</a></p>
+<p id="section-12.1-7">When the re-evaluation response indicates an approval expiry (typically as <code>context.approval.approved_until</code>), the PEP <span class="bcp14">MUST NOT</span> enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) <span class="bcp14">MUST</span> bound the lifetime of those credentials by the approval expiry.<a href="#section-12.1-7" class="pilcrow">¶</a></p>
+<p id="section-12.1-8">When the original submission carried an <code>items</code> array, the PEP re-evaluates each approved item separately.  If the per-item <code>task.items[].result</code> contains <code>approval_context</code>, the PEP includes it in that item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.<a href="#section-12.1-8" class="pilcrow">¶</a></p>
+<p id="section-12.1-9">Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.<a href="#section-12.1-9" class="pilcrow">¶</a></p>
+<p id="section-12.1-10">Non-normative re-evaluation request:<a href="#section-12.1-10" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-12.1-11">
 <pre>
 {
   "subject": {
@@ -2656,10 +2674,10 @@ Content-Type: application/json
     "time": "2026-04-30T20:43:00Z"
   }
 }
-</pre><a href="#section-12.1-9" class="pilcrow">¶</a>
+</pre><a href="#section-12.1-11" class="pilcrow">¶</a>
 </div>
-<p id="section-12.1-10">Non-normative re-evaluation response:<a href="#section-12.1-10" class="pilcrow">¶</a></p>
-<div class="lang-json sourcecode" id="section-12.1-11">
+<p id="section-12.1-12">Non-normative re-evaluation response:<a href="#section-12.1-12" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-12.1-13">
 <pre>
 {
   "decision": true,
@@ -2670,9 +2688,9 @@ Content-Type: application/json
     }
   }
 }
-</pre><a href="#section-12.1-11" class="pilcrow">¶</a>
+</pre><a href="#section-12.1-13" class="pilcrow">¶</a>
 </div>
-<p id="section-12.1-12">Re-evaluation mode is the <span class="bcp14">RECOMMENDED</span> completion mode because it ensures the PDP remains authoritative at enforcement time.<a href="#section-12.1-12" class="pilcrow">¶</a></p>
+<p id="section-12.1-14">Re-evaluation mode is the <span class="bcp14">RECOMMENDED</span> completion mode because it ensures the PDP remains authoritative at enforcement time.<a href="#section-12.1-14" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="decision-result-mode">
@@ -2913,7 +2931,7 @@ Content-Type: application/problem+json
             <p id="section-15.1-2.3.1"><code>requested_access</code> in an Access Request submission.<a href="#section-15.1-2.3.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.1-2.4">
-            <p id="section-15.1-2.4.1"><code>client</code> and <code>client.source</code> in an Access Request submission.<a href="#section-15.1-2.4.1" class="pilcrow">¶</a></p>
+            <p id="section-15.1-2.4.1"><code>client</code>, <code>client.actor</code>, and <code>client.source</code> in an Access Request submission.<a href="#section-15.1-2.4.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.1-2.5">
             <p id="section-15.1-2.5.1">A Catalog Item within a Catalog Response.<a href="#section-15.1-2.5.1" class="pilcrow">¶</a></p>
@@ -3620,6 +3638,8 @@ Content-Type: application/json
 {
   "decision": false,
   "context": {
+    "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+    "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
     "access_request": {
       "requestable": true,

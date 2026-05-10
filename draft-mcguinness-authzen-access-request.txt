@@ -381,11 +381,10 @@ Table of Contents
       requestable denial hint from the time the Decision was produced.
       The PEP MUST compute the hint's expiry by adding expires_in to the
       time the Decision was produced; that production time is taken from
-      an explicit evaluation timestamp when available, otherwise from
-      the HTTP Date response header.  If neither time source is
-      available, the PEP MUST treat the hint as expired.  PDPs SHOULD
-      use expires_at instead of expires_in when precise expiry handling
-      is required.
+      context.evaluated_at when present, otherwise from the HTTP Date
+      response header.  If neither time source is available, the PEP
+      MUST treat the hint as expired.  PDPs SHOULD use expires_at
+      instead of expires_in when precise expiry handling is required.
 
    request_context:  OPTIONAL.  String.  Opaque context to be returned
       to the Access Request Service when submitting the access request.
@@ -445,6 +444,8 @@ Table of Contents
    {
      "decision": false,
      "context": {
+       "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+       "evaluated_at": "2026-04-30T20:15:00Z",
        "reason": "approval_required",
        "access_request": {
          "requestable": true,
@@ -486,6 +487,11 @@ Table of Contents
    A PDP that returns requestable=true without an integrity-protected
    request_context MUST include evaluation_id so the Access Request
    Service has verifiable denial-binding material.
+
+   A PDP MAY return evaluated_at as a member of the AuthZEN Decision
+   Context: context.evaluated_at, an [RFC3339] timestamp indicating when
+   the Decision was produced.  The PEP echoes the captured timestamp as
+   denial.evaluated_at when submitting an Access Request.
 
 8.  Machine-Readable Forms
 
@@ -1291,10 +1297,17 @@ Table of Contents
 
 11.3.  Completed Task Response
 
-   A completed task response includes a result object as follows:
+   A completed task response includes result information as follows:
 
-   *  When task.status is approved, the response MUST include a result
-      object.
+   *  When task.status is approved and the task does not contain an
+      items array, the response MUST include a top-level result object.
+
+   *  When task.status is approved and the task contains an items array,
+      each approved item in task.items[] MUST include its own result
+      object.  The response MAY also include a top-level result object
+      for aggregate workflow information, but a PEP MUST NOT use that
+      top-level result to authorize an individual item unless the same
+      result is also present in that item's result member.
 
    *  For any other terminal status, the response MAY include a result
       object for diagnostic or workflow information, but the PEP MUST
@@ -1415,6 +1428,20 @@ Table of Contents
    Evaluation.
 
    The result.mode value is reevaluate.
+
+   The result MUST include an approval member.  The approval object
+   identifies the approval that completed the Access Request task and
+   has the following members:
+
+   *  id: REQUIRED.  String.  Stable identifier of the approval.
+
+   *  approved_at: OPTIONAL.  [RFC3339] timestamp indicating when the
+      approval completed.
+
+   *  approved_until: OPTIONAL.  [RFC3339] timestamp indicating the
+      latest time through which the approval remains valid.  When
+      present, the PEP MUST NOT use the approval for re-evaluation after
+      this timestamp.
 
    The result MAY include an approval_context member.  approval_context
    is an opaque object populated by the Access Request Service or PDP.
@@ -1727,7 +1754,8 @@ Table of Contents
 
    *  requested_access in an Access Request submission.
 
-   *  client and client.source in an Access Request submission.
+   *  client, client.actor, and client.source in an Access Request
+      submission.
 
    *  A Catalog Item within a Catalog Response.
 
@@ -2337,6 +2365,8 @@ Table of Contents
    {
      "decision": false,
      "context": {
+       "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+       "evaluated_at": "2026-04-30T20:15:00Z",
        "reason": "approval_required",
        "access_request": {
          "requestable": true,
