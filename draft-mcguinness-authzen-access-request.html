@@ -1179,7 +1179,10 @@ svg :is([fill="white"], [fill^="#fff"]) {
                 <p id="section-toc.1-1.9.2.4.1"><a href="#section-9.4" class="auto internal xref">9.4</a>.  <a href="#name-pep-resolution-rules" class="internal xref">PEP Resolution Rules</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9.2.5">
-                <p id="section-toc.1-1.9.2.5.1"><a href="#section-9.5" class="auto internal xref">9.5</a>.  <a href="#name-agent-protocol-catalogs" class="internal xref">Agent Protocol Catalogs</a></p>
+                <p id="section-toc.1-1.9.2.5.1"><a href="#section-9.5" class="auto internal xref">9.5</a>.  <a href="#name-access-request-service-cata" class="internal xref">Access Request Service Catalog Validation</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.9.2.6">
+                <p id="section-toc.1-1.9.2.6.1"><a href="#section-9.6" class="auto internal xref">9.6</a>.  <a href="#name-agent-protocol-catalogs" class="internal xref">Agent Protocol Catalogs</a></p>
 </li>
             </ul>
 </li>
@@ -1549,15 +1552,18 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
      |&lt;-------------------------------------------------------------------|
      |                                   |                                 |
      | 5. Poll task or receive callback  |                                 |
+     |    (consume result in Decision    |                                 |
+     |     Result Mode)                  |                                 |
      |-------------------------------------------------------------------&gt;|
      |&lt;-------------------------------------------------------------------|
      |                                   |                                 |
-     | 6. Re-evaluate or consume result  |                                 |
+     | 6. Re-evaluate                    |                                 |
+     |    (Re-evaluation Mode only)      |                                 |
      |----------------------------------&gt;|                                 |
      |&lt;----------------------------------|                                 |
 </pre><a href="#section-5-1" class="pilcrow">¶</a>
 </div>
-<p id="section-5-2">The access evaluation in step 1 uses the existing AuthZEN Access Evaluation API.  The denial in step 2 is still a denial.  The PEP <span class="bcp14">MUST NOT</span> permit the requested operation based only on the presence of <code>context.access_request</code>.<a href="#section-5-2" class="pilcrow">¶</a></p>
+<p id="section-5-2">The access evaluation in step 1 uses the existing AuthZEN Access Evaluation API.  The denial in step 2 is still a denial.  The PEP <span class="bcp14">MUST NOT</span> permit the requested operation based only on the presence of <code>context.access_request</code>.  In Re-evaluation Mode, step 6 is a new AuthZEN evaluation against the PDP; in Decision Result Mode, the bound result returned in step 5 is enforced directly and step 6 does not occur.<a href="#section-5-2" class="pilcrow">¶</a></p>
 <p id="section-5-3">The Access Request Service <span class="bcp14">MAY</span> additionally publish lifecycle events for governance, audit, and analytics consumers through deployment-level event subscriptions defined by companion specifications.  Such channels are independent of the per-task callback and are not used for enforcement.<a href="#section-5-3" class="pilcrow">¶</a></p>
 </section>
 </div>
@@ -1941,19 +1947,26 @@ Content-Type: application/json
             <p id="section-9.4-2.5.1"><span class="bcp14">MUST</span> treat unknown members of a Catalog Item as informational and <span class="bcp14">MUST NOT</span> rely on them for enforcement.<a href="#section-9.4-2.5.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-9.4-2.6">
-            <p id="section-9.4-2.6.1"><span class="bcp14">MUST NOT</span> treat <code>granted</code> or any other Catalog Item member as an authorization decision.  Such members can only be used to suppress or shape Access Request submission.<a href="#section-9.4-2.6.1" class="pilcrow">¶</a></p>
+            <p id="section-9.4-2.6.1"><span class="bcp14">MUST NOT</span> treat <code>granted</code> or any other Catalog Item member as an authorization decision.  Such members <span class="bcp14">MAY</span> be used to suppress or shape Access Request submission, but <span class="bcp14">MUST NOT</span> be used as authorization input.<a href="#section-9.4-2.6.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
-<p id="section-9.4-3">The Access Request Service <span class="bcp14">MUST</span> validate submitted catalog identifiers at submission time.  It <span class="bcp14">MUST</span> reject, normalize, or route for additional review any submitted catalog value that is no longer valid, no longer requestable by the caller, disabled, retired, or materially different in risk or ownership from the item resolved by the PEP.<a href="#section-9.4-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="access-request-service-catalog-validation">
+<section id="section-9.5">
+        <h3 id="name-access-request-service-cata">
+<a href="#section-9.5" class="section-number selfRef">9.5. </a><a href="#name-access-request-service-cata" class="section-name selfRef">Access Request Service Catalog Validation</a>
+        </h3>
+<p id="section-9.5-1">The Access Request Service <span class="bcp14">MUST</span> validate submitted catalog identifiers at submission time.  It <span class="bcp14">MUST</span> reject, normalize, or route for additional review any submitted catalog value that is no longer valid, no longer requestable by the caller, disabled, retired, or materially different in risk or ownership from the item resolved by the PEP.<a href="#section-9.5-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="catalog-agent-protocol">
-<section id="section-9.5">
+<section id="section-9.6">
         <h3 id="name-agent-protocol-catalogs">
-<a href="#section-9.5" class="section-number selfRef">9.5. </a><a href="#name-agent-protocol-catalogs" class="section-name selfRef">Agent Protocol Catalogs</a>
+<a href="#section-9.6" class="section-number selfRef">9.6. </a><a href="#name-agent-protocol-catalogs" class="section-name selfRef">Agent Protocol Catalogs</a>
         </h3>
-<p id="section-9.5-1">Deployments serving agentic PEPs <span class="bcp14">MAY</span> additionally expose catalogs through an agent protocol.  When such a protocol is used, each catalog <span class="bcp14">SHOULD</span> be exposed as a resource whose identifier or URI template encodes the same scope parameters described by <code>scope_params</code> (for example, <code>entitlements://{application_id}</code>).  Resource read responses <span class="bcp14">SHOULD</span> use the Catalog Response shape defined in this section.<a href="#section-9.5-1" class="pilcrow">¶</a></p>
-<p id="section-9.5-2">This profile does not define agent-protocol discovery or transport.  When both an HTTP Catalog Endpoint and an agent-protocol catalog are exposed, they <span class="bcp14">MUST</span> return the same Catalog Items for equivalent scope parameters.<a href="#section-9.5-2" class="pilcrow">¶</a></p>
+<p id="section-9.6-1">Deployments serving agentic PEPs <span class="bcp14">MAY</span> additionally expose catalogs through an agent protocol.  When such a protocol is used, each catalog <span class="bcp14">SHOULD</span> be exposed as a resource whose identifier or URI template encodes the same scope parameters described by <code>scope_params</code> (for example, <code>entitlements://{application_id}</code>).  Resource read responses <span class="bcp14">SHOULD</span> use the Catalog Response shape defined in this section.<a href="#section-9.6-1" class="pilcrow">¶</a></p>
+<p id="section-9.6-2">This profile does not define agent-protocol discovery or transport.  When both an HTTP Catalog Endpoint and an agent-protocol catalog are exposed, they <span class="bcp14">MUST</span> return the same Catalog Items for equivalent scope parameters.<a href="#section-9.6-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -2020,7 +2033,7 @@ Content-Type: application/json
 <dt id="section-10.1-3.11">
 <code>denial</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-3.12">
-            <p id="section-10.1-3.12.1"><span class="bcp14">REQUIRED</span> when <code>items</code> is absent; <span class="bcp14">OPTIONAL</span> when <code>items</code> is present.  Object binding the Access Request to the denied AuthZEN Decision.  When <code>items</code> is present, every item <span class="bcp14">MUST</span> be covered by either a per-item <code>denial</code> or a top-level bundle denial whose verifiable binding material covers the submitted Subject and every Resource and Action in the <code>items</code> array.  An Access Request with <code>items</code> for which any item lacks a covering denial is malformed and <span class="bcp14">MUST</span> be rejected with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-3.12.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-3.12.1"><span class="bcp14">REQUIRED</span> when <code>items</code> is absent.  When <code>items</code> is present, <span class="bcp14">OPTIONAL</span> only when every item carries its own per-item <code>denial</code>; otherwise <span class="bcp14">REQUIRED</span> as a top-level bundle denial whose verifiable binding material covers the submitted Subject and every Resource and Action in the <code>items</code> array.  Object binding the Access Request to the denied AuthZEN Decision.  An Access Request with <code>items</code> for which any item lacks a covering denial is malformed and <span class="bcp14">MUST</span> be rejected with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-3.12.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-3.13">
@@ -2614,7 +2627,7 @@ Content-Type: application/json
 <p id="section-11.4-4">A successful cancellation returns <code>200 OK</code> and the updated <code>task</code> object whose <code>status</code> is <code>cancelled</code>.  Cancellation of a task that has already reached a terminal status returns <code>409 Conflict</code> using the <code>urn:openid:authzen:access-request:error:invalid_task_state</code> problem type.<a href="#section-11.4-4" class="pilcrow">¶</a></p>
 <p id="section-11.4-5">The Access Request Service <span class="bcp14">MUST</span> authenticate the PEP and <span class="bcp14">MUST</span> verify the PEP is authorized for the original Subject, Resource, Action, task, and cancellation operation.  Authorization to submit the original request or to act for the Subject does not by itself authorize cancellation; the service <span class="bcp14">MUST</span> verify authorization for the bound Resource, Action, task, and operation.<a href="#section-11.4-5" class="pilcrow">¶</a></p>
 <p id="section-11.4-6">An Access Request Service that does not support PEP-initiated cancellation omits <code>links.cancel</code>; a cancellation attempted at any cancellation endpoint in such a deployment returns <code>405 Method Not Allowed</code>.<a href="#section-11.4-6" class="pilcrow">¶</a></p>
-<p id="section-11.4-7">For a task containing an <code>items</code> array, cancellation cancels every item currently in <code>pending</code> status; items already in a terminal status remain unchanged.  The aggregate <code>task.status</code> is recomputed according to the aggregation rule defined in <a href="#access-request-response" class="auto internal xref">Section 10.2</a>, which yields <code>cancelled</code> when no item completed before cancellation, or <code>partial</code> when some items reached other terminal statuses first.  Cancellation of a bulk task in which every item is already in a terminal status returns <code>409 Conflict</code> with <code>urn:openid:authzen:access-request:error:invalid_task_state</code>.<a href="#section-11.4-7" class="pilcrow">¶</a></p>
+<p id="section-11.4-7">For a task containing an <code>items</code> array, cancellation cancels every item currently in <code>pending</code> status; items already in a terminal status remain unchanged.  Behavior for items in implementation-defined non-terminal statuses (<a href="#task-status" class="auto internal xref">Section 11.1</a>) is implementation-defined; an Access Request Service that defines additional non-terminal statuses <span class="bcp14">SHOULD</span> document whether cancellation transitions those items to <code>cancelled</code> or leaves them unchanged.  The aggregate <code>task.status</code> is recomputed according to the aggregation rule defined in <a href="#access-request-response" class="auto internal xref">Section 10.2</a>, which yields <code>cancelled</code> when no item completed before cancellation, or <code>partial</code> when some items reached other terminal statuses first.  Cancellation of a bulk task in which every item is already in a terminal status returns <code>409 Conflict</code> with <code>urn:openid:authzen:access-request:error:invalid_task_state</code>.<a href="#section-11.4-7" class="pilcrow">¶</a></p>
 <p id="section-11.4-8">PEPs that need to abandon an outstanding request without using this endpoint <span class="bcp14">MAY</span> stop polling and rely on <code>task.expires_at</code> and Access Request Service expiry to release resources.<a href="#section-11.4-8" class="pilcrow">¶</a></p>
 </section>
 </div>
@@ -3864,6 +3877,14 @@ Content-Type: application/json
         <dd>
 <span class="refAuthor">Jones, M.</span> and <span class="refAuthor">D. Hardt</span>, <span class="refTitle">"The OAuth 2.0 Authorization Framework: Bearer Token Usage"</span>, <span class="seriesInfo">RFC 6750</span>, <span class="seriesInfo">DOI 10.17487/RFC6750</span>, <time datetime="2012-10" class="refDate">October 2012</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc6750">https://www.rfc-editor.org/rfc/rfc6750</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="RFC7515">[RFC7515]</dt>
+        <dd>
+<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">N. Sakimura</span>, <span class="refTitle">"JSON Web Signature (JWS)"</span>, <span class="seriesInfo">RFC 7515</span>, <span class="seriesInfo">DOI 10.17487/RFC7515</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7515">https://www.rfc-editor.org/rfc/rfc7515</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC7517">[RFC7517]</dt>
+        <dd>
+<span class="refAuthor">Jones, M.</span>, <span class="refTitle">"JSON Web Key (JWK)"</span>, <span class="seriesInfo">RFC 7517</span>, <span class="seriesInfo">DOI 10.17487/RFC7517</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7517">https://www.rfc-editor.org/rfc/rfc7517</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="RFC8174">[RFC8174]</dt>
         <dd>
 <span class="refAuthor">Leiba, B.</span>, <span class="refTitle">"Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 8174</span>, <span class="seriesInfo">DOI 10.17487/RFC8174</span>, <time datetime="2017-05" class="refDate">May 2017</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8174">https://www.rfc-editor.org/rfc/rfc8174</a>&gt;</span>. </dd>
@@ -3893,17 +3914,9 @@ Content-Type: application/json
         <dd>
 <span class="refAuthor">Bryan, P., Ed.</span>, <span class="refAuthor">Zyp, K.</span>, and <span class="refAuthor">M. Nottingham, Ed.</span>, <span class="refTitle">"JavaScript Object Notation (JSON) Pointer"</span>, <span class="seriesInfo">RFC 6901</span>, <span class="seriesInfo">DOI 10.17487/RFC6901</span>, <time datetime="2013-04" class="refDate">April 2013</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc6901">https://www.rfc-editor.org/rfc/rfc6901</a>&gt;</span>. </dd>
 <dd class="break"></dd>
-<dt id="RFC7515">[RFC7515]</dt>
-        <dd>
-<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">N. Sakimura</span>, <span class="refTitle">"JSON Web Signature (JWS)"</span>, <span class="seriesInfo">RFC 7515</span>, <span class="seriesInfo">DOI 10.17487/RFC7515</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7515">https://www.rfc-editor.org/rfc/rfc7515</a>&gt;</span>. </dd>
-<dd class="break"></dd>
 <dt id="RFC7516">[RFC7516]</dt>
         <dd>
 <span class="refAuthor">Jones, M.</span> and <span class="refAuthor">J. Hildebrand</span>, <span class="refTitle">"JSON Web Encryption (JWE)"</span>, <span class="seriesInfo">RFC 7516</span>, <span class="seriesInfo">DOI 10.17487/RFC7516</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7516">https://www.rfc-editor.org/rfc/rfc7516</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="RFC7517">[RFC7517]</dt>
-        <dd>
-<span class="refAuthor">Jones, M.</span>, <span class="refTitle">"JSON Web Key (JWK)"</span>, <span class="seriesInfo">RFC 7517</span>, <span class="seriesInfo">DOI 10.17487/RFC7517</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7517">https://www.rfc-editor.org/rfc/rfc7517</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC7519">[RFC7519]</dt>
         <dd>
@@ -3968,7 +3981,7 @@ Content-Type: application/json
         <h3 id="name-form-and-catalog-translatio">
 <a href="#appendix-A.3" class="section-number selfRef">A.3. </a><a href="#name-form-and-catalog-translatio" class="section-name selfRef">Form and Catalog Translation</a>
         </h3>
-<p id="appendix-A.3-1">Most existing platforms have proprietary form description languages with field types beyond JSON Schema's native vocabulary, and proprietary catalog APIs with vendor-specific request and response shapes.  Implementations translate to the JSON Schema referenced by <code>form_schema_url</code> and to the Catalogs Document and Catalog Endpoint protocol defined in <a href="#catalog-references" class="auto internal xref">Section 9</a>.  Translation may be lossy for vendor-specific widgets and metadata; richer rendering details belong behind <code>form_url</code>, while the JSON Schema and Catalogs Document provide enough information for an autonomous PEP.  Deployments that expose tools or catalogs to autonomous agents through an agent protocol can additionally surface catalogs through that protocol; see <a href="#catalog-agent-protocol" class="auto internal xref">Section 9.5</a>.<a href="#appendix-A.3-1" class="pilcrow">¶</a></p>
+<p id="appendix-A.3-1">Most existing platforms have proprietary form description languages with field types beyond JSON Schema's native vocabulary, and proprietary catalog APIs with vendor-specific request and response shapes.  Implementations translate to the JSON Schema referenced by <code>form_schema_url</code> and to the Catalogs Document and Catalog Endpoint protocol defined in <a href="#catalog-references" class="auto internal xref">Section 9</a>.  Translation may be lossy for vendor-specific widgets and metadata; richer rendering details belong behind <code>form_url</code>, while the JSON Schema and Catalogs Document provide enough information for an autonomous PEP.  Deployments that expose tools or catalogs to autonomous agents through an agent protocol can additionally surface catalogs through that protocol; see <a href="#catalog-agent-protocol" class="auto internal xref">Section 9.6</a>.<a href="#appendix-A.3-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="notification-channels">

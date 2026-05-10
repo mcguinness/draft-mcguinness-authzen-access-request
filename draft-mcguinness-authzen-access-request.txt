@@ -70,7 +70,8 @@ Table of Contents
      9.2.  Catalog Endpoint
      9.3.  Catalog Response
      9.4.  PEP Resolution Rules
-     9.5.  Agent Protocol Catalogs
+     9.5.  Access Request Service Catalog Validation
+     9.6.  Agent Protocol Catalogs
    10. Access Request Endpoint
      10.1.  Access Request Submission
      10.2.  Access Request Response
@@ -285,17 +286,23 @@ Table of Contents
      |<-------------------------------------------------------------------|
      |                                   |                                 |
      | 5. Poll task or receive callback  |                                 |
+     |    (consume result in Decision    |                                 |
+     |     Result Mode)                  |                                 |
      |------------------------------------------------------------------->|
      |<-------------------------------------------------------------------|
      |                                   |                                 |
-     | 6. Re-evaluate or consume result  |                                 |
+     | 6. Re-evaluate                    |                                 |
+     |    (Re-evaluation Mode only)      |                                 |
      |---------------------------------->|                                 |
      |<----------------------------------|                                 |
 
    The access evaluation in step 1 uses the existing AuthZEN Access
    Evaluation API.  The denial in step 2 is still a denial.  The PEP
    MUST NOT permit the requested operation based only on the presence of
-   context.access_request.
+   context.access_request.  In Re-evaluation Mode, step 6 is a new
+   AuthZEN evaluation against the PDP; in Decision Result Mode, the
+   bound result returned in step 5 is enforced directly and step 6 does
+   not occur.
 
    The Access Request Service MAY additionally publish lifecycle events
    for governance, audit, and analytics consumers through deployment-
@@ -730,8 +737,11 @@ Table of Contents
       MUST NOT rely on them for enforcement.
 
    *  MUST NOT treat granted or any other Catalog Item member as an
-      authorization decision.  Such members can only be used to suppress
-      or shape Access Request submission.
+      authorization decision.  Such members MAY be used to suppress or
+      shape Access Request submission, but MUST NOT be used as
+      authorization input.
+
+9.5.  Access Request Service Catalog Validation
 
    The Access Request Service MUST validate submitted catalog
    identifiers at submission time.  It MUST reject, normalize, or route
@@ -740,7 +750,7 @@ Table of Contents
    materially different in risk or ownership from the item resolved by
    the PEP.
 
-9.5.  Agent Protocol Catalogs
+9.6.  Agent Protocol Catalogs
 
    Deployments serving agentic PEPs MAY additionally expose catalogs
    through an agent protocol.  When such a protocol is used, each
@@ -802,14 +812,14 @@ Table of Contents
       augmented with submission-time fields such as business
       justification.
 
-   denial:  REQUIRED when items is absent; OPTIONAL when items is
-      present.  Object binding the Access Request to the denied AuthZEN
-      Decision.  When items is present, every item MUST be covered by
-      either a per-item denial or a top-level bundle denial whose
-      verifiable binding material covers the submitted Subject and every
-      Resource and Action in the items array.  An Access Request with
-      items for which any item lacks a covering denial is malformed and
-      MUST be rejected with urn:openid:authzen:access-
+   denial:  REQUIRED when items is absent.  When items is present,
+      OPTIONAL only when every item carries its own per-item denial;
+      otherwise REQUIRED as a top-level bundle denial whose verifiable
+      binding material covers the submitted Subject and every Resource
+      and Action in the items array.  Object binding the Access Request
+      to the denied AuthZEN Decision.  An Access Request with items for
+      which any item lacks a covering denial is malformed and MUST be
+      rejected with urn:openid:authzen:access-
       request:error:invalid_denial_binding.
 
    requested_access:  OPTIONAL.  Object containing request-specific
@@ -1387,12 +1397,16 @@ Table of Contents
 
    For a task containing an items array, cancellation cancels every item
    currently in pending status; items already in a terminal status
-   remain unchanged.  The aggregate task.status is recomputed according
-   to the aggregation rule defined in Section 10.2, which yields
-   cancelled when no item completed before cancellation, or partial when
-   some items reached other terminal statuses first.  Cancellation of a
-   bulk task in which every item is already in a terminal status returns
-   409 Conflict with urn:openid:authzen:access-
+   remain unchanged.  Behavior for items in implementation-defined non-
+   terminal statuses (Section 11.1) is implementation-defined; an Access
+   Request Service that defines additional non-terminal statuses SHOULD
+   document whether cancellation transitions those items to cancelled or
+   leaves them unchanged.  The aggregate task.status is recomputed
+   according to the aggregation rule defined in Section 10.2, which
+   yields cancelled when no item completed before cancellation, or
+   partial when some items reached other terminal statuses first.
+   Cancellation of a bulk task in which every item is already in a
+   terminal status returns 409 Conflict with urn:openid:authzen:access-
    request:error:invalid_task_state.
 
    PEPs that need to abandon an outstanding request without using this
@@ -2549,6 +2563,14 @@ Table of Contents
               DOI 10.17487/RFC6750, October 2012,
               <https://www.rfc-editor.org/rfc/rfc6750>.
 
+   [RFC7515]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web
+              Signature (JWS)", RFC 7515, DOI 10.17487/RFC7515, May
+              2015, <https://www.rfc-editor.org/rfc/rfc7515>.
+
+   [RFC7517]  Jones, M., "JSON Web Key (JWK)", RFC 7517,
+              DOI 10.17487/RFC7517, May 2015,
+              <https://www.rfc-editor.org/rfc/rfc7517>.
+
    [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
@@ -2576,17 +2598,9 @@ Table of Contents
               DOI 10.17487/RFC6901, April 2013,
               <https://www.rfc-editor.org/rfc/rfc6901>.
 
-   [RFC7515]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web
-              Signature (JWS)", RFC 7515, DOI 10.17487/RFC7515, May
-              2015, <https://www.rfc-editor.org/rfc/rfc7515>.
-
    [RFC7516]  Jones, M. and J. Hildebrand, "JSON Web Encryption (JWE)",
               RFC 7516, DOI 10.17487/RFC7516, May 2015,
               <https://www.rfc-editor.org/rfc/rfc7516>.
-
-   [RFC7517]  Jones, M., "JSON Web Key (JWK)", RFC 7517,
-              DOI 10.17487/RFC7517, May 2015,
-              <https://www.rfc-editor.org/rfc/rfc7517>.
 
    [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web Token
               (JWT)", RFC 7519, DOI 10.17487/RFC7519, May 2015,
@@ -2685,7 +2699,7 @@ A.3.  Form and Catalog Translation
    form_url, while the JSON Schema and Catalogs Document provide enough
    information for an autonomous PEP.  Deployments that expose tools or
    catalogs to autonomous agents through an agent protocol can
-   additionally surface catalogs through that protocol; see Section 9.5.
+   additionally surface catalogs through that protocol; see Section 9.6.
 
 A.4.  Notification Channels
 
