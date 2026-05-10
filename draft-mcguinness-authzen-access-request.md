@@ -210,7 +210,7 @@ The `access_request` object has the following members:
 : OPTIONAL.  String containing an {{RFC3339}} timestamp.  Indicates when the requestable denial hint expires.
 
 `expires_in`:
-: OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP MUST compute the hint's expiry by adding `expires_in` to the time the Decision was produced; that production time is taken from an explicit evaluation timestamp when available, otherwise from the HTTP `Date` response header.  If neither time source is available, the PEP MUST treat the hint as expired.  PDPs SHOULD use `expires_at` instead of `expires_in` when precise expiry handling is required.
+: OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP MUST compute the hint's expiry by adding `expires_in` to the time the Decision was produced; that production time is taken from `context.evaluated_at` when present, otherwise from the HTTP `Date` response header.  If neither time source is available, the PEP MUST treat the hint as expired.  PDPs SHOULD use `expires_at` instead of `expires_in` when precise expiry handling is required.
 
 `request_context`:
 : OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged inside `denial.access_request.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{?RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
@@ -239,6 +239,8 @@ The following is a non-normative example:
 {
   "decision": false,
   "context": {
+    "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+    "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
     "access_request": {
       "requestable": true,
@@ -268,6 +270,8 @@ A PDP returns `evaluation_id` as a member of the AuthZEN Decision Context: `cont
 `evaluation_id` MUST be stable for a given evaluation: subsequent retrievals or echoes of the same evaluation MUST return the same identifier.  PDPs SHOULD generate identifiers that are unique within the PDP's namespace (for example, ULIDs or UUIDs).  An identifier MAY be reused across distinct evaluations only after the original evaluation's binding window has expired.
 
 A PDP that returns `requestable=true` without an integrity-protected `request_context` MUST include `evaluation_id` so the Access Request Service has verifiable denial-binding material.
+
+A PDP MAY return `evaluated_at` as a member of the AuthZEN Decision Context: `context.evaluated_at`, an {{RFC3339}} timestamp indicating when the Decision was produced.  The PEP echoes the captured timestamp as `denial.evaluated_at` when submitting an Access Request.
 
 # Machine-Readable Forms {#machine-readable-forms}
 
@@ -795,9 +799,10 @@ Content-Type: application/json
 
 ## Completed Task Response {#completed-task-response}
 
-A completed task response includes a `result` object as follows:
+A completed task response includes result information as follows:
 
-* When `task.status` is `approved`, the response MUST include a `result` object.
+* When `task.status` is `approved` and the task does not contain an `items` array, the response MUST include a top-level `result` object.
+* When `task.status` is `approved` and the task contains an `items` array, each approved item in `task.items[]` MUST include its own `result` object.  The response MAY also include a top-level `result` object for aggregate workflow information, but a PEP MUST NOT use that top-level `result` to authorize an individual item unless the same result is also present in that item's `result` member.
 * For any other terminal status, the response MAY include a `result` object for diagnostic or workflow information, but the PEP MUST NOT treat it as approval.
 * When present, the `result` object MUST use one of the completion forms defined in {{completion-semantics}}.
 
@@ -865,6 +870,12 @@ For a task containing an `items` array ({{access-request-response}}), each appro
 In re-evaluation mode, the Access Request Service returns an approval reference and instructs the PEP to perform a new AuthZEN Access Evaluation.
 
 The `result.mode` value is `reevaluate`.
+
+The result MUST include an `approval` member.  The `approval` object identifies the approval that completed the Access Request task and has the following members:
+
+* `id`: REQUIRED.  String.  Stable identifier of the approval.
+* `approved_at`: OPTIONAL.  {{RFC3339}} timestamp indicating when the approval completed.
+* `approved_until`: OPTIONAL.  {{RFC3339}} timestamp indicating the latest time through which the approval remains valid.  When present, the PEP MUST NOT use the approval for re-evaluation after this timestamp.
 
 The result MAY include an `approval_context` member.  `approval_context` is an opaque object populated by the Access Request Service or PDP.  When present, the PEP MUST include it as a member named `authzen_access_request_approval` inside the AuthZEN request `context` when re-evaluating.  When absent, the PEP re-evaluates without `authzen_access_request_approval` and relies on current PDP policy and backing state to reflect the approval.  The PEP MUST NOT modify or interpret the contents of `approval_context`.
 
@@ -1081,7 +1092,7 @@ Additional members beyond those defined in this document MAY appear at the follo
 * `context.access_request.display`: user-interface hints in a requestable denial.
 * `context` in an Access Request submission: augments the AuthZEN Context.
 * `requested_access` in an Access Request submission.
-* `client` and `client.source` in an Access Request submission.
+* `client`, `client.actor`, and `client.source` in an Access Request submission.
 * A Catalog Item within a Catalog Response.
 * `task.display`: user-interface hints attached to a Task Handle.
 * `task.links`: link relations to related URLs.
@@ -1397,6 +1408,8 @@ Content-Type: application/json
 {
   "decision": false,
   "context": {
+    "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+    "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
     "access_request": {
       "requestable": true,
