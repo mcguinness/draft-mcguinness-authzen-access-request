@@ -145,15 +145,18 @@ Approval Result:
      |<-------------------------------------------------------------------|
      |                                   |                                 |
      | 5. Poll task or receive callback  |                                 |
+     |    (consume result in Decision    |                                 |
+     |     Result Mode)                  |                                 |
      |------------------------------------------------------------------->|
      |<-------------------------------------------------------------------|
      |                                   |                                 |
-     | 6. Re-evaluate or consume result  |                                 |
+     | 6. Re-evaluate                    |                                 |
+     |    (Re-evaluation Mode only)      |                                 |
      |---------------------------------->|                                 |
      |<----------------------------------|                                 |
 ~~~
 
-The access evaluation in step 1 uses the existing AuthZEN Access Evaluation API.  The denial in step 2 is still a denial.  The PEP MUST NOT permit the requested operation based only on the presence of `context.access_request`.
+The access evaluation in step 1 uses the existing AuthZEN Access Evaluation API.  The denial in step 2 is still a denial.  The PEP MUST NOT permit the requested operation based only on the presence of `context.access_request`.  In Re-evaluation Mode, step 6 is a new AuthZEN evaluation against the PDP; in Decision Result Mode, the bound result returned in step 5 is enforced directly and step 6 does not occur.
 
 The Access Request Service MAY additionally publish lifecycle events for governance, audit, and analytics consumers through deployment-level event subscriptions defined by companion specifications.  Such channels are independent of the per-task callback and are not used for enforcement.
 
@@ -165,7 +168,7 @@ A PDP supporting this profile SHOULD include the following capability URN in the
 
 `urn:openid:authzen:capability:access-request`
 
-A PDP that issues signed values for use under this profile (for example, a JWS-signed `request_context`; see {{requestable-denial-context}}) MUST publish a `jwks_uri` in PDP metadata.  The value is an HTTPS URI of a JWK Set {{?RFC7517}} document containing the public keys used to verify signatures issued by the PDP.
+A PDP that issues signed values for use under this profile (for example, a JWS-signed `request_context`; see {{requestable-denial-context}}) MUST publish a `jwks_uri` in PDP metadata.  The value is an HTTPS URI of a JWK Set {{!RFC7517}} document containing the public keys used to verify signatures issued by the PDP.
 
 Each JWK in the set SHOULD include a `kid` parameter so JWS signatures issued with a `kid` header can be resolved to the corresponding verification key, and SHOULD include a `use` parameter distinguishing signing keys (`use: "sig"`) from any other keys advertised.
 
@@ -213,7 +216,7 @@ The `access_request` object has the following members:
 : OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP MUST compute the hint's expiry by adding `expires_in` to the time the Decision was produced; that production time is taken from `context.evaluated_at` when present, otherwise from the HTTP `Date` response header.  If neither time source is available, the PEP MUST treat the hint as expired.  PDPs SHOULD use `expires_at` instead of `expires_in` when precise expiry handling is required.
 
 `request_context`:
-: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged inside `denial.access_request.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{?RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
+: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged inside `denial.access_request.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{!RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
 
 `display`:
 : OPTIONAL.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP MAY ignore this member.
@@ -421,7 +424,9 @@ A PEP submitting an Access Request based on a form schema with a companion Catal
 * MUST NOT submit catalog values that were not returned by the Catalog Endpoint with the same scope parameters.
 * SHOULD use `search_param` rather than enumerating large catalogs.
 * MUST treat unknown members of a Catalog Item as informational and MUST NOT rely on them for enforcement.
-* MUST NOT treat `granted` or any other Catalog Item member as an authorization decision.  Such members can only be used to suppress or shape Access Request submission.
+* MUST NOT treat `granted` or any other Catalog Item member as an authorization decision.  Such members MAY be used to suppress or shape Access Request submission, but MUST NOT be used as authorization input.
+
+## Access Request Service Catalog Validation
 
 The Access Request Service MUST validate submitted catalog identifiers at submission time.  It MUST reject, normalize, or route for additional review any submitted catalog value that is no longer valid, no longer requestable by the caller, disabled, retired, or materially different in risk or ownership from the item resolved by the PEP.
 
@@ -464,7 +469,7 @@ The request body is a JSON object with the following members:
 : OPTIONAL.  The AuthZEN Context from the denied evaluation, augmented with submission-time fields such as business justification.
 
 `denial`:
-: REQUIRED when `items` is absent; OPTIONAL when `items` is present.  Object binding the Access Request to the denied AuthZEN Decision.  When `items` is present, every item MUST be covered by either a per-item `denial` or a top-level bundle denial whose verifiable binding material covers the submitted Subject and every Resource and Action in the `items` array.  An Access Request with `items` for which any item lacks a covering denial is malformed and MUST be rejected with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
+: REQUIRED when `items` is absent.  When `items` is present, OPTIONAL only when every item carries its own per-item `denial`; otherwise REQUIRED as a top-level bundle denial whose verifiable binding material covers the submitted Subject and every Resource and Action in the `items` array.  Object binding the Access Request to the denied AuthZEN Decision.  An Access Request with `items` for which any item lacks a covering denial is malformed and MUST be rejected with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
 
 `requested_access`:
 : OPTIONAL.  Object containing request-specific information such as requested duration, requested role, requested entitlement, or requested scope.  This object does not define policy semantics and is interpreted by the Access Request Service.  The following well-known optional members are defined; additional members MAY be included subject to {{extension-naming}}:
@@ -853,7 +858,7 @@ The Access Request Service MUST authenticate the PEP and MUST verify the PEP is 
 
 An Access Request Service that does not support PEP-initiated cancellation omits `links.cancel`; a cancellation attempted at any cancellation endpoint in such a deployment returns `405 Method Not Allowed`.
 
-For a task containing an `items` array, cancellation cancels every item currently in `pending` status; items already in a terminal status remain unchanged.  The aggregate `task.status` is recomputed according to the aggregation rule defined in {{access-request-response}}, which yields `cancelled` when no item completed before cancellation, or `partial` when some items reached other terminal statuses first.  Cancellation of a bulk task in which every item is already in a terminal status returns `409 Conflict` with `urn:openid:authzen:access-request:error:invalid_task_state`.
+For a task containing an `items` array, cancellation cancels every item currently in `pending` status; items already in a terminal status remain unchanged.  Behavior for items in implementation-defined non-terminal statuses ({{task-status}}) is implementation-defined; an Access Request Service that defines additional non-terminal statuses SHOULD document whether cancellation transitions those items to `cancelled` or leaves them unchanged.  The aggregate `task.status` is recomputed according to the aggregation rule defined in {{access-request-response}}, which yields `cancelled` when no item completed before cancellation, or `partial` when some items reached other terminal statuses first.  Cancellation of a bulk task in which every item is already in a terminal status returns `409 Conflict` with `urn:openid:authzen:access-request:error:invalid_task_state`.
 
 PEPs that need to abandon an outstanding request without using this endpoint MAY stop polling and rely on `task.expires_at` and Access Request Service expiry to release resources.
 
