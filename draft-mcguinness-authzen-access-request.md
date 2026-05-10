@@ -271,14 +271,12 @@ A PDP that returns `requestable=true` without an integrity-protected `request_co
 
 # Machine-Readable Forms {#machine-readable-forms}
 
-This section describes how PEPs use the OPTIONAL `form_url` and `form_schema_url` members of the `access_request` object ({{requestable-denial-context}}).  A deployment supports this feature simply by including these members in requestable denials; PEPs interacting with deployments that do not include them MAY omit form-schema processing entirely.
+The OPTIONAL `form_url` and `form_schema_url` members of the `access_request` object ({{requestable-denial-context}}) describe additional submission fields the Access Request Service expects beyond those produced by the original AuthZEN evaluation.  PEPs interacting with deployments that do not include either member MAY omit form-schema processing entirely.
 
-When the Access Request Service expects additional submission fields beyond those produced by the original AuthZEN evaluation, the requestable denial describes those fields using `form_url`, `form_schema_url`, or both:
+* `form_url` identifies a form hosted by the Access Request Service or a service it trusts, suitable for PEPs that render the form for a human user.
+* `form_schema_url` identifies a machine-readable description of the same augmentations, suitable for autonomous PEPs and for PEPs that render forms natively against a schema.
 
-* `form_url` identifies a form hosted by the Access Request Service or a service it trusts.  It is suitable for PEPs that render the form for a human user.
-* `form_schema_url` identifies a machine-readable description of the same augmentations.  It is suitable for autonomous PEPs that construct submissions programmatically, and for PEPs that render forms natively against a schema.
-
-When a deployment expects autonomous PEP submissions, the requestable denial SHOULD include `form_schema_url`.  The referenced document is RECOMMENDED to be a JSON Schema {{!I-D.bhutton-json-schema}} {{!I-D.bhutton-json-schema-validation}} that describes the structure of the augmentations the PEP MUST add to the submission's `context` and `requested_access` objects.  An autonomous PEP MAY consume the schema directly to construct a valid submission.
+When a deployment expects autonomous PEP submissions, the requestable denial SHOULD include `form_schema_url` referencing a JSON Schema {{!I-D.bhutton-json-schema}} {{!I-D.bhutton-json-schema-validation}} document that describes the augmentations the PEP MUST add to the submission's `context` and `requested_access` objects.  An autonomous PEP MAY consume the schema directly to construct a valid submission.
 
 Many existing IGA, ITSM, and approval platforms already use proprietary form description languages.  Implementations built on top of such platforms MAY publish a JSON Schema document derived from their native form description.  Some loss of fidelity is expected when translating between form description languages; the JSON Schema referenced by `form_schema_url` SHOULD provide enough information for an autonomous PEP to construct a conformant submission, while richer rendering, widget, and interaction details remain in `form_url`.
 
@@ -290,11 +288,9 @@ This profile does not define an agent protocol surface.  Deployments serving age
 
 # Catalog References {#catalog-references}
 
-This section describes how PEPs use the OPTIONAL `form_catalogs_url` member of the `access_request` object ({{requestable-denial-context}}).  A deployment supports this feature simply by including this member in requestable denials; PEPs interacting with deployments that do not include it MAY omit Catalog Endpoint resolution.  This feature is typically paired with the form-schema feature ({{machine-readable-forms}}).
+The OPTIONAL `form_catalogs_url` member of the `access_request` object ({{requestable-denial-context}}) is the URL of a Catalogs Document that tells PEPs how to resolve form fields whose values come from backing catalogs (for example, applications, entitlements, roles, or cost centers).  PEPs interacting with deployments that do not include `form_catalogs_url` MAY omit Catalog Endpoint resolution.
 
-The Access Request Service MAY publish a Catalogs Document that tells PEPs how to resolve form fields whose values come from backing catalogs (for example, applications, entitlements, roles, or cost centers).  The Catalogs Document is a sibling artifact to the form schema; it does not modify or extend the JSON Schema referenced by `form_schema_url`.
-
-The location of the Catalogs Document is identified by `form_catalogs_url` in the `access_request` object ({{requestable-denial-context}}).
+The Catalogs Document is a sibling artifact to the form schema; it does not modify or extend the JSON Schema referenced by `form_schema_url`.  This feature is typically paired with the form-schema feature ({{machine-readable-forms}}).
 
 ## Catalogs Document
 
@@ -848,7 +844,9 @@ The cancellation request body is an OPTIONAL JSON object with the following memb
 
 A successful cancellation returns `200 OK` and the updated `task` object whose `status` is `cancelled`.  Cancellation of a task that has already reached a terminal status returns `409 Conflict` using the `urn:openid:authzen:access-request:error:invalid_task_state` problem type.
 
-The Access Request Service MUST authenticate the PEP and MUST verify the PEP is authorized for the original Subject, Resource, Action, task, and cancellation operation.  Confirmation that the PEP submitted the request or is authorized to act for the original Subject is not sufficient unless the Access Request Service also verifies authorization for the bound Resource, Action, task, and operation.  An Access Request Service that does not support PEP-initiated cancellation omits `links.cancel`.  If a PEP nevertheless attempts cancellation at a cancellation endpoint, the Access Request Service returns `405 Method Not Allowed`.
+The Access Request Service MUST authenticate the PEP and MUST verify the PEP is authorized for the original Subject, Resource, Action, task, and cancellation operation.  Authorization to submit the original request or to act for the Subject does not by itself authorize cancellation; the service MUST verify authorization for the bound Resource, Action, task, and operation.
+
+An Access Request Service that does not support PEP-initiated cancellation omits `links.cancel`; a cancellation attempted at any cancellation endpoint in such a deployment returns `405 Method Not Allowed`.
 
 For a task containing an `items` array, cancellation cancels every item currently in `pending` status; items already in a terminal status remain unchanged.  The aggregate `task.status` is recomputed according to the aggregation rule defined in {{access-request-response}}, which yields `cancelled` when no item completed before cancellation, or `partial` when some items reached other terminal statuses first.  Cancellation of a bulk task in which every item is already in a terminal status returns `409 Conflict` with `urn:openid:authzen:access-request:error:invalid_task_state`.
 
