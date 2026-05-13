@@ -19,9 +19,10 @@ Abstract
    denied but requestable.  The profile preserves the AuthZEN decision
    model: a denied decision remains a denial and MUST NOT be treated as
    access.  It adds a requestable denial context, an access request
-   endpoint, a task handle for asynchronous approval workflows, and a
-   re-evaluation completion mode that lets the Policy Decision Point
-   remain authoritative at enforcement time after approval.
+   endpoint, a task handle for the asynchronous workflow that resolves a
+   denial, and a re-evaluation completion mode that lets the Policy
+   Decision Point remain authoritative at enforcement time after
+   approval.
 
 Status of This Memo
 
@@ -202,9 +203,9 @@ Table of Contents
    missing.  Identity governance, ITSM, and case-management platforms
    accept access requests routed from enforcing applications.  These
    flows are typically implemented through vendor-specific integrations
-   because the protocol layer between authorization enforcement and
-   approval workflow is not standardized.  PEPs without such a
-   standardized surface fall back to non-standard user-interface
+   because the protocol layer between authorization enforcement and the
+   workflow that resolves a denial is not standardized.  PEPs without
+   such a standardized surface fall back to non-standard user-interface
    messages, out-of-band tickets, or vendor-specific governance
    integrations.
 
@@ -216,8 +217,8 @@ Table of Contents
    1.  The PEP evaluates access using the AuthZEN Access Evaluation API.
 
    2.  The PDP returns decision: false and a structured access_request
-       object in the Decision Context when the denial is eligible for an
-       approval workflow.
+       object in the Decision Context when the denial can be resolved by
+       a workflow capable of evaluating the request.
 
    3.  The PEP submits an access request to the Access Request Endpoint.
 
@@ -233,9 +234,10 @@ Table of Contents
    approval policy language, ticketing system, entitlement catalog, or
    user interface.  Those capabilities are the responsibility of the PDP
    or Access Request Service.  The purpose of this profile is to
-   standardize the handoff between authorization enforcement and
-   approval workflow so that PEPs of any type can route denials to a
-   centralized approval mechanism through a uniform interface.
+   standardize the handoff between authorization enforcement and the
+   workflow that resolves a denial, so that any PEP, autonomous or user-
+   facing, can route denials through a uniform interface to whatever
+   evaluator the deployment uses, human or automated.
 
 2.  Requirements Notation and Conventions
 
@@ -270,15 +272,16 @@ Table of Contents
       PEPs can construct a conformant submission without human
       intervention at submission time.
 
-   *  Provide an opaque task handle suitable for asynchronous approval
-      workflows.
+   *  Provide an opaque task handle suitable for the asynchronous
+      workflow that resolves a denial.
 
    *  Avoid embedding a workflow policy language in the authorization
       response.
 
-   *  Allow approval systems such as ITSM, IGA, chat approval, case
-      management, or custom governance systems to sit behind a common
-      endpoint.
+   *  Allow approval and evaluation systems such as automated policy
+      engines, risk engines, AI supervisors, ITSM platforms, identity
+      governance platforms, chat approval, case management, or custom
+      governance systems to sit behind a common endpoint.
 
    *  Support re-evaluation after approval so the PDP remains
       authoritative at enforcement time.
