@@ -19,9 +19,9 @@ Abstract
    denied but requestable.  The profile preserves the AuthZEN decision
    model: a denied decision remains a denial and MUST NOT be treated as
    access.  It adds a requestable denial context, an access request
-   endpoint, a task handle for asynchronous approval workflows, and
-   completion semantics that allow a PEP to re-evaluate or consume a
-   final authorization result after approval.
+   endpoint, a task handle for asynchronous approval workflows, and a
+   re-evaluation completion mode that lets the Policy Decision Point
+   remain authoritative at enforcement time after approval.
 
 Status of This Memo
 
@@ -83,7 +83,6 @@ Table of Contents
      11.4.  Cancellation
    12. Completion Semantics
      12.1.  Re-evaluation Mode
-     12.2.  Decision Result Mode
    13. Callback Completion
    14. Error Responses
    15. Extensibility and Profiles
@@ -227,9 +226,8 @@ Table of Contents
    5.  The PEP can poll the task, receive a callback, or otherwise use
        the task handle to determine completion.
 
-   6.  When the task is approved, the PEP either performs a new AuthZEN
-       evaluation or receives an approval-bound result that can be
-       enforced according to this profile.
+   6.  When the task is approved, the PEP performs a new AuthZEN
+       evaluation; the PDP remains authoritative at enforcement time.
 
    This specification intentionally does not define a workflow engine,
    approval policy language, ticketing system, entitlement catalog, or
@@ -314,9 +312,10 @@ Table of Contents
       representing the lifecycle of an Access Request.
 
    Approval Result:  The completed result of an Access Request task.  An
-      Approval Result does not itself permit access unless it is
-      returned as, or is used to obtain, an AuthZEN allow decision
-      according to this profile.
+      Approval Result does not itself permit access; the PEP uses it to
+      obtain an AuthZEN allow decision through a new Access Evaluation,
+      or enforces it according to a profile-defined completion mode
+      where one applies.
 
 5.  Protocol Overview
 
@@ -339,23 +338,18 @@ Table of Contents
      |<-------------------------------------------------------------------|
      |                                   |                                 |
      | 5. Poll task or receive callback  |                                 |
-     |    (consume result in Decision    |                                 |
-     |     Result Mode)                  |                                 |
      |------------------------------------------------------------------->|
      |<-------------------------------------------------------------------|
      |                                   |                                 |
      | 6. Re-evaluate                    |                                 |
-     |    (Re-evaluation Mode only)      |                                 |
      |---------------------------------->|                                 |
      |<----------------------------------|                                 |
 
    The access evaluation in step 1 uses the existing AuthZEN Access
    Evaluation API.  The denial in step 2 is still a denial.  The PEP
    MUST NOT permit the requested operation based only on the presence of
-   context.access_request.  In Re-evaluation Mode, step 6 is a new
-   AuthZEN evaluation against the PDP; in Decision Result Mode, the
-   bound result returned in step 5 is enforced directly and step 6 does
-   not occur.
+   context.access_request.  Step 6 is a new AuthZEN evaluation against
+   the PDP so the PDP remains authoritative at enforcement time.
 
    The flow supports execution continuity across the denial, approval,
    and re-evaluation boundary.  The Task Handle returned in step 4 is
@@ -1405,7 +1399,7 @@ Table of Contents
    interface, an approver, or the PEP using the cancellation endpoint
    defined in Section 11.4.
 
-   Non-normative example using a re-evaluation requirement:
+   Non-normative example:
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -1482,37 +1476,35 @@ Table of Contents
 
 12.  Completion Semantics
 
-   This profile defines two completion modes, identified by result.mode:
-   reevaluate and decision.  Implementations MAY define additional
-   completion modes; in particular, profiles of this specification (such
-   as a profile binding the Access Request Service to OAuth 2.0 token
-   issuance) MAY define new modes such as token.  A PEP that receives an
-   unknown result.mode value MUST treat the task as not approved and
-   MUST NOT permit access on the basis of that result.
+   This profile defines a single completion mode, identified by
+   result.mode: reevaluate.  The mode instructs the PEP to perform a new
+   AuthZEN Access Evaluation after approval, so the PDP remains
+   authoritative at enforcement time.
+
+   Profiles of this specification MAY define additional completion modes
+   through the result.mode extension point (Section 15).
+   Implementations that bind approval to a specific issuance flow, such
+   as OAuth token issuance where the issued token is itself the decision
+   representation, MUST do so through a profile that defines a
+   completion mode appropriate to that flow; the base profile does not
+   define such a mode.  A PEP that receives an unknown result.mode value
+   MUST treat the task as not approved and MUST NOT permit access on the
+   basis of that result.
 
    Most existing approval, IGA, and ITSM systems map naturally onto Re-
    evaluation Mode: approval changes state in a backing system, and a
    subsequent AuthZEN evaluation reflects that state.  See Appendix A
-   for deployment patterns that adopt this mapping.  Decision Result
-   Mode addresses narrower deployment patterns and is not expected to be
-   supported by every Access Request Service.
+   for deployment patterns that adopt this mapping.
 
    For a task containing an items array (Section 10.2), each approved
    item MUST include a per-item result that is independently enforceable
-   according to its own result.mode.  Different approved items MAY use
-   different result.mode values.
+   according to its own result.mode.
 
 12.1.  Re-evaluation Mode
 
-   In re-evaluation mode, the Access Request Service returns an approval
-   reference and instructs the PEP to perform a new AuthZEN Access
-   Evaluation.
-
-   The result.mode value is reevaluate.
-
-   The result MUST include an approval member.  The approval object
-   identifies the approval that completed the Access Request task and
-   has the following members:
+   The result.mode value is reevaluate.  The result MUST include an
+   approval member.  The approval object identifies the approval that
+   completed the Access Request task and has the following members:
 
    *  id: REQUIRED.  String.  Stable identifier of the approval.
 
@@ -1596,109 +1588,6 @@ Table of Contents
        "approval": {
          "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
          "approved_until": "2026-05-01T00:42:00Z"
-       }
-     }
-   }
-
-   Re-evaluation mode is the RECOMMENDED completion mode because it
-   ensures the PDP remains authoritative at enforcement time.
-
-12.2.  Decision Result Mode
-
-   In decision result mode, the completed task response includes an
-   AuthZEN Decision in result.decision.
-
-   The result.mode value is decision.
-
-   A result with mode equal to decision MUST include a binding member.
-   The binding object has the following members:
-
-   *  task_id: REQUIRED.  String.  The task identifier this Decision is
-      bound to; MUST equal the task.id returned for the same Access
-      Request.
-
-   *  subject: REQUIRED.  The AuthZEN Subject the Decision applies to.
-
-   *  resource: REQUIRED.  The AuthZEN Resource the Decision applies to.
-
-   *  action: REQUIRED.  The AuthZEN Action the Decision applies to.
-
-   *  approval_id: RECOMMENDED.  String.  Identifier of the approval
-      that produced the Decision.
-
-   *  expires_at: REQUIRED.  [RFC3339] timestamp after which the
-      Decision MUST NOT be enforced.
-
-   The PEP MAY enforce the returned Decision only if all of the
-   following are true:
-
-   *  The response was retrieved over an authenticated channel from the
-      Access Request Service identified in PDP metadata or the
-      requestable denial.
-
-   *  result.decision.decision is true.
-
-   *  The binding.task_id equals the task identifier the PEP submitted,
-      and the binding.subject, binding.resource, and binding.action
-      equal the values the PEP submitted in the Access Request.
-
-   *  The current time is at or before binding.expires_at.
-
-   *  The PEP understands all obligations required for enforcement.
-
-   A Decision Result that is not signed using a mechanism agreed between
-   the PEP and Access Request Service relies on the integrity of the
-   transport channel and the trust the PEP places in the Access Request
-   Service.  Deployments requiring stronger integrity SHOULD wrap the
-   result in a JSON Web Signature (JWS) [RFC7515] whose payload contains
-   the binding and decision members; this profile does not mandate a
-   specific signing format.
-
-   When the original submission carried an items array, per-item
-   bindings appear in task.items[].result.binding rather than in a top-
-   level result.binding.  Each per-item binding has the same shape as
-   the binding object defined above, with subject, resource, and action
-   carrying the per-item values from the submission.
-
-   Non-normative example:
-
-   {
-     "task": {
-       "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-       "status": "approved"
-     },
-     "result": {
-       "mode": "decision",
-       "binding": {
-         "task_id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-         "subject": {
-           "type": "user",
-           "id": "alice@example.com"
-         },
-         "resource": {
-           "type": "document",
-           "id": "q4-plan"
-         },
-         "action": {
-           "name": "can_read"
-         },
-         "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
-         "expires_at": "2026-05-01T00:42:00Z"
-       },
-       "decision": {
-         "decision": true,
-         "context": {
-           "approval": {
-             "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
-             "approved_until": "2026-05-01T00:42:00Z"
-           },
-           "obligations": [
-             {
-               "type": "audit",
-               "message": "Record approved access usage"
-             }
-           ]
-         }
        }
      }
    }
@@ -1963,15 +1852,9 @@ Table of Contents
       authzen_access_request_approval inside the AuthZEN request
       context.
 
-   *  When using Decision Result Mode, MUST verify the result.binding
-      matches the originally submitted task identifier, Subject,
-      Resource, and Action, and MUST NOT enforce the Decision after
-      binding.expires_at.
-
-   *  SHOULD re-evaluate access after approval unless the deployment
-      explicitly supports Decision Result Mode or a profile-defined
-      completion mode (for example, a profile that returns an OAuth
-      access token).
+   *  MUST re-evaluate access through the AuthZEN Access Evaluation API
+      after approval, unless a profile-defined completion mode applies
+      (for example, a profile binding to OAuth token issuance).
 
 17.  PDP Processing Rules
 
@@ -2963,11 +2846,11 @@ A.1.  Identity Governance and Approval Platforms
       user opens a request portal).  Both are valid PEPs under this
       profile.
 
-   Re-evaluation Mode is the natural completion mode for this pattern:
-   provisioning changes platform state, and a subsequent AuthZEN
-   evaluation reflects that state.  Implementations mapping their richer
-   task lifecycle states onto the canonical statuses defined in this
-   profile SHOULD follow the guidance in Section 11.1.1.
+   Re-evaluation Mode aligns directly with this pattern: provisioning
+   changes platform state, and a subsequent AuthZEN evaluation reflects
+   that state.  Implementations mapping their richer task lifecycle
+   states onto the canonical statuses defined in this profile SHOULD
+   follow the guidance in Section 11.1.1.
 
 A.2.  Subjects, Principals, and Actors
 
@@ -3101,8 +2984,9 @@ Appendix B.  Acknowledgements
 Appendix C.  Document History
 
    -00  Initial version.  Defines requestable denials, the Access
-      Request Endpoint, Task Handles, Task Status Endpoint, two
-      completion modes (re-evaluation and decision result), per-task
+      Request Endpoint, Task Handles, Task Status Endpoint, the Re-
+      evaluation completion mode with result.mode extension point for
+      profile-defined modes (such as token issuance), per-task
       callbacks, machine-readable form schemas, sibling Catalogs
       Document and Catalog Endpoint protocol, integrity-protected
       request_context, bulk submission with per-item progress and
