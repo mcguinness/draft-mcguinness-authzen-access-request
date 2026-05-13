@@ -71,9 +71,20 @@ This specification defines an extension profile for the OpenID AuthZEN Authoriza
 
 The AuthZEN Authorization API enables a Policy Enforcement Point (PEP) to ask a Policy Decision Point (PDP) whether a Subject may perform an Action on a Resource within a Context.  The PDP returns a Decision indicating whether the operation is allowed or denied.
 
-When a Decision is denied but the access can be approved through some workflow, real-world systems require a remediation path that returns control to the PEP once approval lands.  This need is most visible in modern deployments where autonomous callers (such as AI agents discovering tool permissions at runtime, or OAuth Authorization Servers issuing fine-grained access tokens to fleets of clients) may produce hundreds of denials, all of which need to be routed to a centralized human-in-the-loop approval mechanism.  The same need arises in long-standing patterns: gateways and brokers requesting just-in-time access on behalf of users, Security Token Services issuing scoped tokens, and SaaS applications and APIs surfacing approval prompts to end users.  Without an interoperable protocol surface, PEPs commonly fall back to non-standard user-interface messages, out-of-band tickets, or vendor-specific governance integrations.
+In classic deployments, the authority a caller needs is largely fixed at provisioning time.  A user is granted a role; an OAuth client is registered with a set of scopes; a service account is granted access to a database.  Runtime denials are uncommon and typically indicate misconfiguration or attack, and the appropriate response is to log, alert, or refuse.
 
-This profile defines a narrow, interoperable mechanism for requestable denials.  The flow is:
+Modern deployments invalidate that assumption.  Authority requirements emerge during execution and cannot be fully predicted in advance:
+
+* An AI agent executing a multi-step task discovers, mid-execution, that it needs to read a document, query a record, or post to a channel that was not declared when the agent was deployed.  Each previously unseen resource produces a denial, and the same agent may produce many such denials over the course of a single task.
+* An OAuth Authorization Server issuing fine-grained access tokens cannot pre-enumerate the cross-resource scope combinations a fleet of long-lived clients will request over time, and so it denies token requests for scope combinations that require governance review (policy evaluation, risk scoring, or human approval) before issuance.
+* A gateway acting as a PEP for an internal API encounters a user attempting an operation that requires elevated authority their standing role does not grant.  The deployment expects the gateway to route the request to an owner for approval rather than refuse the call outright.
+* A Security Token Service minting tokens for downstream calls discovers that a particular downstream resource requires per-call approval beyond what the upstream token already conveys.
+
+In each pattern, the denial is not a terminal error.  It is a signal that further authority is required before the caller can proceed, that the deployment has a workflow capable of evaluating that request, and that the caller should hand off through a defined protocol surface rather than guess at remediation.  Autonomous callers heighten this requirement: an agent, gateway, or token service has no browser to open and no human present at the moment of denial, and the volume of denials a single such caller produces makes per-deployment integrations unsustainable.
+
+The same need has long existed in user-facing patterns.  SaaS applications surface approval prompts to end users when access is missing.  Identity governance, ITSM, and case-management platforms accept access requests routed from enforcing applications.  These flows are typically implemented through vendor-specific integrations because the protocol layer between authorization enforcement and approval workflow is not standardized.  PEPs without such a standardized surface fall back to non-standard user-interface messages, out-of-band tickets, or vendor-specific governance integrations.
+
+This profile defines that protocol layer: a narrow, interoperable mechanism for requestable denials that applies uniformly to autonomous runtime callers and to user-facing approval flows.  The flow is:
 
 1.  The PEP evaluates access using the AuthZEN Access Evaluation API.
 2.  The PDP returns `decision: false` and a structured `access_request` object in the Decision Context when the denial is eligible for an approval workflow.
@@ -95,7 +106,7 @@ The terms Policy Decision Point (PDP), Policy Enforcement Point (PEP), Subject, 
 This profile has the following design goals:
 
 * Preserve the AuthZEN allow/deny decision model.
-* Provide an interoperable interface for any PEP to route denied access to a centralized human-in-the-loop approval mechanism.
+* Provide an interoperable interface for any PEP to route denied access to a centralized governance evaluator, whether that evaluator is human (an owner, approver, or delegate), automated (a policy engine, risk engine, or rule-based evaluator), or a combination of the two.
 * Support high-volume autonomous callers by combining a uniform per-denial submission shape with Access Request Service workflow patterns that absorb load (broad-scope approvals, auto-approval, pre-approval, bulk approval).
 * Make requestability explicit and machine-readable so autonomous PEPs can construct a conformant submission without human intervention at submission time.
 * Provide an opaque task handle suitable for asynchronous approval workflows.
@@ -157,6 +168,8 @@ Approval Result:
 ~~~
 
 The access evaluation in step 1 uses the existing AuthZEN Access Evaluation API.  The denial in step 2 is still a denial.  The PEP MUST NOT permit the requested operation based only on the presence of `context.access_request`.  In Re-evaluation Mode, step 6 is a new AuthZEN evaluation against the PDP; in Decision Result Mode, the bound result returned in step 5 is enforced directly and step 6 does not occur.
+
+The flow supports execution continuity across the denial, approval, and re-evaluation boundary.  The Task Handle returned in step 4 is portable: it survives PEP restart, replacement, or handoff to a different runtime instance, and it can be polled or completed by any caller that can authenticate as authorized for the bound Subject, Resource, Action, and operation (see {{task-status-endpoint}} and {{authorization-and-authentication}}).  A caller that pauses execution at the denial in step 2 (for example, an agent runtime or a workflow orchestrator) can therefore persist the Task Handle, allow approval to proceed asynchronously over minutes, hours, or days, and resume execution at step 5 or step 6 from a fresh process without rebuilding session state.  This profile does not define the orchestration that pauses and resumes execution; it provides the protocol primitives a caller needs to implement it.
 
 The Access Request Service MAY additionally publish lifecycle events for governance, audit, and analytics consumers through deployment-level event subscriptions defined by companion specifications.  Such channels are independent of the per-task callback and are not used for enforcement.
 
@@ -469,7 +482,7 @@ The request body is a JSON object with the following members:
 : OPTIONAL.  The AuthZEN Context from the denied evaluation, augmented with submission-time fields such as business justification.
 
 `denial`:
-: REQUIRED when `items` is absent.  When `items` is present, OPTIONAL only when every item carries its own per-item `denial`; otherwise REQUIRED as a top-level bundle denial whose verifiable binding material covers the submitted Subject and every Resource and Action in the `items` array.  Object binding the Access Request to the denied AuthZEN Decision.  An Access Request with `items` for which any item lacks a covering denial is malformed and MUST be rejected with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
+: REQUIRED when `items` is absent.  Object binding the Access Request to the denied AuthZEN Decision.  When `items` is present, this top-level `denial` is OPTIONAL only when every item carries its own per-item `denial`; otherwise it is REQUIRED, and its verifiable binding material MUST cover the submitted Subject and every Resource and Action in the `items` array.  An Access Request with `items` for which any item lacks a covering denial is malformed and MUST be rejected with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
 
 `requested_access`:
 : OPTIONAL.  Object containing request-specific information such as requested duration, requested role, requested entitlement, or requested scope.  This object does not define policy semantics and is interpreted by the Access Request Service.  The following well-known optional members are defined; additional members MAY be included subject to {{extension-naming}}:
@@ -720,7 +733,7 @@ Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C
 }
 ~~~
 
-# Task Status Endpoint
+# Task Status Endpoint {#task-status-endpoint}
 
 The Task Status Endpoint allows the PEP to retrieve the state of a previously submitted Access Request.
 
@@ -955,7 +968,7 @@ The PEP MAY enforce the returned Decision only if all of the following are true:
 * The current time is at or before `binding.expires_at`.
 * The PEP understands all obligations required for enforcement.
 
-A Decision Result that is not signed using a mechanism agreed between the PEP and Access Request Service relies on the integrity of the transport channel and the trust the PEP places in the Access Request Service.  Deployments requiring stronger integrity SHOULD wrap the result in a JSON Web Signature (JWS) {{?RFC7515}} whose payload contains the `binding` and `decision` members; this profile does not mandate a specific signing format.
+A Decision Result that is not signed using a mechanism agreed between the PEP and Access Request Service relies on the integrity of the transport channel and the trust the PEP places in the Access Request Service.  Deployments requiring stronger integrity SHOULD wrap the result in a JSON Web Signature (JWS) {{!RFC7515}} whose payload contains the `binding` and `decision` members; this profile does not mandate a specific signing format.
 
 When the original submission carried an `items` array, per-item bindings appear in `task.items[].result.binding` rather than in a top-level `result.binding`.  Each per-item binding has the same shape as the binding object defined above, with `subject`, `resource`, and `action` carrying the per-item values from the submission.
 
@@ -1192,7 +1205,7 @@ An Access Request Service implementing this profile:
 * MUST retain sufficient audit records to reconstruct the request, approval, denial, and completion result.
 * When operating Catalog Endpoints under {{catalog-references}}, MUST authorize callers and MUST return only Catalog Items the caller is permitted to see in the context of the original Subject, Resource, and Action.
 
-# Authorization and Authentication
+# Authorization and Authentication {#authorization-and-authentication}
 
 The Access Request Endpoint and Task Status Endpoint are protected APIs.  Support for OAuth 2.0 {{RFC6749}} is RECOMMENDED.  When OAuth 2.0 bearer tokens are used, the endpoints MUST follow {{RFC6750}}.  Catalog Endpoints ({{catalog-references}}) and the Cancellation endpoint ({{cancellation}}) are similarly protected; their authorization rules are defined in their respective sections.
 
@@ -1236,7 +1249,7 @@ Approval references can be replayed if not time-bounded.  Approval results MUST 
 
 This profile does not define an approval policy language.  Implementations MUST NOT treat the `template`, `reason`, `requested_access`, or `display` fields as sufficient authorization policy.  Actual approval scope and enforcement semantics are determined by the PDP and Access Request Service.
 
-## Approver Eligibility and Separation of Duties
+## Approver Eligibility and Separation of Duties {#approver-eligibility}
 
 Approval workflows can violate enterprise access policy if an approver is not eligible to approve the requested access.  Access Request Services MUST evaluate approver eligibility before returning `approved`, including self-approval restrictions, delegated approver authority, separation-of-duties constraints, ownership rules, and conflict-of-interest policy.  A workflow step completed by an ineligible approver MUST NOT be treated as successful approval unless local policy explicitly allows that exception and records it for audit.
 
@@ -1560,6 +1573,253 @@ Content-Type: application/json
 }
 ~~~
 
+## End-to-End Agent Tool Discovery
+
+This non-normative example shows an AI agent acting on behalf of a user that, mid-task, requires authority to invoke a previously undeclared downstream tool.  A broad-scope approval grants authority for a class of subsequent same-class invocations, so the agent does not produce a new Access Request for each related call.
+
+### Initial Evaluation Request
+
+The agent attempts to invoke a CRM search tool while assembling a renewal report.
+
+~~~ http
+POST /access/v1/evaluation HTTP/1.1
+Host: pdp.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Content-Type: application/json
+
+{
+  "subject": {
+    "type": "user",
+    "id": "alice@example.com",
+    "properties": {
+      "act": {
+        "iss": "https://agents.example.com",
+        "sub": "agent_renewal_assistant_v3",
+        "sub_profile": "ai_agent"
+      }
+    }
+  },
+  "resource": {
+    "type": "tool",
+    "id": "crm.search_accounts"
+  },
+  "action": {
+    "name": "invoke"
+  },
+  "context": {
+    "time": "2026-05-12T15:00:00Z"
+  }
+}
+~~~
+
+### Requestable Denial
+
+The PDP returns a denial requesting broad-scope approval for the agent to call CRM tools.
+
+~~~ http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "decision": false,
+  "context": {
+    "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
+    "evaluated_at": "2026-05-12T15:00:00Z",
+    "reason": "agent_authority_missing",
+    "access_request": {
+      "requestable": true,
+      "template": "agent_tool_class_approval",
+      "reason": "agent_class_approval_required",
+      "expires_in": 600,
+      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0sySDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+      "form_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
+    }
+  }
+}
+~~~
+
+### Submitting the Access Request
+
+The agent's runtime submits a request and supplies actor and source members so the Access Request Service can route approval to the agent's owner and record the conversation that triggered the request.  The agent persists the Task Handle, releases the calling thread, and continues other in-flight work; approval may take minutes to days, and execution resumes when the callback fires.
+
+~~~ http
+POST /access/v1/requests HTTP/1.1
+Host: pdp.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Content-Type: application/json
+Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
+
+{
+  "subject": {
+    "type": "user",
+    "id": "alice@example.com"
+  },
+  "resource": {
+    "type": "tool",
+    "id": "crm.search_accounts"
+  },
+  "action": {
+    "name": "invoke"
+  },
+  "context": {
+    "business_justification": "Assembling Q2 renewal report for customer ACME-1042"
+  },
+  "requested_access": {
+    "requested_duration": "P7D"
+  },
+  "client": {
+    "id": "renewal_assistant",
+    "instance_id": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M",
+    "actor": {
+      "id": "agent_renewal_assistant_v3",
+      "issuer": "https://agents.example.com",
+      "type": "ai_agent"
+    },
+    "source": {
+      "conversation_id": "conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N"
+    }
+  },
+  "callback": {
+    "endpoint": "https://agents.example.com/callbacks/access-requests",
+    "state": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M/conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
+    "events": ["approved", "denied", "expired"]
+  },
+  "denial": {
+    "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
+    "evaluated_at": "2026-05-12T15:00:00Z",
+    "decision": {
+      "decision": false,
+      "context": {"reason": "agent_authority_missing"}
+    },
+    "access_request": {
+      "requestable": true,
+      "template": "agent_tool_class_approval",
+      "reason": "agent_class_approval_required",
+      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0sySDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
+    }
+  }
+}
+~~~
+
+### Task Handle
+
+~~~ http
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+Location: https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7
+
+{
+  "task": {
+    "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
+    "status": "pending",
+    "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
+    "expires_at": "2026-05-19T15:00:00Z"
+  }
+}
+~~~
+
+### Approval Callback
+
+Hours later, after the agent's owner approves the request, the Access Request Service notifies the agent's callback endpoint.  The callback is notification-only; the agent retrieves the Task Status Endpoint before enforcing access.
+
+~~~ http
+POST /callbacks/access-requests HTTP/1.1
+Host: agents.example.com
+Authorization: Bearer mF_9.B5f-4.1JqM
+Content-Type: application/json
+
+{
+  "state": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M/conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
+  "task": {
+    "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
+    "status": "approved",
+    "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7"
+  }
+}
+~~~
+
+### Completed Task
+
+The agent retrieves the completed task and obtains an approval reference scoped to the CRM tool class for seven days.
+
+~~~ http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "task": {
+    "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
+    "status": "approved"
+  },
+  "result": {
+    "mode": "reevaluate",
+    "approval": {
+      "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
+      "approved_at": "2026-05-12T17:30:00Z",
+      "approved_until": "2026-05-19T17:30:00Z"
+    },
+    "approval_context": {
+      "approval_id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK"
+    }
+  }
+}
+~~~
+
+### Re-evaluation After Approval
+
+The agent re-evaluates the original tool invocation; the PDP authorizes it against the approval reference.  Subsequent same-class CRM tool invocations within the approval lifetime are also authorized without a new Access Request.
+
+~~~ http
+POST /access/v1/evaluation HTTP/1.1
+Host: pdp.example.com
+Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+Content-Type: application/json
+
+{
+  "subject": {
+    "type": "user",
+    "id": "alice@example.com",
+    "properties": {
+      "act": {
+        "iss": "https://agents.example.com",
+        "sub": "agent_renewal_assistant_v3",
+        "sub_profile": "ai_agent"
+      }
+    }
+  },
+  "resource": {
+    "type": "tool",
+    "id": "crm.search_accounts"
+  },
+  "action": {
+    "name": "invoke"
+  },
+  "context": {
+    "time": "2026-05-12T17:31:00Z",
+    "authzen_access_request_approval": {
+      "approval_id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK"
+    }
+  }
+}
+~~~
+
+### Final Decision
+
+~~~ http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "decision": true,
+  "context": {
+    "approval": {
+      "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
+      "approved_until": "2026-05-19T17:30:00Z"
+    }
+  }
+}
+~~~
+
 --- back
 
 # Implementation Considerations {#impl-considerations}
@@ -1594,18 +1854,28 @@ Most existing platforms have proprietary form description languages with field t
 
 Implementations frequently already have webhook subscriptions or other deployment-level event channels.  Per-task callbacks ({{callback-completion}}) are an alternative; deployments may rely on existing webhook infrastructure or event-streaming bindings defined by companion specifications for completion notification.
 
-## Approval Volume and Workflow Design
+## Evaluators and Workflow Design
 
-When the calling population includes high-volume PEPs (gateways aggregating many users, OAuth Authorization Servers serving fleets of clients, or autonomous agents that discover and request many fine-grained permissions), the protocol's per-denial submission shape is sufficient on the wire but must be paired with Access Request Service workflow design that does not require human approval for every submission.  Without such design, approval volume overwhelms approvers and the deployment is unusable at scale.
+The Access Request Service determines what kind of evaluator processes a given submission.  Evaluators commonly include:
+
+* Human approvers acting through a user interface (an owner, manager, security reviewer, or delegate).
+* Automated policy engines that apply static or dynamic rules (separation-of-duties checks, ownership rules, conflict-of-interest constraints, organizational policy).
+* Risk engines that score the request against runtime signals and approve, deny, or escalate based on score thresholds.
+* AI supervisors or LLM-based evaluators that summarize requested authority, reason about stated intent, and approve, deny, or hand off to another evaluator.
+* Hybrid pipelines that combine these (for example, an automated risk check that escalates to a human reviewer only for non-trivial cases).
+
+This profile does not constrain which evaluator a deployment uses or how evaluators are combined.  An Access Request can be resolved entirely without human involvement, entirely by a human approver, or by any mixture.  The protocol's synchronous-completion response, callback notification, and re-evaluation semantics apply uniformly across evaluator types.  The approver-eligibility, self-approval, and separation-of-duties requirements of {{approver-eligibility}} apply to whichever entity completes a workflow step, whether human or automated.
+
+When the calling population includes high-volume PEPs (gateways aggregating many users, OAuth Authorization Servers serving fleets of clients, or autonomous agents that discover and request many fine-grained permissions), the protocol's per-denial submission shape is sufficient on the wire but must be paired with workflow design that does not require interactive human review for every submission.  Without such design, evaluation volume overwhelms human reviewers and the deployment is unusable at scale.
 
 Common workflow patterns that absorb volume include:
 
-* Auto-approval rules that resolve low-risk requests synchronously, returning `201 Created` with a populated `result` and never engaging a human approver (see {{access-request-response}}).
-* Broad-scope approvals that grant a class of future evaluations from a single human decision (for example, "approve agent X to call tool Y for the next 30 days"), so subsequent same-class submissions either auto-approve or are unnecessary because re-evaluation already permits the access.
-* Bulk approval, where an approver acts on a batch of related submissions in a single workflow step.
+* Auto-approval rules that resolve low-risk requests synchronously, returning `201 Created` with a populated `result` and never engaging a human reviewer (see {{access-request-response}}).
+* Broad-scope approvals that grant a class of future evaluations from a single decision (for example, "approve agent X to call tool Y for the next 30 days"), so subsequent same-class submissions either auto-approve or are unnecessary because re-evaluation already permits the access.
+* Bulk approval, where an evaluator acts on a batch of related submissions in a single workflow step.
 * Pre-approval or standing grants established out of band (for example, when an agent is provisioned), so the caller never reaches a denial that requires interactive approval.
 
-This profile defines the substrate; it does not define approval workflow.  The Access Request Service is responsible for implementing the workflow primitives that prevent approval volume from overwhelming approvers.  The protocol's bulk submission, idempotency, synchronous-approval response, and approval-expiry semantics provide the inputs an Access Request Service needs to apply these patterns.
+This profile defines the substrate; it does not define approval workflow.  The Access Request Service is responsible for implementing the evaluator policy and the workflow primitives that route submissions appropriately.  The protocol's bulk submission, idempotency, synchronous-completion response, and approval-expiry semantics provide the inputs an Access Request Service needs to apply these patterns.
 
 # Acknowledgements
 
@@ -1614,4 +1884,4 @@ The author thanks the OpenID AuthZEN Working Group for discussion and review.
 # Document History
 
 -00
-: Initial version.  Defines requestable denials, the Access Request Endpoint, Task Handles, Task Status Endpoint, two completion modes (re-evaluation and decision result), per-task callbacks, machine-readable form schemas, sibling Catalogs Document and Catalog Endpoint protocol, integrity-protected `request_context`, bulk submission with per-item progress and aggregation rules, multi-step `progress` reporting, PEP-initiated cancellation, synchronous-completion response, the Extensibility and Profiles framework with the AuthZEN Access Request Member Names registry, an Implementation Considerations appendix covering identity governance platforms, subjects/principals/actors, form and catalog translation, notification channels, and approval-volume workflow design, and PDP / PEP / Access Request Service processing rules.
+: Initial version.  Defines requestable denials, the Access Request Endpoint, Task Handles, Task Status Endpoint, two completion modes (re-evaluation and decision result), per-task callbacks, machine-readable form schemas, sibling Catalogs Document and Catalog Endpoint protocol, integrity-protected `request_context`, bulk submission with per-item progress and aggregation rules, multi-step `progress` reporting, PEP-initiated cancellation, synchronous-completion response, the Extensibility and Profiles framework with the AuthZEN Access Request Member Names registry, an Implementation Considerations appendix covering identity governance platforms, subjects/principals/actors, form and catalog translation, notification channels, and evaluators and workflow design, and PDP / PEP / Access Request Service processing rules.
