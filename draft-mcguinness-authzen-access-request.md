@@ -36,6 +36,11 @@ normative:
   RFC3339:
   RFC6749:
   RFC6750:
+  RFC7515:
+  RFC7517:
+  I-D.bhutton-json-schema:
+  I-D.bhutton-json-schema-validation:
+  I-D.ietf-httpapi-idempotency-key-header:
   AuthZEN:
     title: "Authorization API 1.0"
     target: "https://openid.github.io/authzen/"
@@ -178,7 +183,7 @@ A PDP supporting this profile SHOULD include the following capability URN in the
 
 `urn:openid:authzen:capability:access-request`
 
-A PDP that issues signed values for use under this profile (for example, a JWS-signed `request_context`; see {{requestable-denial-context}}) MUST publish a `jwks_uri` in PDP metadata.  The value is an HTTPS URI of a JWK Set {{!RFC7517}} document containing the public keys used to verify signatures issued by the PDP.
+A PDP that issues signed values for use under this profile (for example, a JWS-signed `request_context`; see {{requestable-denial-context}}) MUST publish a `jwks_uri` in PDP metadata.  The value is an HTTPS URI of a JWK Set {{RFC7517}} document containing the public keys used to verify signatures issued by the PDP.
 
 Each JWK in the set SHOULD include a `kid` parameter so JWS signatures issued with a `kid` header can be resolved to the corresponding verification key, and SHOULD include a `use` parameter distinguishing signing keys (`use: "sig"`) from any other keys advertised.
 
@@ -225,7 +230,7 @@ The `access_request` object has the following members:
 : OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP MUST compute the hint's expiry by adding `expires_in` to the time the Decision was produced; that production time is taken from `context.evaluated_at` when present, otherwise from the HTTP `Date` response header.  If neither time source is available, the PEP MUST treat the hint as expired.  PDPs SHOULD use `expires_at` instead of `expires_in` when precise expiry handling is required.
 
 `request_context`:
-: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged as `denial.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{!RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
+: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged as `denial.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
 
 `display`:
 : OPTIONAL.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP MAY ignore this member.
@@ -234,7 +239,7 @@ The `access_request` object has the following members:
 : OPTIONAL.  HTTPS URI.  URL of a form, hosted by the Access Request Service or another service trusted by the deployment, where the requester can supply additional information required for the Access Request.  Suitable for PEPs that render the form for a human user.  See {{machine-readable-forms}}.
 
 `request_schema_url`:
-: OPTIONAL.  HTTPS URI.  URL where the Access Request Service publishes a machine-readable description of the augmentations the PEP must add to the submission's `context` and `requested_access` objects.  RECOMMENDED to be a JSON Schema {{!I-D.bhutton-json-schema}} {{!I-D.bhutton-json-schema-validation}} document.  Suitable for autonomous PEPs and for PEPs that render forms natively against a schema.  See {{machine-readable-forms}}.
+: OPTIONAL.  HTTPS URI.  URL where the Access Request Service publishes a machine-readable description of the augmentations the PEP must add to the submission's `context` and `requested_access` objects.  RECOMMENDED to be a JSON Schema {{I-D.bhutton-json-schema}} {{I-D.bhutton-json-schema-validation}} document.  Suitable for autonomous PEPs and for PEPs that render forms natively against a schema.  See {{machine-readable-forms}}.
 
 `request_catalogs_url`:
 : OPTIONAL.  HTTPS URI.  URL of a Catalogs Document describing how the PEP resolves form fields whose values are selected from a backing catalog.  See {{catalog-references}}.
@@ -291,7 +296,7 @@ The OPTIONAL `form_url` and `request_schema_url` members of the `access_request`
 * `form_url` identifies a form hosted by the Access Request Service or a service it trusts, suitable for PEPs that render the form for a human user.
 * `request_schema_url` identifies a machine-readable description of the same augmentations, suitable for autonomous PEPs and for PEPs that render forms natively against a schema.
 
-When a deployment expects autonomous PEP submissions, the requestable denial SHOULD include `request_schema_url` referencing a JSON Schema {{!I-D.bhutton-json-schema}} {{!I-D.bhutton-json-schema-validation}} document that describes the augmentations the PEP MUST add to the submission's `context` and `requested_access` objects.  An autonomous PEP MAY consume the schema directly to construct a valid submission.
+When a deployment expects autonomous PEP submissions, the requestable denial SHOULD include `request_schema_url` referencing a JSON Schema {{I-D.bhutton-json-schema}} {{I-D.bhutton-json-schema-validation}} document that describes the augmentations the PEP MUST add to the submission's `context` and `requested_access` objects.  An autonomous PEP MAY consume the schema directly to construct a valid submission.
 
 Many existing IGA, ITSM, and approval platforms already use proprietary form description languages.  Implementations built on top of such platforms MAY publish a JSON Schema document derived from their native form description.  Some loss of fidelity is expected when translating between form description languages; the JSON Schema referenced by `request_schema_url` SHOULD provide enough information for an autonomous PEP to construct a conformant submission, while richer rendering, widget, and interaction details remain in `form_url`.
 
@@ -538,7 +543,7 @@ A PEP MUST submit an Access Request only for an AuthZEN Decision with `decision`
 
 The submitted `denial` object for each requested item MUST include either `denial.request_context` or `denial.evaluation_id`.  The Access Request Service MUST reject a submission that lacks verifiable denial-binding material with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
 
-A PEP SHOULD include an `Idempotency-Key` header, following the conventions described in {{!I-D.ietf-httpapi-idempotency-key-header}}.  The Idempotency-Key covers the entire submission body, including all members of the `items` array when present.
+A PEP SHOULD include an `Idempotency-Key` header, following the conventions described in {{I-D.ietf-httpapi-idempotency-key-header}}.  The Idempotency-Key covers the entire submission body, including all members of the `items` array when present.
 
 The Access Request Service SHOULD treat a repeated submission with the same `Idempotency-Key`, the same authenticated requester, and an equivalent submission body as the same request, returning the same Task Handle while the original request remains available.  A submission with the same `Idempotency-Key` and authenticated requester but a materially different submission body MUST be rejected with `urn:openid:authzen:access-request:error:duplicate_request`.
 
@@ -622,6 +627,14 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d14
 ## Access Request Response {#access-request-response}
 
 A successful Access Request submission returns HTTP status code `201 Created` or `202 Accepted` and a JSON object containing a `task` member.  The `task.status_endpoint` member is authoritative for subsequent status retrieval.  A response MAY also include an HTTP `Location` header equal to `task.status_endpoint`.
+
+The response object has the following top-level members:
+
+`task`:
+: REQUIRED.  Task Handle returned for the submitted Access Request.
+
+`result`:
+: OPTIONAL except where required by {{completed-task-response}}.  Completion result for the task.  A PEP MUST NOT treat this member as approval unless the task is approved and the result is enforceable under {{completion-semantics}}.
 
 When the Access Request Service is able to resolve the request synchronously (for example, when policy auto-approves and provisioning completes within the request), the Access Request Service SHOULD return `201 Created` with `task.status` already set to a terminal value and a populated `result` member ({{completion-semantics}}).  PEPs MUST handle this synchronous-completion case without polling; the Task Status Endpoint remains usable for later retrieval but is not on the critical path.
 
@@ -768,7 +781,7 @@ Implementations MAY define additional status values.  A PEP that receives an unk
 
 ### State Transitions {#state-transitions}
 
-A task is created in the `pending` state and transitions exactly once to one of the terminal states defined above.  Terminal states do not transition further.
+In the base state machine, a task is created in the `pending` state and transitions exactly once to one of the terminal states defined above.  Terminal states do not transition further.
 
 ~~~ ascii-art
                           (created)
@@ -798,7 +811,7 @@ The following transitions are defined from `pending`:
 | `failed` | A system error prevents the request from completing. |
 | `partial` | Bulk tasks only.  All items in the `items` array reach terminal status, with two or more distinct terminal statuses present.  See aggregation rules in {{access-request-response}}. |
 
-For tasks containing an `items` array, each item independently follows the same state machine; the aggregate `task.status` is computed from per-item statuses according to the aggregation rule in {{access-request-response}}.
+For tasks containing an `items` array, each item independently follows the same base state machine; the aggregate `task.status` is computed from per-item statuses according to the aggregation rule in {{access-request-response}}.
 
 Implementations that define additional status values ({{task-status}}) extend the state machine.  Such extensions SHOULD specify the transitions into and out of the new state and document them alongside the value definition.
 
@@ -1053,7 +1066,7 @@ This specification defines a base wire format.  Several of its objects are inten
 
 ## Extension Points
 
-Additional members beyond those defined in this document MAY appear at the following locations.  No other object members may be extended without a revision of this specification or a profile that explicitly redefines them.
+Additional members beyond those defined in this document MAY appear only at the following locations, and those members MUST follow the naming rules in {{extension-naming}}.  No other object members may be extended without a revision of this specification or a profile that explicitly redefines them.
 
 * `context.access_request.display`: user-interface hints in a requestable denial.
 * `context` in an Access Request submission: augments the AuthZEN Context.
@@ -1242,9 +1255,9 @@ Approval workflows can introduce latency and dependency on external systems.  PE
 
 # IANA Considerations
 
-This document has no IANA actions.
+This document has no IANA actions.  OpenID Foundation registry requests are listed in {{openid-foundation-registry-considerations}}.
 
-# OpenID Foundation Registry Considerations
+# OpenID Foundation Registry Considerations {#openid-foundation-registry-considerations}
 
 ## AuthZEN Policy Decision Point Metadata Registry
 
@@ -1266,7 +1279,7 @@ Name:
 : `jwks_uri`
 
 Description:
-: HTTPS URI of a JWK Set ({{?RFC7517}}) document containing the public keys used to verify signatures issued by the PDP, including but not limited to JWS-signed `request_context` values defined by this profile.
+: HTTPS URI of a JWK Set ({{RFC7517}}) document containing the public keys used to verify signatures issued by the PDP, including but not limited to JWS-signed `request_context` values defined by this profile.
 
 Change Controller:
 : OpenID Foundation AuthZEN Working Group
