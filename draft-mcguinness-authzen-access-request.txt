@@ -78,7 +78,8 @@ Table of Contents
      10.2.  Access Request Response
    11. Task Status Endpoint
      11.1.  Task Status Values
-       11.1.1.  Mapping Backend States
+       11.1.1.  State Transitions
+       11.1.2.  Mapping Backend States
      11.2.  Pending Task Response
      11.3.  Completed Task Response
      11.4.  Cancellation
@@ -460,16 +461,16 @@ Table of Contents
    request_context:  OPTIONAL.  String.  Opaque context to be returned
       to the Access Request Service when submitting the access request.
       The PEP MUST NOT decode, modify, or interpret this value.  The PEP
-      returns it unchanged inside denial.access_request.request_context
-      when submitting the Access Request (Section 10.1).  When present,
-      the value MUST be integrity protected in a way the Access Request
-      Service can verify, and SHOULD be a JSON Web Signature (JWS)
-      [RFC7515] in compact serialization, signed by the PDP, with a
-      payload (such as a JWT [RFC7519]) that the Access Request Service
-      can verify and bind to the original denied evaluation.  JSON Web
-      Encryption (JWE) [RFC7516] MAY be used in addition to integrity
-      protection when the payload contains information that must not be
-      visible to the PEP, for example by encrypting a signed payload.
+      returns it unchanged as denial.request_context when submitting the
+      Access Request (Section 10.1).  When present, the value MUST be
+      integrity protected in a way the Access Request Service can
+      verify, and SHOULD be a JSON Web Signature (JWS) [RFC7515] in
+      compact serialization, signed by the PDP, with a payload (such as
+      a JWT [RFC7519]) that the Access Request Service can verify and
+      bind to the original denied evaluation.  JSON Web Encryption (JWE)
+      [RFC7516] MAY be used in addition to integrity protection when the
+      payload contains information that must not be visible to the PEP,
+      for example by encrypting a signed payload.
 
    display:  OPTIONAL.  Object.  Localizable user-interface hints such
       as title, description, or recommended call-to-action text.  The
@@ -876,14 +877,23 @@ Table of Contents
       augmented with submission-time fields such as business
       justification.
 
-   denial:  REQUIRED when items is absent.  Object binding the Access
-      Request to the denied AuthZEN Decision.  When items is present,
-      this top-level denial is OPTIONAL only when every item carries its
-      own per-item denial; otherwise it is REQUIRED, and its verifiable
-      binding material MUST cover the submitted Subject and every
-      Resource and Action in the items array.  An Access Request with
-      items for which any item lacks a covering denial is malformed and
-      MUST be rejected with urn:openid:authzen:access-
+   denial:  Object binding the Access Request to the denied AuthZEN
+      Decision.  REQUIRED in the following cases:
+
+      *  items is absent: the denial binds the single submitted Subject,
+         Resource, and Action.
+
+      *  items is present and any item lacks a per-item denial: the top-
+         level denial is a bundle denial whose verifiable binding
+         material MUST cover the Subject and every Resource and Action
+         in items.
+
+      OPTIONAL when items is present and every item carries its own per-
+      item denial.
+
+      An Access Request whose denial binding does not cover the
+      submitted Subject, Resource, and Action (for every item when items
+      is present) MUST be rejected with urn:openid:authzen:access-
       request:error:invalid_denial_binding.
 
    requested_access:  OPTIONAL.  Object containing request-specific
@@ -956,17 +966,17 @@ Table of Contents
 
    decision:  REQUIRED.  The denied AuthZEN Decision returned by the
       PDP, including its Decision Context.  The PEP MAY omit
-      context.access_request from the embedded Decision Context when the
-      same object is supplied in denial.access_request.
+      context.access_request from the embedded Decision Context; the
+      Access Request Service consumes the fields it needs
+      (denial.request_context for binding, denial.template for routing)
+      directly from denial rather than from the embedded
+      context.access_request.
 
-   access_request:  REQUIRED.  The context.access_request object from
-      the denied decision.
-
-   evaluation_id:  REQUIRED when denial.access_request.request_context
-      is absent; otherwise RECOMMENDED.  A stable identifier for the
-      denied evaluation, captured by the PEP from context.evaluation_id
-      in the AuthZEN Decision and echoed unchanged here (Section 7.1).
-      The Access Request Service MUST be able to resolve or validate
+   evaluation_id:  REQUIRED when denial.request_context is absent;
+      otherwise RECOMMENDED.  A stable identifier for the denied
+      evaluation, captured by the PEP from context.evaluation_id in the
+      AuthZEN Decision and echoed unchanged here (Section 7.1).  The
+      Access Request Service MUST be able to resolve or validate
       evaluation_id before relying on it as denial-binding material.
       evaluation_id provides the strongest audit binding between the
       original denial and the submitted Access Request and SHOULD be
@@ -974,6 +984,18 @@ Table of Contents
 
    evaluated_at:  OPTIONAL.  [RFC3339] timestamp indicating when the
       denial was produced.
+
+   request_context:  REQUIRED when denial.evaluation_id is absent;
+      otherwise OPTIONAL.  String.  Integrity-protected binding material
+      echoed unchanged from context.access_request.request_context of
+      the denied evaluation (Section 7).  The PEP MUST NOT decode,
+      modify, or interpret this value; it returns the original PDP-
+      issued value byte-for-byte.
+
+   template:  OPTIONAL.  String.  Echoed unchanged from
+      context.access_request.template of the denied evaluation, when the
+      PDP provided one.  The Access Request Service uses this value to
+      route the request to the appropriate workflow.
 
    The PEP determines the additional members of the context and
    requested_access objects from the JSON Schema referenced by the
@@ -993,9 +1015,9 @@ Table of Contents
    to true.
 
    The submitted denial object for each requested item MUST include
-   either denial.access_request.request_context or denial.evaluation_id.
-   The Access Request Service MUST reject a submission that lacks
-   verifiable denial-binding material with urn:openid:authzen:access-
+   either denial.request_context or denial.evaluation_id.  The Access
+   Request Service MUST reject a submission that lacks verifiable
+   denial-binding material with urn:openid:authzen:access-
    request:error:invalid_denial_binding.
 
    A PEP SHOULD include an Idempotency-Key header, following the
@@ -1046,12 +1068,8 @@ Table of Contents
            "reason": "approval_required"
          }
        },
-       "access_request": {
-         "requestable": true,
-         "template": "manager_approval",
-         "reason": "manager_approval_required",
-         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl"
-       }
+       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+       "template": "manager_approval"
      }
    }
 
@@ -1091,11 +1109,8 @@ Table of Contents
          "decision": false,
          "context": {"reason": "approval_required"}
        },
-       "access_request": {
-         "requestable": true,
-         "template": "onboarding_bundle",
-         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl"
-       }
+       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl",
+       "template": "onboarding_bundle"
      }
    }
 
@@ -1315,7 +1330,64 @@ Table of Contents
    Implementations MAY define additional status values.  A PEP that
    receives an unknown status value MUST treat the task as not approved.
 
-11.1.1.  Mapping Backend States
+11.1.1.  State Transitions
+
+   A task is created in the pending state and transitions exactly once
+   to one of the terminal states defined above.  Terminal states do not
+   transition further.
+
+                             (created)
+                                 |
+                                 v
+                          +-------------+
+                          |   pending   |
+                          +------+------+
+                                 |
+      +----------+----------+----+----+-----------+-----------+
+      |          |          |        |           |           |
+      v          v          v        v           v           v
+   +--------+ +------+ +-------+ +----------+ +--------+ +---------+
+   |approved| |denied| |expired| |cancelled | | failed | | partial |
+   +--------+ +------+ +-------+ +----------+ +--------+ +---------+
+                                                          (bulk only)
+
+   The following transitions are defined from pending:
+
+        +===========+============================================+
+        | To        | Trigger                                    |
+        +===========+============================================+
+        | approved  | Approval workflow completes successfully.  |
+        +-----------+--------------------------------------------+
+        | denied    | Approval workflow rejects the request.     |
+        +-----------+--------------------------------------------+
+        | expired   | task.expires_at is reached before the      |
+        |           | request reaches a terminal state.          |
+        +-----------+--------------------------------------------+
+        | cancelled | The request is cancelled by the requester, |
+        |           | approver, administrator, or PEP using the  |
+        |           | cancellation endpoint (Section 11.4).      |
+        +-----------+--------------------------------------------+
+        | failed    | A system error prevents the request from   |
+        |           | completing.                                |
+        +-----------+--------------------------------------------+
+        | partial   | Bulk tasks only.  All items in the items   |
+        |           | array reach terminal status, with two or   |
+        |           | more distinct terminal statuses present.   |
+        |           | See aggregation rules in Section 10.2.     |
+        +-----------+--------------------------------------------+
+
+                                 Table 1
+
+   For tasks containing an items array, each item independently follows
+   the same state machine; the aggregate task.status is computed from
+   per-item statuses according to the aggregation rule in Section 10.2.
+
+   Implementations that define additional status values (Section 11.1)
+   extend the state machine.  Such extensions SHOULD specify the
+   transitions into and out of the new state and document them alongside
+   the value definition.
+
+11.1.2.  Mapping Backend States
 
    Access Request Services typically maintain richer task lifecycle
    state than the canonical statuses defined above.  Common backend
@@ -1348,7 +1420,7 @@ Table of Contents
    | more distinct terminal statuses               |                  |
    +-----------------------------------------------+------------------+
 
-                                 Table 1
+                                 Table 2
 
    Implementations SHOULD document the mapping they apply so that PEP
    behavior remains predictable across upgrades and operational changes.
@@ -1838,9 +1910,9 @@ Table of Contents
       submission's context and requested_access objects according to
       Section 8 and Section 9.
 
-   *  MUST include denial.evaluation_id when
-      denial.access_request.request_context is absent, and SHOULD
-      include it when the PDP returned an evaluation identifier.
+   *  MUST include denial.evaluation_id when denial.request_context is
+      absent, and SHOULD include it when the PDP returned an evaluation
+      identifier.
 
    *  SHOULD include an idempotency key for Access Request submissions.
 
@@ -1921,14 +1993,14 @@ Table of Contents
    *  MUST verify the denial-binding material for every requested item,
       applying the following rules:
 
-      -  When denial.access_request.request_context is present, the
-         service MUST verify its integrity.  When the value is a JWS,
-         the service MUST verify the signature using a key resolved from
-         the JWK Set advertised at the PDP's jwks_uri (Section 6); JWS
-         kid headers are matched against JWK kid parameters.
+      -  When denial.request_context is present, the service MUST verify
+         its integrity.  When the value is a JWS, the service MUST
+         verify the signature using a key resolved from the JWK Set
+         advertised at the PDP's jwks_uri (Section 6); JWS kid headers
+         are matched against JWK kid parameters.
 
-      -  When denial.access_request.request_context is absent, the
-         service MUST resolve or validate denial.evaluation_id.
+      -  When denial.request_context is absent, the service MUST resolve
+         or validate denial.evaluation_id.
 
       -  The service MUST reject submissions whose binding material
          cannot be verified or whose claims do not bind to the submitted
@@ -2295,7 +2367,7 @@ Table of Contents
    |                    |                  | cancel the request.       |
    +--------------------+------------------+---------------------------+
 
-                                  Table 2
+                                  Table 3
 
    Change Controller for all initial entries: OpenID Foundation AuthZEN
    Working Group.  Specification Document for all initial entries: This
@@ -2388,12 +2460,8 @@ Table of Contents
            "reason": "approval_required"
          }
        },
-       "access_request": {
-         "requestable": true,
-         "template": "manager_approval",
-         "reason": "manager_approval_required",
-         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl"
-       }
+       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+       "template": "manager_approval"
      }
    }
 
@@ -2608,12 +2676,8 @@ Table of Contents
          "decision": false,
          "context": {"reason": "agent_authority_missing"}
        },
-       "access_request": {
-         "requestable": true,
-         "template": "agent_tool_class_approval",
-         "reason": "agent_class_approval_required",
-         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
-       }
+       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+       "template": "agent_tool_class_approval"
      }
    }
 
@@ -2869,7 +2933,7 @@ A.1.  Identity Governance and Approval Platforms
    changes platform state, and a subsequent AuthZEN evaluation reflects
    that state.  Implementations mapping their richer task lifecycle
    states onto the canonical statuses defined in this profile SHOULD
-   follow the guidance in Section 11.1.1.
+   follow the guidance in Section 11.1.2.
 
 A.2.  Subjects, Principals, and Actors
 

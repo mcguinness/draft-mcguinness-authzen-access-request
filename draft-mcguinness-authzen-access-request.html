@@ -1204,7 +1204,10 @@ svg :is([fill="white"], [fill^="#fff"]) {
                 <p id="section-toc.1-1.11.2.1.1"><a href="#section-11.1" class="auto internal xref">11.1</a>.  <a href="#name-task-status-values" class="internal xref">Task Status Values</a></p>
 <ul class="compact toc ulBare ulEmpty">
 <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11.2.1.2.1">
-                    <p id="section-toc.1-1.11.2.1.2.1.1"><a href="#section-11.1.1" class="auto internal xref">11.1.1</a>.  <a href="#name-mapping-backend-states" class="internal xref">Mapping Backend States</a></p>
+                    <p id="section-toc.1-1.11.2.1.2.1.1"><a href="#section-11.1.1" class="auto internal xref">11.1.1</a>.  <a href="#name-state-transitions" class="internal xref">State Transitions</a></p>
+</li>
+                  <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.11.2.1.2.2">
+                    <p id="section-toc.1-1.11.2.1.2.2.1"><a href="#section-11.1.2" class="auto internal xref">11.1.2</a>.  <a href="#name-mapping-backend-states" class="internal xref">Mapping Backend States</a></p>
 </li>
                 </ul>
 </li>
@@ -1684,7 +1687,7 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 <dt id="section-7-3.13">
 <code>request_context</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-3.14">
-          <p id="section-7-3.14.1"><span class="bcp14">OPTIONAL</span>.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value.  The PEP returns it unchanged inside <code>denial.access_request.request_context</code> when submitting the Access Request (<a href="#access-request-submission" class="auto internal xref">Section 10.1</a>).  When present, the value <span class="bcp14">MUST</span> be integrity protected in a way the Access Request Service can verify, and <span class="bcp14">SHOULD</span> be a JSON Web Signature (JWS) <span>[<a href="#RFC7515" class="cite xref">RFC7515</a>]</span> in compact serialization, signed by the PDP, with a payload (such as a JWT <span>[<a href="#RFC7519" class="cite xref">RFC7519</a>]</span>) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) <span>[<a href="#RFC7516" class="cite xref">RFC7516</a>]</span> <span class="bcp14">MAY</span> be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.<a href="#section-7-3.14.1" class="pilcrow">¶</a></p>
+          <p id="section-7-3.14.1"><span class="bcp14">OPTIONAL</span>.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value.  The PEP returns it unchanged as <code>denial.request_context</code> when submitting the Access Request (<a href="#access-request-submission" class="auto internal xref">Section 10.1</a>).  When present, the value <span class="bcp14">MUST</span> be integrity protected in a way the Access Request Service can verify, and <span class="bcp14">SHOULD</span> be a JSON Web Signature (JWS) <span>[<a href="#RFC7515" class="cite xref">RFC7515</a>]</span> in compact serialization, signed by the PDP, with a payload (such as a JWT <span>[<a href="#RFC7519" class="cite xref">RFC7519</a>]</span>) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) <span>[<a href="#RFC7516" class="cite xref">RFC7516</a>]</span> <span class="bcp14">MAY</span> be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.<a href="#section-7-3.14.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-3.15">
@@ -2074,7 +2077,17 @@ Content-Type: application/json
 <dt id="section-10.1-3.11">
 <code>denial</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-3.12">
-            <p id="section-10.1-3.12.1"><span class="bcp14">REQUIRED</span> when <code>items</code> is absent.  Object binding the Access Request to the denied AuthZEN Decision.  When <code>items</code> is present, this top-level <code>denial</code> is <span class="bcp14">OPTIONAL</span> only when every item carries its own per-item <code>denial</code>; otherwise it is <span class="bcp14">REQUIRED</span>, and its verifiable binding material <span class="bcp14">MUST</span> cover the submitted Subject and every Resource and Action in the <code>items</code> array.  An Access Request with <code>items</code> for which any item lacks a covering denial is malformed and <span class="bcp14">MUST</span> be rejected with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-3.12.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-3.12.1">Object binding the Access Request to the denied AuthZEN Decision.  <span class="bcp14">REQUIRED</span> in the following cases:<a href="#section-10.1-3.12.1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-10.1-3.12.2.1">
+                <p id="section-10.1-3.12.2.1.1"><code>items</code> is absent: the <code>denial</code> binds the single submitted Subject, Resource, and Action.<a href="#section-10.1-3.12.2.1.1" class="pilcrow">¶</a></p>
+</li>
+              <li class="normal" id="section-10.1-3.12.2.2">
+                <p id="section-10.1-3.12.2.2.1"><code>items</code> is present and any item lacks a per-item <code>denial</code>: the top-level <code>denial</code> is a bundle denial whose verifiable binding material <span class="bcp14">MUST</span> cover the Subject and every Resource and Action in <code>items</code>.<a href="#section-10.1-3.12.2.2.1" class="pilcrow">¶</a></p>
+</li>
+            </ul>
+<p id="section-10.1-3.12.3"><span class="bcp14">OPTIONAL</span> when <code>items</code> is present and every item carries its own per-item <code>denial</code>.<a href="#section-10.1-3.12.3" class="pilcrow">¶</a></p>
+<p id="section-10.1-3.12.4">An Access Request whose denial binding does not cover the submitted Subject, Resource, and Action (for every item when <code>items</code> is present) <span class="bcp14">MUST</span> be rejected with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-3.12.4" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-3.13">
@@ -2152,32 +2165,38 @@ Content-Type: application/json
           <dt id="section-10.1-5.1">
 <code>decision</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.2">
-            <p id="section-10.1-5.2.1"><span class="bcp14">REQUIRED</span>.  The denied AuthZEN Decision returned by the PDP, including its Decision Context.  The PEP <span class="bcp14">MAY</span> omit <code>context.access_request</code> from the embedded Decision Context when the same object is supplied in <code>denial.access_request</code>.<a href="#section-10.1-5.2.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.2.1"><span class="bcp14">REQUIRED</span>.  The denied AuthZEN Decision returned by the PDP, including its Decision Context.  The PEP <span class="bcp14">MAY</span> omit <code>context.access_request</code> from the embedded Decision Context; the Access Request Service consumes the fields it needs (<code>denial.request_context</code> for binding, <code>denial.template</code> for routing) directly from <code>denial</code> rather than from the embedded <code>context.access_request</code>.<a href="#section-10.1-5.2.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.3">
-<code>access_request</code>:</dt>
+<code>evaluation_id</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.4">
-            <p id="section-10.1-5.4.1"><span class="bcp14">REQUIRED</span>.  The <code>context.access_request</code> object from the denied decision.<a href="#section-10.1-5.4.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.4.1"><span class="bcp14">REQUIRED</span> when <code>denial.request_context</code> is absent; otherwise <span class="bcp14">RECOMMENDED</span>.  A stable identifier for the denied evaluation, captured by the PEP from <code>context.evaluation_id</code> in the AuthZEN Decision and echoed unchanged here (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>).  The Access Request Service <span class="bcp14">MUST</span> be able to resolve or validate <code>evaluation_id</code> before relying on it as denial-binding material.  <code>evaluation_id</code> provides the strongest audit binding between the original denial and the submitted Access Request and <span class="bcp14">SHOULD</span> be preferred over <code>evaluated_at</code> alone.<a href="#section-10.1-5.4.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.5">
-<code>evaluation_id</code>:</dt>
+<code>evaluated_at</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.6">
-            <p id="section-10.1-5.6.1"><span class="bcp14">REQUIRED</span> when <code>denial.access_request.request_context</code> is absent; otherwise <span class="bcp14">RECOMMENDED</span>.  A stable identifier for the denied evaluation, captured by the PEP from <code>context.evaluation_id</code> in the AuthZEN Decision and echoed unchanged here (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>).  The Access Request Service <span class="bcp14">MUST</span> be able to resolve or validate <code>evaluation_id</code> before relying on it as denial-binding material.  <code>evaluation_id</code> provides the strongest audit binding between the original denial and the submitted Access Request and <span class="bcp14">SHOULD</span> be preferred over <code>evaluated_at</code> alone.<a href="#section-10.1-5.6.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.6.1"><span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the denial was produced.<a href="#section-10.1-5.6.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.7">
-<code>evaluated_at</code>:</dt>
+<code>request_context</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.8">
-            <p id="section-10.1-5.8.1"><span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the denial was produced.<a href="#section-10.1-5.8.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.8.1"><span class="bcp14">REQUIRED</span> when <code>denial.evaluation_id</code> is absent; otherwise <span class="bcp14">OPTIONAL</span>.  String.  Integrity-protected binding material echoed unchanged from <code>context.access_request.request_context</code> of the denied evaluation (<a href="#requestable-denial-context" class="auto internal xref">Section 7</a>).  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value; it returns the original PDP-issued value byte-for-byte.<a href="#section-10.1-5.8.1" class="pilcrow">¶</a></p>
+</dd>
+          <dd class="break"></dd>
+<dt id="section-10.1-5.9">
+<code>template</code>:</dt>
+          <dd style="margin-left: 1.5em" id="section-10.1-5.10">
+            <p id="section-10.1-5.10.1"><span class="bcp14">OPTIONAL</span>.  String.  Echoed unchanged from <code>context.access_request.template</code> of the denied evaluation, when the PDP provided one.  The Access Request Service uses this value to route the request to the appropriate workflow.<a href="#section-10.1-5.10.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 </dl>
 <p id="section-10.1-6">The PEP determines the additional members of the <code>context</code> and <code>requested_access</code> objects from the JSON Schema referenced by the requestable denial's <code>form_schema_url</code>, when present.  Field values that are selected from a backing catalog are resolved according to the Catalogs Document referenced by <code>form_catalogs_url</code>; see <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-10.1-6" class="pilcrow">¶</a></p>
 <p id="section-10.1-7">If both <code>requested_access.requested_duration</code> and <code>requested_access.requested_until</code> are present, the Access Request Service <span class="bcp14">MUST</span> reject the submission unless the deployment defines an explicit reconciliation rule.  When a deployment permits both members, the approved access lifetime <span class="bcp14">MUST NOT</span> exceed the earlier resulting expiry.<a href="#section-10.1-7" class="pilcrow">¶</a></p>
 <p id="section-10.1-8">A PEP <span class="bcp14">MUST</span> submit an Access Request only for an AuthZEN Decision with <code>decision</code> equal to <code>false</code> and <code>context.access_request.requestable</code> equal to <code>true</code>.<a href="#section-10.1-8" class="pilcrow">¶</a></p>
-<p id="section-10.1-9">The submitted <code>denial</code> object for each requested item <span class="bcp14">MUST</span> include either <code>denial.access_request.request_context</code> or <code>denial.evaluation_id</code>.  The Access Request Service <span class="bcp14">MUST</span> reject a submission that lacks verifiable denial-binding material with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-9" class="pilcrow">¶</a></p>
+<p id="section-10.1-9">The submitted <code>denial</code> object for each requested item <span class="bcp14">MUST</span> include either <code>denial.request_context</code> or <code>denial.evaluation_id</code>.  The Access Request Service <span class="bcp14">MUST</span> reject a submission that lacks verifiable denial-binding material with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-9" class="pilcrow">¶</a></p>
 <p id="section-10.1-10">A PEP <span class="bcp14">SHOULD</span> include an <code>Idempotency-Key</code> header, following the conventions described in <span>[<a href="#I-D.ietf-httpapi-idempotency-key-header" class="cite xref">I-D.ietf-httpapi-idempotency-key-header</a>]</span>.  The Idempotency-Key covers the entire submission body, including all members of the <code>items</code> array when present.<a href="#section-10.1-10" class="pilcrow">¶</a></p>
 <p id="section-10.1-11">The Access Request Service <span class="bcp14">SHOULD</span> treat a repeated submission with the same <code>Idempotency-Key</code>, the same authenticated requester, and an equivalent submission body as the same request, returning the same Task Handle while the original request remains available.  A submission with the same <code>Idempotency-Key</code> and authenticated requester but a materially different submission body <span class="bcp14">MUST</span> be rejected with <code>urn:openid:authzen:access-request:error:duplicate_request</code>.<a href="#section-10.1-11" class="pilcrow">¶</a></p>
 <p id="section-10.1-12">Non-normative example:<a href="#section-10.1-12" class="pilcrow">¶</a></p>
@@ -2216,12 +2235,8 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
         "reason": "approval_required"
       }
     },
-    "access_request": {
-      "requestable": true,
-      "template": "manager_approval",
-      "reason": "manager_approval_required",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl"
-    }
+    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+    "template": "manager_approval"
   }
 }
 </pre><a href="#section-10.1-13" class="pilcrow">¶</a>
@@ -2263,11 +2278,8 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d14
       "decision": false,
       "context": {"reason": "approval_required"}
     },
-    "access_request": {
-      "requestable": true,
-      "template": "onboarding_bundle",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl"
-    }
+    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl",
+    "template": "onboarding_bundle"
   }
 }
 </pre><a href="#section-10.1-15" class="pilcrow">¶</a>
@@ -2507,15 +2519,92 @@ Accept: application/json
         <dd class="break"></dd>
 </dl>
 <p id="section-11.1-3">Implementations <span class="bcp14">MAY</span> define additional status values.  A PEP that receives an unknown status value <span class="bcp14">MUST</span> treat the task as not approved.<a href="#section-11.1-3" class="pilcrow">¶</a></p>
-<div id="status-mapping">
+<div id="state-transitions">
 <section id="section-11.1.1">
-          <h4 id="name-mapping-backend-states">
-<a href="#section-11.1.1" class="section-number selfRef">11.1.1. </a><a href="#name-mapping-backend-states" class="section-name selfRef">Mapping Backend States</a>
+          <h4 id="name-state-transitions">
+<a href="#section-11.1.1" class="section-number selfRef">11.1.1. </a><a href="#name-state-transitions" class="section-name selfRef">State Transitions</a>
           </h4>
-<p id="section-11.1.1-1">Access Request Services typically maintain richer task lifecycle state than the canonical statuses defined above.  Common backend models include separate fields for open versus closed, processing versus waiting, escalation states, and auto-approval states.  Implementations are expected to collapse such richer state into the canonical statuses for the purpose of the Task Status Endpoint.<a href="#section-11.1.1-1" class="pilcrow">¶</a></p>
-<p id="section-11.1.1-2">The following non-normative mapping illustrates one such collapse and may be used as a starting point:<a href="#section-11.1.1-2" class="pilcrow">¶</a></p>
+<p id="section-11.1.1-1">A task is created in the <code>pending</code> state and transitions exactly once to one of the terminal states defined above.  Terminal states do not transition further.<a href="#section-11.1.1-1" class="pilcrow">¶</a></p>
+<div class="alignLeft art-ascii-art art-text artwork" id="section-11.1.1-2">
+<pre>
+                          (created)
+                              |
+                              v
+                       +-------------+
+                       |   pending   |
+                       +------+------+
+                              |
+   +----------+----------+----+----+-----------+-----------+
+   |          |          |        |           |           |
+   v          v          v        v           v           v
++--------+ +------+ +-------+ +----------+ +--------+ +---------+
+|approved| |denied| |expired| |cancelled | | failed | | partial |
++--------+ +------+ +-------+ +----------+ +--------+ +---------+
+                                                       (bulk only)
+</pre><a href="#section-11.1.1-2" class="pilcrow">¶</a>
+</div>
+<p id="section-11.1.1-3">The following transitions are defined from <code>pending</code>:<a href="#section-11.1.1-3" class="pilcrow">¶</a></p>
 <table class="center" id="table-1">
             <caption><a href="#table-1" class="selfRef">Table 1</a></caption>
+<thead>
+              <tr>
+                <th class="text-left" rowspan="1" colspan="1">To</th>
+                <th class="text-left" rowspan="1" colspan="1">Trigger</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>approved</code>
+</td>
+                <td class="text-left" rowspan="1" colspan="1">Approval workflow completes successfully.</td>
+              </tr>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>denied</code>
+</td>
+                <td class="text-left" rowspan="1" colspan="1">Approval workflow rejects the request.</td>
+              </tr>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>expired</code>
+</td>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>task.expires_at</code> is reached before the request reaches a terminal state.</td>
+              </tr>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>cancelled</code>
+</td>
+                <td class="text-left" rowspan="1" colspan="1">The request is cancelled by the requester, approver, administrator, or PEP using the cancellation endpoint (<a href="#cancellation" class="auto internal xref">Section 11.4</a>).</td>
+              </tr>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>failed</code>
+</td>
+                <td class="text-left" rowspan="1" colspan="1">A system error prevents the request from completing.</td>
+              </tr>
+              <tr>
+                <td class="text-left" rowspan="1" colspan="1">
+                  <code>partial</code>
+</td>
+                <td class="text-left" rowspan="1" colspan="1">Bulk tasks only.  All items in the <code>items</code> array reach terminal status, with two or more distinct terminal statuses present.  See aggregation rules in <a href="#access-request-response" class="auto internal xref">Section 10.2</a>.</td>
+              </tr>
+            </tbody>
+          </table>
+<p id="section-11.1.1-5">For tasks containing an <code>items</code> array, each item independently follows the same state machine; the aggregate <code>task.status</code> is computed from per-item statuses according to the aggregation rule in <a href="#access-request-response" class="auto internal xref">Section 10.2</a>.<a href="#section-11.1.1-5" class="pilcrow">¶</a></p>
+<p id="section-11.1.1-6">Implementations that define additional status values (<a href="#task-status" class="auto internal xref">Section 11.1</a>) extend the state machine.  Such extensions <span class="bcp14">SHOULD</span> specify the transitions into and out of the new state and document them alongside the value definition.<a href="#section-11.1.1-6" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="status-mapping">
+<section id="section-11.1.2">
+          <h4 id="name-mapping-backend-states">
+<a href="#section-11.1.2" class="section-number selfRef">11.1.2. </a><a href="#name-mapping-backend-states" class="section-name selfRef">Mapping Backend States</a>
+          </h4>
+<p id="section-11.1.2-1">Access Request Services typically maintain richer task lifecycle state than the canonical statuses defined above.  Common backend models include separate fields for open versus closed, processing versus waiting, escalation states, and auto-approval states.  Implementations are expected to collapse such richer state into the canonical statuses for the purpose of the Task Status Endpoint.<a href="#section-11.1.2-1" class="pilcrow">¶</a></p>
+<p id="section-11.1.2-2">The following non-normative mapping illustrates one such collapse and may be used as a starting point:<a href="#section-11.1.2-2" class="pilcrow">¶</a></p>
+<table class="center" id="table-2">
+            <caption><a href="#table-2" class="selfRef">Table 2</a></caption>
 <thead>
               <tr>
                 <th class="text-left" rowspan="1" colspan="1">Backend state</th>
@@ -2567,7 +2656,7 @@ Accept: application/json
               </tr>
             </tbody>
           </table>
-<p id="section-11.1.1-4">Implementations <span class="bcp14">SHOULD</span> document the mapping they apply so that PEP behavior remains predictable across upgrades and operational changes.<a href="#section-11.1.1-4" class="pilcrow">¶</a></p>
+<p id="section-11.1.2-4">Implementations <span class="bcp14">SHOULD</span> document the mapping they apply so that PEP behavior remains predictable across upgrades and operational changes.<a href="#section-11.1.2-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -2997,7 +3086,7 @@ Content-Type: application/problem+json
           <p id="section-16-2.5.1">When the requestable denial includes <code>form_schema_url</code> or <code>form_catalogs_url</code>, <span class="bcp14">MUST</span> construct the augmentations to the submission's <code>context</code> and <code>requested_access</code> objects according to <a href="#machine-readable-forms" class="auto internal xref">Section 8</a> and <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-16-2.5.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-16-2.6">
-          <p id="section-16-2.6.1"><span class="bcp14">MUST</span> include <code>denial.evaluation_id</code> when <code>denial.access_request.request_context</code> is absent, and <span class="bcp14">SHOULD</span> include it when the PDP returned an evaluation identifier.<a href="#section-16-2.6.1" class="pilcrow">¶</a></p>
+          <p id="section-16-2.6.1"><span class="bcp14">MUST</span> include <code>denial.evaluation_id</code> when <code>denial.request_context</code> is absent, and <span class="bcp14">SHOULD</span> include it when the PDP returned an evaluation identifier.<a href="#section-16-2.6.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-16-2.7">
           <p id="section-16-2.7.1"><span class="bcp14">SHOULD</span> include an idempotency key for Access Request submissions.<a href="#section-16-2.7.1" class="pilcrow">¶</a></p>
@@ -3086,10 +3175,10 @@ Content-Type: application/problem+json
           <p id="section-18-2.3.1"><span class="bcp14">MUST</span> verify the denial-binding material for every requested item, applying the following rules:<a href="#section-18-2.3.1" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-18-2.3.2.1">
-              <p id="section-18-2.3.2.1.1">When <code>denial.access_request.request_context</code> is present, the service <span class="bcp14">MUST</span> verify its integrity.  When the value is a JWS, the service <span class="bcp14">MUST</span> verify the signature using a key resolved from the JWK Set advertised at the PDP's <code>jwks_uri</code> (<a href="#discovery" class="auto internal xref">Section 6</a>); JWS <code>kid</code> headers are matched against JWK <code>kid</code> parameters.<a href="#section-18-2.3.2.1.1" class="pilcrow">¶</a></p>
+              <p id="section-18-2.3.2.1.1">When <code>denial.request_context</code> is present, the service <span class="bcp14">MUST</span> verify its integrity.  When the value is a JWS, the service <span class="bcp14">MUST</span> verify the signature using a key resolved from the JWK Set advertised at the PDP's <code>jwks_uri</code> (<a href="#discovery" class="auto internal xref">Section 6</a>); JWS <code>kid</code> headers are matched against JWK <code>kid</code> parameters.<a href="#section-18-2.3.2.1.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-18-2.3.2.2">
-              <p id="section-18-2.3.2.2.1">When <code>denial.access_request.request_context</code> is absent, the service <span class="bcp14">MUST</span> resolve or validate <code>denial.evaluation_id</code>.<a href="#section-18-2.3.2.2.1" class="pilcrow">¶</a></p>
+              <p id="section-18-2.3.2.2.1">When <code>denial.request_context</code> is absent, the service <span class="bcp14">MUST</span> resolve or validate <code>denial.evaluation_id</code>.<a href="#section-18-2.3.2.2.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-18-2.3.2.3">
               <p id="section-18-2.3.2.3.1">The service <span class="bcp14">MUST</span> reject submissions whose binding material cannot be verified or whose claims do not bind to the submitted denial.<a href="#section-18-2.3.2.3.1" class="pilcrow">¶</a></p>
@@ -3411,8 +3500,8 @@ Content-Type: application/problem+json
         <dd class="break"></dd>
 </dl>
 <p id="section-23.3-4">Initial entries registered by this specification:<a href="#section-23.3-4" class="pilcrow">¶</a></p>
-<table class="center" id="table-2">
-          <caption><a href="#table-2" class="selfRef">Table 2</a></caption>
+<table class="center" id="table-3">
+          <caption><a href="#table-3" class="selfRef">Table 3</a></caption>
 <thead>
             <tr>
               <th class="text-left" rowspan="1" colspan="1">Name</th>
@@ -3651,12 +3740,8 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
         "reason": "approval_required"
       }
     },
-    "access_request": {
-      "requestable": true,
-      "template": "manager_approval",
-      "reason": "manager_approval_required",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl"
-    }
+    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+    "template": "manager_approval"
   }
 }
 </pre><a href="#section-24.1.3-1" class="pilcrow">¶</a>
@@ -3917,12 +4002,8 @@ Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
       "decision": false,
       "context": {"reason": "agent_authority_missing"}
     },
-    "access_request": {
-      "requestable": true,
-      "template": "agent_tool_class_approval",
-      "reason": "agent_class_approval_required",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
-    }
+    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+    "template": "agent_tool_class_approval"
   }
 }
 </pre><a href="#section-24.2.3-2" class="pilcrow">¶</a>
@@ -4207,7 +4288,7 @@ Content-Type: application/json
             <p id="appendix-A.1-2.3.1">The Policy Enforcement Point is either an enforcing application (reactive: a gateway calls AuthZEN when a user attempts an operation) or a request user interface or agent (proactive: the user opens a request portal).  Both are valid PEPs under this profile.<a href="#appendix-A.1-2.3.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
-<p id="appendix-A.1-3">Re-evaluation Mode aligns directly with this pattern: provisioning changes platform state, and a subsequent AuthZEN evaluation reflects that state.  Implementations mapping their richer task lifecycle states onto the canonical statuses defined in this profile <span class="bcp14">SHOULD</span> follow the guidance in <a href="#status-mapping" class="auto internal xref">Section 11.1.1</a>.<a href="#appendix-A.1-3" class="pilcrow">¶</a></p>
+<p id="appendix-A.1-3">Re-evaluation Mode aligns directly with this pattern: provisioning changes platform state, and a subsequent AuthZEN evaluation reflects that state.  Implementations mapping their richer task lifecycle states onto the canonical statuses defined in this profile <span class="bcp14">SHOULD</span> follow the guidance in <a href="#status-mapping" class="auto internal xref">Section 11.1.2</a>.<a href="#appendix-A.1-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="subjects-principals-and-actors">
