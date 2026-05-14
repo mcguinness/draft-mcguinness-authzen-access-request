@@ -1076,6 +1076,7 @@ Additional members beyond those defined in this document MAY appear only at the 
 * `task.display`: user-interface hints attached to a Task Handle.
 * `task.links`: link relations to related URLs.
 * `result` and the additions defined under each `result.mode`.
+* `approval.state` in a Re-evaluation Mode result: opaque profile-specific or deployment-specific state carried through the PEP to the PDP at re-evaluation time.
 
 This specification also defines extensibility for enumerated values:
 
@@ -1200,6 +1201,29 @@ An attacker could attempt to obtain approval for one resource and apply it to an
 ## Request Context Integrity
 
 The `request_context` member round-trips PDP-issued state through the PEP to the Access Request Service.  Without integrity protection, a buggy or hostile PEP could drop, alter, or fabricate this value to influence approval routing or scope.  PDPs MUST integrity-protect `request_context` using a mechanism the Access Request Service can verify and SHOULD issue it as a JWS so the Access Request Service can prove the value was produced by the PDP and bound to the original denied evaluation.  When the payload contains information that must not be visible to the PEP, the PDP MAY use JWE in addition to integrity protection, for example by encrypting a signed payload.  This is a confused-deputy mitigation: it lets the Access Request Service confirm that the requestable-denial state was issued by the PDP and not fabricated or altered by the PEP.
+
+This profile does not mandate a specific JWS payload; the contents are deployment-specific.  Implementations that issue `request_context` as a JWT SHOULD include the following claims to provide sound token hygiene and confused-deputy protection:
+
+* `iss`: PDP identifier.  Lets the Access Request Service select the correct verification key from the PDP's JWK Set ({{discovery}}).
+* `aud`: Access Request Service identifier.  Prevents replay of a token issued for one Access Request Service against another.
+* `iat`, `exp`: issued-at and expiry.  Expiry SHOULD be short (typically minutes, aligned with the requestable-denial hint lifetime).
+* `jti`: unique token identifier.  The Access Request Service SHOULD track recently-seen `jti` values to detect replay of an otherwise valid token.
+* Binding claims that identify the original denied evaluation.  Either:
+    * Inline: the Subject, Resource, and Action of the denied evaluation, in shapes the Access Request Service can compare against the submitted Subject, Resource, and Action; or
+    * Hashed: a `binding_hash` over a canonical serialization of the Subject, Resource, and Action, which the Access Request Service recomputes from the submission.
+* `evaluation_id`: the PDP's identifier for the evaluation, when present in `context.evaluation_id` ({{evaluation-identifier}}).
+
+When `items` is present in the submission (bulk), the binding claims cover the entire `items` array (for example, an `items` claim listing each Resource and Action, or a `binding_hash` computed over the full item list).
+
+PDPs MAY add deployment-specific claims (policy version, factors, risk score, tenant identifier) when the Access Request Service needs them for routing or audit.  When such claims must remain opaque to the PEP, the PDP wraps the signed payload in JWE encrypted to the Access Request Service.
+
+The Access Request Service, on receipt:
+
+1. parses the JWS header and resolves the verification key from the JWK Set at the PDP's `jwks_uri`;
+2. verifies the signature, the `aud` claim, and the expiry;
+3. checks `jti` against recently-seen tokens to detect replay;
+4. compares the binding claims (inline or hashed) against the submission's Subject, Resource, and Action (or per-item for bulk submissions);
+5. rejects with `urn:openid:authzen:access-request:error:invalid_denial_binding` on any failure.
 
 ## Approval Replay
 
