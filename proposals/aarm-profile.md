@@ -16,9 +16,9 @@ This profile registers the AARM-specific vocabulary and conventions at the base 
 
 This profile defines:
 
-- A request-reason vocabulary that names AARM's STEP_UP and DEFER classes on the wire.
+- A request-template vocabulary that names AARM's STEP_UP and DEFER classes on the wire (carried in `context.access_request.template` and echoed in the submission as `denial.template`).
 - `context` augmentations that carry AARM's risk-level, policy-confidence, and semantic-distance fields.
-- A `result.approval` augmentation that carries AARM's identity-verification flag.
+- An `approval.state` augmentation that carries AARM's identity-verification flag through the base profile's opaque PDP-state slot.
 - Task-lifecycle expectations that match AARM's DENY-on-timeout default.
 - An identity convention that maps AARM's ActionIdentity chain to the base profile's `subject` and `client.actor` shape.
 
@@ -45,16 +45,16 @@ AARM's `request()` is conceptually blocking; this profile's wire is async.  AARM
 
 ## Profile Registrations
 
-### Request-reason vocabulary
+### Request-template vocabulary
 
-Registers the following well-known values for `context.access_request.reason` in the base profile's Requestable Denial Context:
+Registers the following well-known values for `context.access_request.template` in the base profile's Requestable Denial Context.  The PDP sets these values when emitting a requestable denial; the PEP echoes them unchanged at `denial.template` in the submission, and the Access Request Service uses the value for workflow routing:
 
 | Value | Meaning |
 |---|---|
 | `step_up` | Request triggered by AARM's STEP_UP decision class (direct high-risk action). |
 | `defer_escalation` | Request triggered by AARM's DEFER escalation (unresolved policy deferral requiring human judgment). |
 
-These map to AARM's `ApprovalRequest.source` field.
+These map to AARM's `ApprovalRequest.source` field.  This proposal places them on `template` rather than `context.access_request.reason` because `template` is echoed in the submission shape introduced by the base profile's flat `denial` object, while `context.access_request.reason` is consumed only by the PEP at evaluation time and is not echoed.
 
 ### Context augmentations
 
@@ -63,14 +63,14 @@ Registers the following members at the `context` extension point in an Access Re
 | Member | Type | Description |
 |---|---|---|
 | `risk_level` | String | AARM risk classification.  One of `low`, `medium`, `high`, `critical`. |
-| `policy_confidence` | Number | AARM policy confidence score, in the range `0.0`–`1.0`. |
+| `policy_confidence` | Number | AARM policy confidence score, in the range `0.0` to `1.0`. |
 | `semantic_distance` | Number | Semantic distance from the original user intent, when computed by the upstream system. |
 
 Lowercase is used here for consistency with the base profile's existing `risk_level` Catalog Item member.  AARM-conformant senders MAY accept either case; this profile uses lowercase on the wire.
 
-### `result.approval` augmentation
+### `approval.state` augmentation
 
-Registers the following member on `result.approval` for the Re-evaluation Mode result:
+Registers the following member inside the opaque `approval.state` slot defined by the base profile's Re-evaluation Mode.  The PEP round-trips `approval.state` unchanged from `result.approval.state` to `context.approval.state` in the re-evaluation request; AARM-aware PDPs read `identity_verified` to enforce policies that require identity verification at execution time:
 
 | Member | Type | Description |
 |---|---|---|
@@ -105,8 +105,9 @@ An AARM-conformant deployment of this profile:
 - MUST publish `access_request_endpoint` and `jwks_uri` in PDP metadata per the base profile.
 - MUST advertise `urn:openid:authzen:capability:access-request:aarm` in `capabilities`.
 - MUST use `result.mode: reevaluate` (the only base completion mode).
-- MUST use `step_up` or `defer_escalation` as `context.access_request.reason` for STEP_UP and DEFER classes respectively.
-- MAY include `risk_level`, `policy_confidence`, and `semantic_distance` in `context` when these values are produced by the upstream Policy Engine.
+- MUST use `step_up` or `defer_escalation` as `context.access_request.template` for STEP_UP and DEFER classes respectively (echoed in the submission as `denial.template`).
+- MAY include `risk_level`, `policy_confidence`, and `semantic_distance` as augmentations in the submission's `context`, per the base profile's `context` extension point.
+- MUST place AARM's identity-verification flag inside `approval.state.identity_verified` when issuing approval results, so the PEP round-trips it unchanged to the re-evaluation request.
 - MUST re-validate identity at re-evaluation when AARM policy requires identity verification at execution; the PDP's re-evaluation is the authoritative point for that check.
 - MUST treat `task.status: expired` as denial of the underlying action.
 
@@ -114,11 +115,13 @@ A base-profile-only PEP that submits an Access Request without AARM-specific ext
 
 ## Open Questions
 
-- **Risk-level placement.**  Belongs in `context`, `requested_access`, or `context.access_request.reason`?  This proposal puts it in `context` to match how AARM models it (a property of the action under evaluation, not of the requester's ask).  Alternative: put it in `context.access_request.reason` as a structured reason code.
+- **Risk-level placement.**  Belongs in `context`, `requested_access`, or as a `context.access_request.reason` value?  This proposal puts it in `context` to match how AARM models it (a property of the action under evaluation, not of the requester's ask).  Alternative: structure it as a reason code under `context.access_request.reason`.
+- **Source on `template` vs `reason`.**  This proposal registers `step_up` and `defer_escalation` as `context.access_request.template` values because `template` is echoed in the submission as `denial.template` and is what the Access Request Service reads for routing.  An alternative places them on `context.access_request.reason` for conceptual cleanliness (source-as-reason), but the ARS would then need to extract source from the JWS `request_context` payload or look it up by `evaluation_id` since `context.access_request.reason` is not echoed in the submission.  Confirm `template` is the right carrier, or define an explicit `source` augmentation in the submission's `context`.
 - **Configured approvers.**  AARM's `ApprovalRequest` includes a configured-approvers list.  The base profile's privacy considerations argue against exposing approver identities to the PEP.  This proposal does not register a field for configured approvers; the Access Request Service handles approver selection internally.  Confirm this is acceptable for AARM use cases.
 - **SessionContext.**  AARM's SessionContext (accumulated session history) is rich and deployment-specific.  This proposal suggests carrying it through `client.source.external_url` or `client.source.conversation_id` for audit, rather than embedding the full session.  Confirm whether AARM needs a structured `session_context` augmentation.
 - **`policy_confidence` semantics.**  Whether the score is advisory (informational to the approver or re-evaluator) or normative input to the Access Request Service workflow.  This proposal treats it as advisory; AARM may require otherwise.
-- **Identity-verification scope.**  `result.approval.identity_verified` could mean (a) the approver's identity was verified, or (b) the actor's identity was verified, or (c) both.  AARM's documentation suggests (b) primarily.  Profile text should resolve.
+- **Identity-verification scope.**  `approval.state.identity_verified` could mean (a) the approver's identity was verified, or (b) the actor's identity was verified, or (c) both.  AARM's documentation suggests (b) primarily.  Profile text should resolve.
+- **Use of `approval.state` for other PDP data.**  AARM-aware PDPs may want to round-trip additional state (signed references, verification tokens, deployment-specific context) through `approval.state`.  This proposal defines only `identity_verified`; future revisions or sibling profiles can register additional members under `approval.state`.
 
 ## Relationship to the Base Profile
 
@@ -128,6 +131,6 @@ A future companion profile could define `mode: token` for AARM-style deployments
 
 ## References
 
-- [draft-mcguinness-authzen-access-request](../draft-mcguinness-authzen-access-request.md) — the base profile this proposal profiles.
+- [draft-mcguinness-authzen-access-request](../draft-mcguinness-authzen-access-request.md): the base profile this proposal profiles.
 - AARM Approval Service component, https://aarm.dev/components/approval-service.
-- draft-mcguinness-oauth-actor-profile — `act` claim conventions referenced by both this proposal and the base profile.
+- draft-mcguinness-oauth-actor-profile: `act` claim conventions referenced by both this proposal and the base profile.
