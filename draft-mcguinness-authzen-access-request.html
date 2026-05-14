@@ -1443,7 +1443,7 @@ svg :is([fill="white"], [fill^="#fff"]) {
       </h2>
 <p id="section-1-1">The AuthZEN Authorization API enables a Policy Enforcement Point (PEP) to ask a Policy Decision Point (PDP) whether a Subject may perform an Action on a Resource within a Context.  The PDP returns a Decision indicating whether the operation is allowed or denied.<a href="#section-1-1" class="pilcrow">¶</a></p>
 <p id="section-1-2">In classic deployments, the authority a caller needs is largely fixed at provisioning time.  A user is granted a role; an OAuth client is registered with a set of scopes; a service account is granted access to a database.  Runtime denials are uncommon and typically indicate misconfiguration or attack, and the appropriate response is to log, alert, or refuse.<a href="#section-1-2" class="pilcrow">¶</a></p>
-<p id="section-1-3">Modern deployments invalidate that assumption.  Authority requirements emerge during execution and cannot be fully predicted in advance:<a href="#section-1-3" class="pilcrow">¶</a></p>
+<p id="section-1-3">Modern systems increasingly require authorization decisions to evolve during ongoing execution due to delegation, dynamic resource discovery, scope expansion, and long-running agent activity:<a href="#section-1-3" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-1-4.1">
           <p id="section-1-4.1.1">An AI agent executing a multi-step task discovers, mid-execution, that it needs to read a document, query a record, or post to a channel that was not declared when the agent was deployed.  Each previously unseen resource produces a denial, and the same agent may produce many such denials over the course of a single task.<a href="#section-1-4.1.1" class="pilcrow">¶</a></p>
@@ -2789,9 +2789,12 @@ Content-Type: application/json
 <p id="section-12.1-5">The PDP <span class="bcp14">MUST</span> evaluate the new request using current policy and the approval reference.  The PDP <span class="bcp14">MAY</span> still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.<a href="#section-12.1-5" class="pilcrow">¶</a></p>
 <p id="section-12.1-6">When the re-evaluation response indicates an approval expiry (typically as <code>context.approval.approved_until</code>), the PEP <span class="bcp14">MUST NOT</span> enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) <span class="bcp14">MUST</span> bound the lifetime of those credentials by the approval expiry.<a href="#section-12.1-6" class="pilcrow">¶</a></p>
 <p id="section-12.1-7">When the original submission carried an <code>items</code> array, the PEP re-evaluates each approved item separately, including that item's <code>result.approval</code> at <code>context.approval</code> in the item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.<a href="#section-12.1-7" class="pilcrow">¶</a></p>
-<p id="section-12.1-8">Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.<a href="#section-12.1-8" class="pilcrow">¶</a></p>
-<p id="section-12.1-9">Non-normative re-evaluation request:<a href="#section-12.1-9" class="pilcrow">¶</a></p>
-<div class="lang-json sourcecode" id="section-12.1-10">
+<p id="section-12.1-8">Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.<a href="#section-12.1-8" class="pilcrow">¶</a></p>
+<p id="section-12.1-9">An Approval Result <span class="bcp14">MAY</span> be associated with an approval scope: a description of the class of future Access Evaluations for which the approval may be considered.  This specification does not define a standard approval scope representation or matching algorithm.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.<a href="#section-12.1-9" class="pilcrow">¶</a></p>
+<p id="section-12.1-10">The PDP <span class="bcp14">MUST</span> only consider an Approval Result applicable when the current evaluation request is within the approval scope recorded for that Approval Result.<a href="#section-12.1-10" class="pilcrow">¶</a></p>
+<p id="section-12.1-11">A PEP <span class="bcp14">MUST NOT</span> treat an Approval Result as authorizing any future Access Evaluation solely on the basis that the Access Request was approved.  A PEP <span class="bcp14">MAY</span> include the Approval Result in a subsequent Access Evaluation (by placing the <code>approval</code> object at <code>context.approval</code> as described above), but the PDP remains responsible for determining whether the Approval Result applies under current policy.  A PEP <span class="bcp14">MAY</span> cache or retain an Approval Result, but <span class="bcp14">MUST NOT</span> independently infer that a future request is covered by that approval unless directed by the PDP or by a profile-defined mechanism.<a href="#section-12.1-11" class="pilcrow">¶</a></p>
+<p id="section-12.1-12">Non-normative re-evaluation request:<a href="#section-12.1-12" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-12.1-13">
 <pre>
 {
   "subject": {
@@ -2814,10 +2817,10 @@ Content-Type: application/json
     "time": "2026-04-30T20:43:00Z"
   }
 }
-</pre><a href="#section-12.1-10" class="pilcrow">¶</a>
+</pre><a href="#section-12.1-13" class="pilcrow">¶</a>
 </div>
-<p id="section-12.1-11">Non-normative re-evaluation response:<a href="#section-12.1-11" class="pilcrow">¶</a></p>
-<div class="lang-json sourcecode" id="section-12.1-12">
+<p id="section-12.1-14">Non-normative re-evaluation response:<a href="#section-12.1-14" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-12.1-15">
 <pre>
 {
   "decision": true,
@@ -2828,7 +2831,7 @@ Content-Type: application/json
     }
   }
 }
-</pre><a href="#section-12.1-12" class="pilcrow">¶</a>
+</pre><a href="#section-12.1-15" class="pilcrow">¶</a>
 </div>
 </section>
 </div>
@@ -3113,6 +3116,9 @@ Content-Type: application/problem+json
         <li class="normal" id="section-16-2.14">
           <p id="section-16-2.14.1"><span class="bcp14">MUST</span> re-evaluate access through the AuthZEN Access Evaluation API after approval, unless a profile-defined completion mode applies (for example, a profile binding to OAuth token issuance).<a href="#section-16-2.14.1" class="pilcrow">¶</a></p>
 </li>
+        <li class="normal" id="section-16-2.15">
+          <p id="section-16-2.15.1"><span class="bcp14">MUST NOT</span> treat an Approval Result as authorizing any future Access Evaluation solely on the basis that the Access Request task reached <code>approved</code>; applicability is determined by the PDP at each subsequent evaluation.<a href="#section-16-2.15.1" class="pilcrow">¶</a></p>
+</li>
       </ul>
 </section>
 </div>
@@ -3154,7 +3160,10 @@ Content-Type: application/problem+json
           <p id="section-17-2.10.1"><span class="bcp14">MUST</span> validate approval references presented during re-evaluation.<a href="#section-17-2.10.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-17-2.11">
-          <p id="section-17-2.11.1"><span class="bcp14">MUST</span> ensure that approval does not override policy conditions that remain mandatory at enforcement time, such as subject status, resource sensitivity, action constraints, environmental risk, and approval expiry.<a href="#section-17-2.11.1" class="pilcrow">¶</a></p>
+          <p id="section-17-2.11.1"><span class="bcp14">MUST</span> only consider an Approval Result applicable when the current evaluation request is within the approval scope recorded for that Approval Result.<a href="#section-17-2.11.1" class="pilcrow">¶</a></p>
+</li>
+        <li class="normal" id="section-17-2.12">
+          <p id="section-17-2.12.1"><span class="bcp14">MUST</span> ensure that approval does not override policy conditions that remain mandatory at enforcement time, such as subject status, resource sensitivity, action constraints, environmental risk, and approval expiry.<a href="#section-17-2.12.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
 </section>

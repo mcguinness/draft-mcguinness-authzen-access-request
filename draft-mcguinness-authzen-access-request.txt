@@ -162,9 +162,9 @@ Table of Contents
    misconfiguration or attack, and the appropriate response is to log,
    alert, or refuse.
 
-   Modern deployments invalidate that assumption.  Authority
-   requirements emerge during execution and cannot be fully predicted in
-   advance:
+   Modern systems increasingly require authorization decisions to evolve
+   during ongoing execution due to delegation, dynamic resource
+   discovery, scope expansion, and long-running agent activity:
 
    *  An AI agent executing a multi-step task discovers, mid-execution,
       that it needs to read a document, query a record, or post to a
@@ -1634,10 +1634,30 @@ Table of Contents
    fine-grained permissions over time, rely on this property: a single
    broad-scope approval (for example, one that grants access to a class
    of resources for a defined duration) reduces the number of denial-
-   and-approval cycles by orders of magnitude.  Approval workflow policy
-   at the Access Request Service determines how broad an approval
-   grants; this profile does not constrain that policy beyond the
-   integrity, expiry, and audit requirements stated elsewhere.
+   and-approval cycles by orders of magnitude.
+
+   An Approval Result MAY be associated with an approval scope: a
+   description of the class of future Access Evaluations for which the
+   approval may be considered.  This specification does not define a
+   standard approval scope representation or matching algorithm.
+   Approval workflow policy at the Access Request Service determines how
+   broad an approval grants; this profile does not constrain that policy
+   beyond the integrity, expiry, and audit requirements stated
+   elsewhere.
+
+   The PDP MUST only consider an Approval Result applicable when the
+   current evaluation request is within the approval scope recorded for
+   that Approval Result.
+
+   A PEP MUST NOT treat an Approval Result as authorizing any future
+   Access Evaluation solely on the basis that the Access Request was
+   approved.  A PEP MAY include the Approval Result in a subsequent
+   Access Evaluation (by placing the approval object at context.approval
+   as described above), but the PDP remains responsible for determining
+   whether the Approval Result applies under current policy.  A PEP MAY
+   cache or retain an Approval Result, but MUST NOT independently infer
+   that a future request is covered by that approval unless directed by
+   the PDP or by a profile-defined mechanism.
 
    Non-normative re-evaluation request:
 
@@ -1948,6 +1968,11 @@ Table of Contents
       after approval, unless a profile-defined completion mode applies
       (for example, a profile binding to OAuth token issuance).
 
+   *  MUST NOT treat an Approval Result as authorizing any future Access
+      Evaluation solely on the basis that the Access Request task
+      reached approved; applicability is determined by the PDP at each
+      subsequent evaluation.
+
 17.  PDP Processing Rules
 
    A PDP implementing this profile:
@@ -1987,6 +2012,10 @@ Table of Contents
       can verify and SHOULD issue it as a JWS in compact serialization.
 
    *  MUST validate approval references presented during re-evaluation.
+
+   *  MUST only consider an Approval Result applicable when the current
+      evaluation request is within the approval scope recorded for that
+      Approval Result.
 
    *  MUST ensure that approval does not override policy conditions that
       remain mandatory at enforcement time, such as subject status,
