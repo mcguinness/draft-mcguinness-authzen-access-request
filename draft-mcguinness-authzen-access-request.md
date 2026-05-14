@@ -78,7 +78,7 @@ The AuthZEN Authorization API enables a Policy Enforcement Point (PEP) to ask a 
 
 In classic deployments, the authority a caller needs is largely fixed at provisioning time.  A user is granted a role; an OAuth client is registered with a set of scopes; a service account is granted access to a database.  Runtime denials are uncommon and typically indicate misconfiguration or attack, and the appropriate response is to log, alert, or refuse.
 
-Modern deployments invalidate that assumption.  Authority requirements emerge during execution and cannot be fully predicted in advance:
+Modern systems increasingly require authorization decisions to evolve during ongoing execution due to delegation, dynamic resource discovery, scope expansion, and long-running agent activity:
 
 * An AI agent executing a multi-step task discovers, mid-execution, that it needs to read a document, query a record, or post to a channel that was not declared when the agent was deployed.  Each previously unseen resource produces a denial, and the same agent may produce many such denials over the course of a single task.
 * An OAuth Authorization Server issuing fine-grained access tokens cannot pre-enumerate the cross-resource scope combinations a fleet of long-lived clients will request over time, and so it denies token requests for scope combinations that require governance review (policy evaluation, risk scoring, or human approval) before issuance.
@@ -936,7 +936,13 @@ When the re-evaluation response indicates an approval expiry (typically as `cont
 
 When the original submission carried an `items` array, the PEP re-evaluates each approved item separately, including that item's `result.approval` at `context.approval` in the item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.
 
-Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.
+Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.
+
+An Approval Result MAY be associated with an approval scope: a description of the class of future Access Evaluations for which the approval may be considered.  This specification does not define a standard approval scope representation or matching algorithm.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.
+
+The PDP MUST only consider an Approval Result applicable when the current evaluation request is within the approval scope recorded for that Approval Result.
+
+A PEP MUST NOT treat an Approval Result as authorizing any future Access Evaluation solely on the basis that the Access Request was approved.  A PEP MAY include the Approval Result in a subsequent Access Evaluation (by placing the `approval` object at `context.approval` as described above), but the PDP remains responsible for determining whether the Approval Result applies under current policy.  A PEP MAY cache or retain an Approval Result, but MUST NOT independently infer that a future request is covered by that approval unless directed by the PDP or by a profile-defined mechanism.
 
 Non-normative re-evaluation request:
 
@@ -1130,6 +1136,7 @@ A PEP implementing this profile:
 * MUST treat unknown `result.mode` values as not approved.
 * When using Re-evaluation Mode, MUST include the returned `approval` object unchanged at `context.approval` inside the AuthZEN re-evaluation request.
 * MUST re-evaluate access through the AuthZEN Access Evaluation API after approval, unless a profile-defined completion mode applies (for example, a profile binding to OAuth token issuance).
+* MUST NOT treat an Approval Result as authorizing any future Access Evaluation solely on the basis that the Access Request task reached `approved`; applicability is determined by the PDP at each subsequent evaluation.
 
 # PDP Processing Rules
 
@@ -1145,6 +1152,7 @@ A PDP implementing this profile:
 * SHOULD return a stable evaluation identifier as `context.evaluation_id` ({{evaluation-identifier}}) that the PEP can supply as `denial.evaluation_id` when submitting an Access Request.
 * When including `context.access_request.request_context`, MUST integrity-protect it using a mechanism the Access Request Service can verify and SHOULD issue it as a JWS in compact serialization.
 * MUST validate approval references presented during re-evaluation.
+* MUST only consider an Approval Result applicable when the current evaluation request is within the approval scope recorded for that Approval Result.
 * MUST ensure that approval does not override policy conditions that remain mandatory at enforcement time, such as subject status, resource sensitivity, action constraints, environmental risk, and approval expiry.
 
 # Access Request Service Processing Rules
