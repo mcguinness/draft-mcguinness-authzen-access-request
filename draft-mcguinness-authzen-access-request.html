@@ -2989,6 +2989,9 @@ Content-Type: application/problem+json
           <li class="normal" id="section-15.1-2.8">
             <p id="section-15.1-2.8.1"><code>result</code> and the additions defined under each <code>result.mode</code>.<a href="#section-15.1-2.8.1" class="pilcrow">¶</a></p>
 </li>
+          <li class="normal" id="section-15.1-2.9">
+            <p id="section-15.1-2.9.1"><code>approval.state</code> in a Re-evaluation Mode result: opaque profile-specific or deployment-specific state carried through the PEP to the PDP at re-evaluation time.<a href="#section-15.1-2.9.1" class="pilcrow">¶</a></p>
+</li>
         </ul>
 <p id="section-15.1-3">This specification also defines extensibility for enumerated values:<a href="#section-15.1-3" class="pilcrow">¶</a></p>
 <ul class="normal">
@@ -3260,6 +3263,55 @@ Content-Type: application/problem+json
 <a href="#section-21.3" class="section-number selfRef">21.3. </a><a href="#name-request-context-integrity" class="section-name selfRef">Request Context Integrity</a>
         </h3>
 <p id="section-21.3-1">The <code>request_context</code> member round-trips PDP-issued state through the PEP to the Access Request Service.  Without integrity protection, a buggy or hostile PEP could drop, alter, or fabricate this value to influence approval routing or scope.  PDPs <span class="bcp14">MUST</span> integrity-protect <code>request_context</code> using a mechanism the Access Request Service can verify and <span class="bcp14">SHOULD</span> issue it as a JWS so the Access Request Service can prove the value was produced by the PDP and bound to the original denied evaluation.  When the payload contains information that must not be visible to the PEP, the PDP <span class="bcp14">MAY</span> use JWE in addition to integrity protection, for example by encrypting a signed payload.  This is a confused-deputy mitigation: it lets the Access Request Service confirm that the requestable-denial state was issued by the PDP and not fabricated or altered by the PEP.<a href="#section-21.3-1" class="pilcrow">¶</a></p>
+<p id="section-21.3-2">This profile does not mandate a specific JWS payload; the contents are deployment-specific.  Implementations that issue <code>request_context</code> as a JWT <span class="bcp14">SHOULD</span> include the following claims to provide sound token hygiene and confused-deputy protection:<a href="#section-21.3-2" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-21.3-3.1">
+            <p id="section-21.3-3.1.1"><code>iss</code>: PDP identifier.  Lets the Access Request Service select the correct verification key from the PDP's JWK Set (<a href="#discovery" class="auto internal xref">Section 6</a>).<a href="#section-21.3-3.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-21.3-3.2">
+            <p id="section-21.3-3.2.1"><code>aud</code>: Access Request Service identifier.  Prevents replay of a token issued for one Access Request Service against another.<a href="#section-21.3-3.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-21.3-3.3">
+            <p id="section-21.3-3.3.1"><code>iat</code>, <code>exp</code>: issued-at and expiry.  Expiry <span class="bcp14">SHOULD</span> be short (typically minutes, aligned with the requestable-denial hint lifetime).<a href="#section-21.3-3.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-21.3-3.4">
+            <p id="section-21.3-3.4.1"><code>jti</code>: unique token identifier.  The Access Request Service <span class="bcp14">SHOULD</span> track recently-seen <code>jti</code> values to detect replay of an otherwise valid token.<a href="#section-21.3-3.4.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-21.3-3.5">
+            <p id="section-21.3-3.5.1">Binding claims that identify the original denied evaluation.  Either:<a href="#section-21.3-3.5.1" class="pilcrow">¶</a></p>
+<ul class="normal">
+<li class="normal" id="section-21.3-3.5.2.1">
+                <p id="section-21.3-3.5.2.1.1">Inline: the Subject, Resource, and Action of the denied evaluation, in shapes the Access Request Service can compare against the submitted Subject, Resource, and Action; or<a href="#section-21.3-3.5.2.1.1" class="pilcrow">¶</a></p>
+</li>
+              <li class="normal" id="section-21.3-3.5.2.2">
+                <p id="section-21.3-3.5.2.2.1">Hashed: a <code>binding_hash</code> over a canonical serialization of the Subject, Resource, and Action, which the Access Request Service recomputes from the submission.<a href="#section-21.3-3.5.2.2.1" class="pilcrow">¶</a></p>
+</li>
+            </ul>
+</li>
+          <li class="normal" id="section-21.3-3.6">
+            <p id="section-21.3-3.6.1"><code>evaluation_id</code>: the PDP's identifier for the evaluation, when present in <code>context.evaluation_id</code> (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>).<a href="#section-21.3-3.6.1" class="pilcrow">¶</a></p>
+</li>
+        </ul>
+<p id="section-21.3-4">When <code>items</code> is present in the submission (bulk), the binding claims cover the entire <code>items</code> array (for example, an <code>items</code> claim listing each Resource and Action, or a <code>binding_hash</code> computed over the full item list).<a href="#section-21.3-4" class="pilcrow">¶</a></p>
+<p id="section-21.3-5">PDPs <span class="bcp14">MAY</span> add deployment-specific claims (policy version, factors, risk score, tenant identifier) when the Access Request Service needs them for routing or audit.  When such claims must remain opaque to the PEP, the PDP wraps the signed payload in JWE encrypted to the Access Request Service.<a href="#section-21.3-5" class="pilcrow">¶</a></p>
+<p id="section-21.3-6">The Access Request Service, on receipt:<a href="#section-21.3-6" class="pilcrow">¶</a></p>
+<ol start="1" type="1" class="normal type-1" id="section-21.3-7">
+<li id="section-21.3-7.1">
+            <p id="section-21.3-7.1.1">parses the JWS header and resolves the verification key from the JWK Set at the PDP's <code>jwks_uri</code>;<a href="#section-21.3-7.1.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-21.3-7.2">
+            <p id="section-21.3-7.2.1">verifies the signature, the <code>aud</code> claim, and the expiry;<a href="#section-21.3-7.2.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-21.3-7.3">
+            <p id="section-21.3-7.3.1">checks <code>jti</code> against recently-seen tokens to detect replay;<a href="#section-21.3-7.3.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-21.3-7.4">
+            <p id="section-21.3-7.4.1">compares the binding claims (inline or hashed) against the submission's Subject, Resource, and Action (or per-item for bulk submissions);<a href="#section-21.3-7.4.1" class="pilcrow">¶</a></p>
+</li>
+          <li id="section-21.3-7.5">
+            <p id="section-21.3-7.5.1">rejects with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code> on any failure.<a href="#section-21.3-7.5.1" class="pilcrow">¶</a></p>
+</li>
+        </ol>
 </section>
 </div>
 <div id="approval-replay">
