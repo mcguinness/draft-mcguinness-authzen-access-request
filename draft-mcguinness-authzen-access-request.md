@@ -205,10 +205,9 @@ The `access_request_endpoint` MAY be hosted by the PDP itself, by a service trus
 
 When an AuthZEN Access Evaluation response denies access and the denial is eligible for an access request, the PDP MAY include an `access_request` object in the Decision Context.
 
-The `access_request` object has the following members:
+The presence of `context.access_request` is the signal that the denial is requestable.  The PDP MUST include this object only when the denied access is eligible for submission to an Access Request Endpoint; the PEP MUST treat the absence of this object as a non-requestable denial regardless of any other context members.
 
-`requestable`:
-: REQUIRED.  Boolean.  When `true`, indicates that the denied request is eligible for submission to an Access Request Endpoint.  When absent or `false`, the PEP MUST NOT treat the denial as requestable under this profile.
+The `access_request` object has the following members:
 
 `endpoint`:
 : OPTIONAL.  HTTPS URI.  The endpoint to which the PEP submits the access request.  If omitted, the PEP MUST use the `access_request_endpoint` from PDP metadata ({{discovery}}).
@@ -244,7 +243,7 @@ If both `expires_at` and `expires_in` are present, `expires_at` takes precedence
 
 The `reason` member of the `access_request` object is independent of any `reason` member that the PDP may include directly in `context`.  The outer `context.reason` describes why the Decision was denied (echoed by the PEP as `denial.reason` when submitting an Access Request); `context.access_request.reason` describes why the denial is requestable and which approval flow applies (used by the PEP at evaluation time but not echoed in the submission).
 
-The PDP MUST provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore MUST either include an integrity-protected `request_context`, or include `context.evaluation_id` ({{evaluation-identifier}}) that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP MUST NOT return `requestable` with a value of `true`.
+The PDP MUST provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore MUST either include an integrity-protected `request_context`, or include `context.evaluation_id` ({{evaluation-identifier}}) that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP MUST NOT include `context.access_request` in the Decision Context.
 
 The following is a non-normative example:
 
@@ -256,7 +255,6 @@ The following is a non-normative example:
     "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
     "access_request": {
-      "requestable": true,
       "endpoint": "https://pdp.example.com/access/v1/requests",
       "template": "manager_approval",
       "reason": "manager_approval_required",
@@ -282,7 +280,7 @@ A PDP returns `evaluation_id` as a member of the AuthZEN Decision Context: `cont
 
 `evaluation_id` MUST be stable for a given evaluation: subsequent retrievals or echoes of the same evaluation MUST return the same identifier.  PDPs SHOULD generate identifiers that are unique within the PDP's namespace (for example, ULIDs or UUIDs).  An identifier MAY be reused across distinct evaluations only after the original evaluation's binding window has expired.
 
-A PDP that returns `requestable=true` without an integrity-protected `request_context` MUST include `evaluation_id` so the Access Request Service has verifiable denial-binding material.
+A PDP that returns `context.access_request` without an integrity-protected `request_context` MUST include `evaluation_id` so the Access Request Service has verifiable denial-binding material.
 
 A PDP MAY return `evaluated_at` as a member of the AuthZEN Decision Context: `context.evaluated_at`, an {{RFC3339}} timestamp indicating when the Decision was produced.  The PEP echoes the captured timestamp as `denial.evaluated_at` when submitting an Access Request.
 
@@ -536,7 +534,7 @@ The PEP determines the additional members of the `context` and `requested_access
 
 If both `requested_access.requested_duration` and `requested_access.requested_until` are present, the Access Request Service MUST reject the submission unless the deployment defines an explicit reconciliation rule.  When a deployment permits both members, the approved access lifetime MUST NOT exceed the earlier resulting expiry.
 
-A PEP MUST submit an Access Request only for an AuthZEN Decision with `decision` equal to `false` and `context.access_request.requestable` equal to `true`.
+A PEP MUST submit an Access Request only for an AuthZEN Decision with `decision` equal to `false` and a `context.access_request` object present in the Decision Context.
 
 The submitted `denial` object for each requested item MUST include either `denial.request_context` or `denial.evaluation_id`.  The Access Request Service MUST reject a submission that lacks verifiable denial-binding material with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
 
@@ -716,10 +714,7 @@ Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C
     "mode": "reevaluate",
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVJ",
-      "approved_until": "2026-05-01T00:42:00Z",
-      "state": {
-        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVJ"
-      }
+      "approved_until": "2026-05-01T00:42:00Z"
     }
   }
 }
@@ -872,10 +867,7 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
       "approved_at": "2026-04-30T20:42:00Z",
-      "approved_until": "2026-05-01T00:42:00Z",
-      "state": {
-        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
-      }
+      "approved_until": "2026-05-01T00:42:00Z"
     }
   }
 }
@@ -952,10 +944,7 @@ Non-normative re-evaluation request:
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
       "approved_at": "2026-04-30T20:42:00Z",
-      "approved_until": "2026-05-01T00:42:00Z",
-      "state": {
-        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
-      }
+      "approved_until": "2026-05-01T00:42:00Z"
     },
     "time": "2026-04-30T20:43:00Z"
   }
@@ -1054,7 +1043,7 @@ Content-Type: application/problem+json
   "type": "urn:openid:authzen:access-request:error:not_requestable",
   "title": "Access is not requestable",
   "status": 400,
-  "detail": "The denied decision did not contain context.access_request.requestable=true."
+  "detail": "The denied decision did not contain a context.access_request object."
 }
 ~~~
 
@@ -1114,7 +1103,7 @@ This base specification does not enumerate profiles.  Conformance to a profile i
 A PEP implementing this profile:
 
 * MUST treat `decision: false` as a denial, even when the Decision Context contains an `access_request` object.
-* MUST NOT submit an Access Request unless the denied Decision contains `context.access_request.requestable` set to `true`.
+* MUST NOT submit an Access Request unless the denied Decision contains a `context.access_request` object.
 * MUST use the `endpoint` from the denial context when present; otherwise it MUST use the `access_request_endpoint` from PDP metadata.
 * MUST preserve the principal identity of the Subject, and MUST preserve the Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.  When the original evaluation conveyed an actor identity in the Subject (for example, via `subject.properties.act`), the PEP MAY preserve the actor in the submission's `subject` or normalize it to `client.actor`; the actor identity itself MUST NOT be dropped.
 * When the requestable denial includes `request_schema_url` or `request_catalogs_url`, MUST construct the augmentations to the submission's `context` and `requested_access` objects according to {{machine-readable-forms}} and {{catalog-references}}.
@@ -1133,12 +1122,12 @@ A PEP implementing this profile:
 A PDP implementing this profile:
 
 * MAY include `context.access_request` in a denied AuthZEN Decision when the denied access is eligible for approval.
-* MUST NOT include `context.access_request.requestable=true` unless an Access Request Endpoint is available to process the request.
+* MUST NOT include `context.access_request` unless an Access Request Endpoint is available to process the request.
 * SHOULD include a stable machine-readable reason code when returning a requestable denial.
 * SHOULD include an expiration time or lifetime for the requestable denial hint.
 * MAY include `form_url`, `request_schema_url`, and `request_catalogs_url` in the requestable denial when the Access Request requires additional submission fields beyond those produced by the original AuthZEN evaluation.
 * MUST include `request_schema_url` when including `request_catalogs_url`.
-* MUST provide verifiable denial-binding material when returning `context.access_request.requestable=true`, either by including an integrity-protected `context.access_request.request_context` or by returning a stable evaluation identifier that the Access Request Service can resolve or validate.
+* MUST provide verifiable denial-binding material when returning `context.access_request`, either by including an integrity-protected `context.access_request.request_context` or by returning a stable evaluation identifier that the Access Request Service can resolve or validate.
 * SHOULD return a stable evaluation identifier as `context.evaluation_id` ({{evaluation-identifier}}) that the PEP can supply as `denial.evaluation_id` when submitting an Access Request.
 * When including `context.access_request.request_context`, MUST integrity-protect it using a mechanism the Access Request Service can verify and SHOULD issue it as a JWS in compact serialization.
 * MUST validate approval references presented during re-evaluation.
@@ -1388,7 +1377,6 @@ Content-Type: application/json
     "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
     "access_request": {
-      "requestable": true,
       "template": "manager_approval",
       "reason": "manager_approval_required",
       "expires_in": 600,
@@ -1478,10 +1466,7 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
       "approved_at": "2026-04-30T20:42:00Z",
-      "approved_until": "2026-05-01T00:42:00Z",
-      "state": {
-        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
-      }
+      "approved_until": "2026-05-01T00:42:00Z"
     }
   }
 }
@@ -1512,10 +1497,7 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
       "approved_at": "2026-04-30T20:42:00Z",
-      "approved_until": "2026-05-01T00:42:00Z",
-      "state": {
-        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
-      }
+      "approved_until": "2026-05-01T00:42:00Z"
     }
   }
 }
@@ -1592,7 +1574,6 @@ Content-Type: application/json
     "evaluated_at": "2026-05-12T15:00:00Z",
     "reason": "agent_authority_missing",
     "access_request": {
-      "requestable": true,
       "template": "agent_tool_class_approval",
       "reason": "agent_class_approval_required",
       "expires_in": 600,
@@ -1714,10 +1695,7 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
       "approved_at": "2026-05-12T17:30:00Z",
-      "approved_until": "2026-05-19T17:30:00Z",
-      "state": {
-        "approval_id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK"
-      }
+      "approved_until": "2026-05-19T17:30:00Z"
     }
   }
 }
@@ -1757,10 +1735,7 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
       "approved_at": "2026-05-12T17:30:00Z",
-      "approved_until": "2026-05-19T17:30:00Z",
-      "state": {
-        "approval_id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK"
-      }
+      "approved_until": "2026-05-19T17:30:00Z"
     }
   }
 }

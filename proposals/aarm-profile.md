@@ -32,7 +32,7 @@ It does **not** define:
 
 | AARM | Base profile |
 |---|---|
-| Policy Engine `STEP_UP` / `DEFER escalation` decision | AuthZEN `decision: false` with `context.access_request.requestable: true` |
+| Policy Engine `STEP_UP` / `DEFER escalation` decision | AuthZEN `decision: false` with `context.access_request` present |
 | Approval Service | Access Request Service |
 | `request()` (blocks until decision) | `POST` to Access Request Endpoint; synchronous completion when fast, polling or callback otherwise |
 | `approve()` / `deny()` | Internal to the Access Request Service; out of scope |
