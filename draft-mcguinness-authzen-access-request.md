@@ -716,10 +716,10 @@ Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C
     "mode": "reevaluate",
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVJ",
-      "approved_until": "2026-05-01T00:42:00Z"
-    },
-    "approval_context": {
-      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVJ"
+      "approved_until": "2026-05-01T00:42:00Z",
+      "state": {
+        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVJ"
+      }
     }
   }
 }
@@ -872,10 +872,10 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
       "approved_at": "2026-04-30T20:42:00Z",
-      "approved_until": "2026-05-01T00:42:00Z"
-    },
-    "approval_context": {
-      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+      "approved_until": "2026-05-01T00:42:00Z",
+      "state": {
+        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+      }
     }
   }
 }
@@ -921,13 +921,15 @@ The `result.mode` value is `reevaluate`.  The result MUST include an `approval` 
 * `approved_at`: OPTIONAL.  {{RFC3339}} timestamp indicating when the approval completed.
 * `approved_until`: OPTIONAL.  {{RFC3339}} timestamp indicating the latest time through which the approval remains valid.  When present, the PEP MUST NOT use the approval for re-evaluation after this timestamp.
 
-The result MAY include an `approval_context` member.  `approval_context` is an opaque object populated by the Access Request Service or PDP.  When present, the PEP MUST include it as a member named `authzen_access_request_approval` inside the AuthZEN request `context` when re-evaluating.  When absent, the PEP re-evaluates without `authzen_access_request_approval` and relies on current PDP policy and backing state to reflect the approval.  The PEP MUST NOT modify or interpret the contents of `approval_context`.
+The `approval` object MAY additionally include a `state` member.  `state` is an opaque object populated by the Access Request Service or PDP, carrying whatever the PDP needs at re-evaluation time (for example, a signed reference, an extended lookup token, or deployment-specific state).  The PEP MUST NOT modify or interpret the contents of `approval.state`.
+
+The PEP MUST include the `approval` object unchanged at `context.approval` inside the AuthZEN re-evaluation request.  The PDP receives the same `approval` shape it produced (id, timestamps, and any `state`) and uses it to identify and verify the approval.
 
 The PDP MUST evaluate the new request using current policy and the approval reference.  The PDP MAY still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.
 
 When the re-evaluation response indicates an approval expiry (typically as `context.approval.approved_until`), the PEP MUST NOT enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) MUST bound the lifetime of those credentials by the approval expiry.
 
-When the original submission carried an `items` array, the PEP re-evaluates each approved item separately.  If the per-item `task.items[].result` contains `approval_context`, the PEP includes it in that item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.
+When the original submission carried an `items` array, the PEP re-evaluates each approved item separately, including that item's `result.approval` at `context.approval` in the item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.
 
 Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.
 
@@ -947,8 +949,13 @@ Non-normative re-evaluation request:
     "name": "can_read"
   },
   "context": {
-    "authzen_access_request_approval": {
-      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+    "approval": {
+      "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "approved_at": "2026-04-30T20:42:00Z",
+      "approved_until": "2026-05-01T00:42:00Z",
+      "state": {
+        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+      }
     },
     "time": "2026-04-30T20:43:00Z"
   }
@@ -1118,7 +1125,7 @@ A PEP implementing this profile:
 * MUST treat unknown task status values as not approved.
 * MUST enforce an approved result only according to {{completion-semantics}}.
 * MUST treat unknown `result.mode` values as not approved.
-* When using Re-evaluation Mode, MUST include any returned `approval_context` unchanged as a member named `authzen_access_request_approval` inside the AuthZEN request `context`.
+* When using Re-evaluation Mode, MUST include the returned `approval` object unchanged at `context.approval` inside the AuthZEN re-evaluation request.
 * MUST re-evaluate access through the AuthZEN Access Evaluation API after approval, unless a profile-defined completion mode applies (for example, a profile binding to OAuth token issuance).
 
 # PDP Processing Rules
@@ -1471,10 +1478,10 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
       "approved_at": "2026-04-30T20:42:00Z",
-      "approved_until": "2026-05-01T00:42:00Z"
-    },
-    "approval_context": {
-      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+      "approved_until": "2026-05-01T00:42:00Z",
+      "state": {
+        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+      }
     }
   }
 }
@@ -1502,8 +1509,13 @@ Content-Type: application/json
   },
   "context": {
     "time": "2026-04-30T20:43:00Z",
-    "authzen_access_request_approval": {
-      "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+    "approval": {
+      "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "approved_at": "2026-04-30T20:42:00Z",
+      "approved_until": "2026-05-01T00:42:00Z",
+      "state": {
+        "approval_id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH"
+      }
     }
   }
 }
@@ -1702,10 +1714,10 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
       "approved_at": "2026-05-12T17:30:00Z",
-      "approved_until": "2026-05-19T17:30:00Z"
-    },
-    "approval_context": {
-      "approval_id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK"
+      "approved_until": "2026-05-19T17:30:00Z",
+      "state": {
+        "approval_id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK"
+      }
     }
   }
 }
@@ -1742,8 +1754,13 @@ Content-Type: application/json
   },
   "context": {
     "time": "2026-05-12T17:31:00Z",
-    "authzen_access_request_approval": {
-      "approval_id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK"
+    "approval": {
+      "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
+      "approved_at": "2026-05-12T17:30:00Z",
+      "approved_until": "2026-05-19T17:30:00Z",
+      "state": {
+        "approval_id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK"
+      }
     }
   }
 }
