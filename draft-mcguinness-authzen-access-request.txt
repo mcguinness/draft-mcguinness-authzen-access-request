@@ -482,26 +482,28 @@ Table of Contents
       the Access Request.  Suitable for PEPs that render the form for a
       human user.  See Section 8.
 
-   form_schema_url:  OPTIONAL.  HTTPS URI.  URL where the Access Request
-      Service publishes a machine-readable description of the
+   request_schema_url:  OPTIONAL.  HTTPS URI.  URL where the Access
+      Request Service publishes a machine-readable description of the
       augmentations the PEP must add to the submission's context and
       requested_access objects.  RECOMMENDED to be a JSON Schema
       [I-D.bhutton-json-schema] [I-D.bhutton-json-schema-validation]
       document.  Suitable for autonomous PEPs and for PEPs that render
       forms natively against a schema.  See Section 8.
 
-   form_catalogs_url:  OPTIONAL.  HTTPS URI.  URL of a Catalogs Document
-      describing how the PEP resolves form fields whose values are
-      selected from a backing catalog.  See Section 9.
+   request_catalogs_url:  OPTIONAL.  HTTPS URI.  URL of a Catalogs
+      Document describing how the PEP resolves form fields whose values
+      are selected from a backing catalog.  See Section 9.
 
    If both expires_at and expires_in are present, expires_at takes
    precedence and the PEP MUST ignore expires_in.
 
    The reason member of the access_request object is independent of any
    reason member that the PDP may include directly in context.  The
-   outer context.reason describes why the Decision was denied;
+   outer context.reason describes why the Decision was denied (echoed by
+   the PEP as denial.reason when submitting an Access Request);
    context.access_request.reason describes why the denial is requestable
-   and which approval flow applies.
+   and which approval flow applies (used by the PEP at evaluation time
+   but not echoed in the submission).
 
    The PDP MUST provide enough denial-binding material for the Access
    Request Service to verify that a submitted Access Request corresponds
@@ -527,8 +529,8 @@ Table of Contents
          "expires_in": 600,
          "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
          "form_url": "https://requests.example.com/forms/manager_approval",
-         "form_schema_url": "https://requests.example.com/schemas/manager_approval.json",
-         "form_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json",
+         "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
+         "request_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json",
          "display": {
            "title": "Request access",
            "description": "Manager approval is required before this document can be opened."
@@ -567,7 +569,7 @@ Table of Contents
 
 8.  Machine-Readable Forms
 
-   The OPTIONAL form_url and form_schema_url members of the
+   The OPTIONAL form_url and request_schema_url members of the
    access_request object (Section 7) describe additional submission
    fields the Access Request Service expects beyond those produced by
    the original AuthZEN evaluation.  PEPs interacting with deployments
@@ -578,12 +580,12 @@ Table of Contents
       a service it trusts, suitable for PEPs that render the form for a
       human user.
 
-   *  form_schema_url identifies a machine-readable description of the
-      same augmentations, suitable for autonomous PEPs and for PEPs that
-      render forms natively against a schema.
+   *  request_schema_url identifies a machine-readable description of
+      the same augmentations, suitable for autonomous PEPs and for PEPs
+      that render forms natively against a schema.
 
    When a deployment expects autonomous PEP submissions, the requestable
-   denial SHOULD include form_schema_url referencing a JSON Schema
+   denial SHOULD include request_schema_url referencing a JSON Schema
    [I-D.bhutton-json-schema] [I-D.bhutton-json-schema-validation]
    document that describes the augmentations the PEP MUST add to the
    submission's context and requested_access objects.  An autonomous PEP
@@ -594,14 +596,14 @@ Table of Contents
    of such platforms MAY publish a JSON Schema document derived from
    their native form description.  Some loss of fidelity is expected
    when translating between form description languages; the JSON Schema
-   referenced by form_schema_url SHOULD provide enough information for
-   an autonomous PEP to construct a conformant submission, while richer
-   rendering, widget, and interaction details remain in form_url.
+   referenced by request_schema_url SHOULD provide enough information
+   for an autonomous PEP to construct a conformant submission, while
+   richer rendering, widget, and interaction details remain in form_url.
 
    Field values that are selected from a backing catalog (for example,
    applications, entitlements, roles, or cost centers) are described in
-   a separate Catalogs Document referenced by form_catalogs_url.  This
-   profile keeps catalog references outside the form schema so the
+   a separate Catalogs Document referenced by request_catalogs_url.
+   This profile keeps catalog references outside the form schema so the
    schema remains a pure description of data shape.  See Section 9.
 
    This profile does not define a UI rendering vocabulary.  Deployments
@@ -612,27 +614,27 @@ Table of Contents
    This profile does not define an agent protocol surface.  Deployments
    serving agentic PEPs MAY additionally expose Access Request
    submission through an agent protocol where the tool input schema
-   corresponds to the JSON Schema referenced by form_schema_url.
+   corresponds to the JSON Schema referenced by request_schema_url.
    Discovery of such surfaces is out of scope for this specification.
 
 9.  Catalog References
 
-   The OPTIONAL form_catalogs_url member of the access_request object
+   The OPTIONAL request_catalogs_url member of the access_request object
    (Section 7) is the URL of a Catalogs Document that tells PEPs how to
    resolve form fields whose values come from backing catalogs (for
    example, applications, entitlements, roles, or cost centers).  PEPs
-   interacting with deployments that do not include form_catalogs_url
+   interacting with deployments that do not include request_catalogs_url
    MAY omit Catalog Endpoint resolution.
 
    The Catalogs Document is a sibling artifact to the form schema; it
    does not modify or extend the JSON Schema referenced by
-   form_schema_url.  This feature is typically paired with the form-
+   request_schema_url.  This feature is typically paired with the form-
    schema feature (Section 8).
 
 9.1.  Catalogs Document
 
    The Catalogs Document is a JSON object retrieved from
-   form_catalogs_url using HTTP GET.  It has the following members:
+   request_catalogs_url using HTTP GET.  It has the following members:
 
    fields:  REQUIRED.  Object.  Each member name is a JSON Pointer
       ([RFC6901]) into the form data instance described by the form
@@ -962,15 +964,11 @@ Table of Contents
       NOT rely on client.actor or client.source as authorization input
       unless the values are independently verified by the service.
 
-   The denial object has the following members:
-
-   decision:  REQUIRED.  The denied AuthZEN Decision returned by the
-      PDP, including its Decision Context.  The PEP MAY omit
-      context.access_request from the embedded Decision Context; the
-      Access Request Service consumes the fields it needs
-      (denial.request_context for binding, denial.template for routing)
-      directly from denial rather than from the embedded
-      context.access_request.
+   The denial object has the following members.  Each field maps
+   directly to a single member of the PDP's denied evaluation response;
+   the denial object does not echo the full AuthZEN Decision because the
+   binding material (evaluation_id and request_context) provides
+   stronger evidence of the denial than a verbatim JSON echo could.
 
    evaluation_id:  REQUIRED when denial.request_context is absent;
       otherwise RECOMMENDED.  A stable identifier for the denied
@@ -983,7 +981,14 @@ Table of Contents
       preferred over evaluated_at alone.
 
    evaluated_at:  OPTIONAL.  [RFC3339] timestamp indicating when the
-      denial was produced.
+      denial was produced, echoed from context.evaluated_at of the
+      denied evaluation.
+
+   reason:  OPTIONAL.  String.  Machine-readable reason code for the
+      denial, echoed unchanged from context.reason of the denied
+      evaluation.  This is the decision's reason and is distinct from
+      any requestability hint the PDP may carry in
+      context.access_request.reason.
 
    request_context:  REQUIRED when denial.evaluation_id is absent;
       otherwise OPTIONAL.  String.  Integrity-protected binding material
@@ -999,9 +1004,10 @@ Table of Contents
 
    The PEP determines the additional members of the context and
    requested_access objects from the JSON Schema referenced by the
-   requestable denial's form_schema_url, when present.  Field values
+   requestable denial's request_schema_url, when present.  Field values
    that are selected from a backing catalog are resolved according to
-   the Catalogs Document referenced by form_catalogs_url; see Section 9.
+   the Catalogs Document referenced by request_catalogs_url; see
+   Section 9.
 
    If both requested_access.requested_duration and
    requested_access.requested_until are present, the Access Request
@@ -1062,12 +1068,7 @@ Table of Contents
      "denial": {
        "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
        "evaluated_at": "2026-04-30T20:15:00Z",
-       "decision": {
-         "decision": false,
-         "context": {
-           "reason": "approval_required"
-         }
-       },
+       "reason": "approval_required",
        "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
        "template": "manager_approval"
      }
@@ -1105,10 +1106,7 @@ Table of Contents
      "denial": {
        "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M2",
        "evaluated_at": "2026-04-30T20:15:00Z",
-       "decision": {
-         "decision": false,
-         "context": {"reason": "approval_required"}
-       },
+       "reason": "approval_required",
        "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl",
        "template": "onboarding_bundle"
      }
@@ -1905,8 +1903,8 @@ Table of Contents
       submission's subject or normalize it to client.actor; the actor
       identity itself MUST NOT be dropped.
 
-   *  When the requestable denial includes form_schema_url or
-      form_catalogs_url, MUST construct the augmentations to the
+   *  When the requestable denial includes request_schema_url or
+      request_catalogs_url, MUST construct the augmentations to the
       submission's context and requested_access objects according to
       Section 8 and Section 9.
 
@@ -1952,12 +1950,13 @@ Table of Contents
    *  SHOULD include an expiration time or lifetime for the requestable
       denial hint.
 
-   *  MAY include form_url, form_schema_url, and form_catalogs_url in
-      the requestable denial when the Access Request requires additional
-      submission fields beyond those produced by the original AuthZEN
-      evaluation.
+   *  MAY include form_url, request_schema_url, and request_catalogs_url
+      in the requestable denial when the Access Request requires
+      additional submission fields beyond those produced by the original
+      AuthZEN evaluation.
 
-   *  MUST include form_schema_url when including form_catalogs_url.
+   *  MUST include request_schema_url when including
+      request_catalogs_url.
 
    *  MUST provide verifiable denial-binding material when returning
       context.access_request.requestable=true, either by including an
@@ -2155,13 +2154,13 @@ Table of Contents
 
 21.8.  Trusting URLs from the Requestable Denial
 
-   The endpoint, form_url, form_schema_url, form_catalogs_url, and the
-   catalog endpoint values inside a Catalogs Document are all delivered
-   to the PEP inside a denial response or document fetched on the basis
-   of that response.  A compromised or misconfigured PDP, or an Access
-   Request Service compelled by one, could direct the PEP at attacker-
-   controlled hosts to harvest justifications, render hostile UI,
-   substitute schemas and catalogs, or perform credential phishing
+   The endpoint, form_url, request_schema_url, request_catalogs_url, and
+   the catalog endpoint values inside a Catalogs Document are all
+   delivered to the PEP inside a denial response or document fetched on
+   the basis of that response.  A compromised or misconfigured PDP, or
+   an Access Request Service compelled by one, could direct the PEP at
+   attacker-controlled hosts to harvest justifications, render hostile
+   UI, substitute schemas and catalogs, or perform credential phishing
    against the requester.
 
    PEPs SHOULD verify that these URLs resolve to hosts trusted under the
@@ -2419,8 +2418,8 @@ Table of Contents
          "expires_in": 600,
          "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
          "form_url": "https://requests.example.com/forms/manager_approval",
-         "form_schema_url": "https://requests.example.com/schemas/manager_approval.json",
-         "form_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json"
+         "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
+         "request_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json"
        }
      }
    }
@@ -2454,12 +2453,7 @@ Table of Contents
      "denial": {
        "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
        "evaluated_at": "2026-04-30T20:15:00Z",
-       "decision": {
-         "decision": false,
-         "context": {
-           "reason": "approval_required"
-         }
-       },
+       "reason": "approval_required",
        "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
        "template": "manager_approval"
      }
@@ -2614,7 +2608,7 @@ Table of Contents
          "reason": "agent_class_approval_required",
          "expires_in": 600,
          "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
-         "form_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
+         "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
        }
      }
    }
@@ -2672,10 +2666,7 @@ Table of Contents
      "denial": {
        "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
        "evaluated_at": "2026-05-12T15:00:00Z",
-       "decision": {
-         "decision": false,
-         "context": {"reason": "agent_authority_missing"}
-       },
+       "reason": "agent_authority_missing",
        "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
        "template": "agent_tool_class_approval"
      }
@@ -2985,7 +2976,7 @@ A.3.  Form and Catalog Translation
    with field types beyond JSON Schema's native vocabulary, and
    proprietary catalog APIs with vendor-specific request and response
    shapes.  Implementations translate to the JSON Schema referenced by
-   form_schema_url and to the Catalogs Document and Catalog Endpoint
+   request_schema_url and to the Catalogs Document and Catalog Endpoint
    protocol defined in Section 9.  Translation may be lossy for vendor-
    specific widgets and metadata; richer rendering details belong behind
    form_url, while the JSON Schema and Catalogs Document provide enough

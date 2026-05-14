@@ -1703,20 +1703,20 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-3.19">
-<code>form_schema_url</code>:</dt>
+<code>request_schema_url</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-3.20">
           <p id="section-7-3.20.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  URL where the Access Request Service publishes a machine-readable description of the augmentations the PEP must add to the submission's <code>context</code> and <code>requested_access</code> objects.  <span class="bcp14">RECOMMENDED</span> to be a JSON Schema <span>[<a href="#I-D.bhutton-json-schema" class="cite xref">I-D.bhutton-json-schema</a>]</span> <span>[<a href="#I-D.bhutton-json-schema-validation" class="cite xref">I-D.bhutton-json-schema-validation</a>]</span> document.  Suitable for autonomous PEPs and for PEPs that render forms natively against a schema.  See <a href="#machine-readable-forms" class="auto internal xref">Section 8</a>.<a href="#section-7-3.20.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-3.21">
-<code>form_catalogs_url</code>:</dt>
+<code>request_catalogs_url</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-3.22">
           <p id="section-7-3.22.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  URL of a Catalogs Document describing how the PEP resolves form fields whose values are selected from a backing catalog.  See <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-7-3.22.1" class="pilcrow">¶</a></p>
 </dd>
       <dd class="break"></dd>
 </dl>
 <p id="section-7-4">If both <code>expires_at</code> and <code>expires_in</code> are present, <code>expires_at</code> takes precedence and the PEP <span class="bcp14">MUST</span> ignore <code>expires_in</code>.<a href="#section-7-4" class="pilcrow">¶</a></p>
-<p id="section-7-5">The <code>reason</code> member of the <code>access_request</code> object is independent of any <code>reason</code> member that the PDP may include directly in <code>context</code>.  The outer <code>context.reason</code> describes why the Decision was denied; <code>context.access_request.reason</code> describes why the denial is requestable and which approval flow applies.<a href="#section-7-5" class="pilcrow">¶</a></p>
+<p id="section-7-5">The <code>reason</code> member of the <code>access_request</code> object is independent of any <code>reason</code> member that the PDP may include directly in <code>context</code>.  The outer <code>context.reason</code> describes why the Decision was denied (echoed by the PEP as <code>denial.reason</code> when submitting an Access Request); <code>context.access_request.reason</code> describes why the denial is requestable and which approval flow applies (used by the PEP at evaluation time but not echoed in the submission).<a href="#section-7-5" class="pilcrow">¶</a></p>
 <p id="section-7-6">The PDP <span class="bcp14">MUST</span> provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore <span class="bcp14">MUST</span> either include an integrity-protected <code>request_context</code>, or include <code>context.evaluation_id</code> (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>) that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP <span class="bcp14">MUST NOT</span> return <code>requestable</code> with a value of <code>true</code>.<a href="#section-7-6" class="pilcrow">¶</a></p>
 <p id="section-7-7">The following is a non-normative example:<a href="#section-7-7" class="pilcrow">¶</a></p>
 <div class="lang-json sourcecode" id="section-7-8">
@@ -1735,8 +1735,8 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
-      "form_schema_url": "https://requests.example.com/schemas/manager_approval.json",
-      "form_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json",
+      "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
+      "request_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json",
       "display": {
         "title": "Request access",
         "description": "Manager approval is required before this document can be opened."
@@ -1765,20 +1765,20 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
       <h2 id="name-machine-readable-forms">
 <a href="#section-8" class="section-number selfRef">8. </a><a href="#name-machine-readable-forms" class="section-name selfRef">Machine-Readable Forms</a>
       </h2>
-<p id="section-8-1">The <span class="bcp14">OPTIONAL</span> <code>form_url</code> and <code>form_schema_url</code> members of the <code>access_request</code> object (<a href="#requestable-denial-context" class="auto internal xref">Section 7</a>) describe additional submission fields the Access Request Service expects beyond those produced by the original AuthZEN evaluation.  PEPs interacting with deployments that do not include either member <span class="bcp14">MAY</span> omit form-schema processing entirely.<a href="#section-8-1" class="pilcrow">¶</a></p>
+<p id="section-8-1">The <span class="bcp14">OPTIONAL</span> <code>form_url</code> and <code>request_schema_url</code> members of the <code>access_request</code> object (<a href="#requestable-denial-context" class="auto internal xref">Section 7</a>) describe additional submission fields the Access Request Service expects beyond those produced by the original AuthZEN evaluation.  PEPs interacting with deployments that do not include either member <span class="bcp14">MAY</span> omit form-schema processing entirely.<a href="#section-8-1" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-8-2.1">
           <p id="section-8-2.1.1"><code>form_url</code> identifies a form hosted by the Access Request Service or a service it trusts, suitable for PEPs that render the form for a human user.<a href="#section-8-2.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-8-2.2">
-          <p id="section-8-2.2.1"><code>form_schema_url</code> identifies a machine-readable description of the same augmentations, suitable for autonomous PEPs and for PEPs that render forms natively against a schema.<a href="#section-8-2.2.1" class="pilcrow">¶</a></p>
+          <p id="section-8-2.2.1"><code>request_schema_url</code> identifies a machine-readable description of the same augmentations, suitable for autonomous PEPs and for PEPs that render forms natively against a schema.<a href="#section-8-2.2.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
-<p id="section-8-3">When a deployment expects autonomous PEP submissions, the requestable denial <span class="bcp14">SHOULD</span> include <code>form_schema_url</code> referencing a JSON Schema <span>[<a href="#I-D.bhutton-json-schema" class="cite xref">I-D.bhutton-json-schema</a>]</span> <span>[<a href="#I-D.bhutton-json-schema-validation" class="cite xref">I-D.bhutton-json-schema-validation</a>]</span> document that describes the augmentations the PEP <span class="bcp14">MUST</span> add to the submission's <code>context</code> and <code>requested_access</code> objects.  An autonomous PEP <span class="bcp14">MAY</span> consume the schema directly to construct a valid submission.<a href="#section-8-3" class="pilcrow">¶</a></p>
-<p id="section-8-4">Many existing IGA, ITSM, and approval platforms already use proprietary form description languages.  Implementations built on top of such platforms <span class="bcp14">MAY</span> publish a JSON Schema document derived from their native form description.  Some loss of fidelity is expected when translating between form description languages; the JSON Schema referenced by <code>form_schema_url</code> <span class="bcp14">SHOULD</span> provide enough information for an autonomous PEP to construct a conformant submission, while richer rendering, widget, and interaction details remain in <code>form_url</code>.<a href="#section-8-4" class="pilcrow">¶</a></p>
-<p id="section-8-5">Field values that are selected from a backing catalog (for example, applications, entitlements, roles, or cost centers) are described in a separate Catalogs Document referenced by <code>form_catalogs_url</code>.  This profile keeps catalog references outside the form schema so the schema remains a pure description of data shape.  See <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-8-5" class="pilcrow">¶</a></p>
+<p id="section-8-3">When a deployment expects autonomous PEP submissions, the requestable denial <span class="bcp14">SHOULD</span> include <code>request_schema_url</code> referencing a JSON Schema <span>[<a href="#I-D.bhutton-json-schema" class="cite xref">I-D.bhutton-json-schema</a>]</span> <span>[<a href="#I-D.bhutton-json-schema-validation" class="cite xref">I-D.bhutton-json-schema-validation</a>]</span> document that describes the augmentations the PEP <span class="bcp14">MUST</span> add to the submission's <code>context</code> and <code>requested_access</code> objects.  An autonomous PEP <span class="bcp14">MAY</span> consume the schema directly to construct a valid submission.<a href="#section-8-3" class="pilcrow">¶</a></p>
+<p id="section-8-4">Many existing IGA, ITSM, and approval platforms already use proprietary form description languages.  Implementations built on top of such platforms <span class="bcp14">MAY</span> publish a JSON Schema document derived from their native form description.  Some loss of fidelity is expected when translating between form description languages; the JSON Schema referenced by <code>request_schema_url</code> <span class="bcp14">SHOULD</span> provide enough information for an autonomous PEP to construct a conformant submission, while richer rendering, widget, and interaction details remain in <code>form_url</code>.<a href="#section-8-4" class="pilcrow">¶</a></p>
+<p id="section-8-5">Field values that are selected from a backing catalog (for example, applications, entitlements, roles, or cost centers) are described in a separate Catalogs Document referenced by <code>request_catalogs_url</code>.  This profile keeps catalog references outside the form schema so the schema remains a pure description of data shape.  See <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-8-5" class="pilcrow">¶</a></p>
 <p id="section-8-6">This profile does not define a UI rendering vocabulary.  Deployments that need richer rendering hints (such as widget selection, layout, or conditional display) <span class="bcp14">MAY</span> layer a UI vocabulary, identified out of band, typically keyed by <code>template</code>.<a href="#section-8-6" class="pilcrow">¶</a></p>
-<p id="section-8-7">This profile does not define an agent protocol surface.  Deployments serving agentic PEPs <span class="bcp14">MAY</span> additionally expose Access Request submission through an agent protocol where the tool input schema corresponds to the JSON Schema referenced by <code>form_schema_url</code>.  Discovery of such surfaces is out of scope for this specification.<a href="#section-8-7" class="pilcrow">¶</a></p>
+<p id="section-8-7">This profile does not define an agent protocol surface.  Deployments serving agentic PEPs <span class="bcp14">MAY</span> additionally expose Access Request submission through an agent protocol where the tool input schema corresponds to the JSON Schema referenced by <code>request_schema_url</code>.  Discovery of such surfaces is out of scope for this specification.<a href="#section-8-7" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="catalog-references">
@@ -1786,14 +1786,14 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
       <h2 id="name-catalog-references">
 <a href="#section-9" class="section-number selfRef">9. </a><a href="#name-catalog-references" class="section-name selfRef">Catalog References</a>
       </h2>
-<p id="section-9-1">The <span class="bcp14">OPTIONAL</span> <code>form_catalogs_url</code> member of the <code>access_request</code> object (<a href="#requestable-denial-context" class="auto internal xref">Section 7</a>) is the URL of a Catalogs Document that tells PEPs how to resolve form fields whose values come from backing catalogs (for example, applications, entitlements, roles, or cost centers).  PEPs interacting with deployments that do not include <code>form_catalogs_url</code> <span class="bcp14">MAY</span> omit Catalog Endpoint resolution.<a href="#section-9-1" class="pilcrow">¶</a></p>
-<p id="section-9-2">The Catalogs Document is a sibling artifact to the form schema; it does not modify or extend the JSON Schema referenced by <code>form_schema_url</code>.  This feature is typically paired with the form-schema feature (<a href="#machine-readable-forms" class="auto internal xref">Section 8</a>).<a href="#section-9-2" class="pilcrow">¶</a></p>
+<p id="section-9-1">The <span class="bcp14">OPTIONAL</span> <code>request_catalogs_url</code> member of the <code>access_request</code> object (<a href="#requestable-denial-context" class="auto internal xref">Section 7</a>) is the URL of a Catalogs Document that tells PEPs how to resolve form fields whose values come from backing catalogs (for example, applications, entitlements, roles, or cost centers).  PEPs interacting with deployments that do not include <code>request_catalogs_url</code> <span class="bcp14">MAY</span> omit Catalog Endpoint resolution.<a href="#section-9-1" class="pilcrow">¶</a></p>
+<p id="section-9-2">The Catalogs Document is a sibling artifact to the form schema; it does not modify or extend the JSON Schema referenced by <code>request_schema_url</code>.  This feature is typically paired with the form-schema feature (<a href="#machine-readable-forms" class="auto internal xref">Section 8</a>).<a href="#section-9-2" class="pilcrow">¶</a></p>
 <div id="catalogs-document">
 <section id="section-9.1">
         <h3 id="name-catalogs-document">
 <a href="#section-9.1" class="section-number selfRef">9.1. </a><a href="#name-catalogs-document" class="section-name selfRef">Catalogs Document</a>
         </h3>
-<p id="section-9.1-1">The Catalogs Document is a JSON object retrieved from <code>form_catalogs_url</code> using HTTP <code>GET</code>.  It has the following members:<a href="#section-9.1-1" class="pilcrow">¶</a></p>
+<p id="section-9.1-1">The Catalogs Document is a JSON object retrieved from <code>request_catalogs_url</code> using HTTP <code>GET</code>.  It has the following members:<a href="#section-9.1-1" class="pilcrow">¶</a></p>
 <span class="break"></span><dl class="dlParallel" id="section-9.1-2">
           <dt id="section-9.1-2.1">
 <code>fields</code>:</dt>
@@ -2160,24 +2160,24 @@ Content-Type: application/json
 </dd>
         <dd class="break"></dd>
 </dl>
-<p id="section-10.1-4">The <code>denial</code> object has the following members:<a href="#section-10.1-4" class="pilcrow">¶</a></p>
+<p id="section-10.1-4">The <code>denial</code> object has the following members.  Each field maps directly to a single member of the PDP's denied evaluation response; the <code>denial</code> object does not echo the full AuthZEN Decision because the binding material (<code>evaluation_id</code> and <code>request_context</code>) provides stronger evidence of the denial than a verbatim JSON echo could.<a href="#section-10.1-4" class="pilcrow">¶</a></p>
 <span class="break"></span><dl class="dlParallel" id="section-10.1-5">
           <dt id="section-10.1-5.1">
-<code>decision</code>:</dt>
+<code>evaluation_id</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.2">
-            <p id="section-10.1-5.2.1"><span class="bcp14">REQUIRED</span>.  The denied AuthZEN Decision returned by the PDP, including its Decision Context.  The PEP <span class="bcp14">MAY</span> omit <code>context.access_request</code> from the embedded Decision Context; the Access Request Service consumes the fields it needs (<code>denial.request_context</code> for binding, <code>denial.template</code> for routing) directly from <code>denial</code> rather than from the embedded <code>context.access_request</code>.<a href="#section-10.1-5.2.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.2.1"><span class="bcp14">REQUIRED</span> when <code>denial.request_context</code> is absent; otherwise <span class="bcp14">RECOMMENDED</span>.  A stable identifier for the denied evaluation, captured by the PEP from <code>context.evaluation_id</code> in the AuthZEN Decision and echoed unchanged here (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>).  The Access Request Service <span class="bcp14">MUST</span> be able to resolve or validate <code>evaluation_id</code> before relying on it as denial-binding material.  <code>evaluation_id</code> provides the strongest audit binding between the original denial and the submitted Access Request and <span class="bcp14">SHOULD</span> be preferred over <code>evaluated_at</code> alone.<a href="#section-10.1-5.2.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.3">
-<code>evaluation_id</code>:</dt>
+<code>evaluated_at</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.4">
-            <p id="section-10.1-5.4.1"><span class="bcp14">REQUIRED</span> when <code>denial.request_context</code> is absent; otherwise <span class="bcp14">RECOMMENDED</span>.  A stable identifier for the denied evaluation, captured by the PEP from <code>context.evaluation_id</code> in the AuthZEN Decision and echoed unchanged here (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>).  The Access Request Service <span class="bcp14">MUST</span> be able to resolve or validate <code>evaluation_id</code> before relying on it as denial-binding material.  <code>evaluation_id</code> provides the strongest audit binding between the original denial and the submitted Access Request and <span class="bcp14">SHOULD</span> be preferred over <code>evaluated_at</code> alone.<a href="#section-10.1-5.4.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.4.1"><span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the denial was produced, echoed from <code>context.evaluated_at</code> of the denied evaluation.<a href="#section-10.1-5.4.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.5">
-<code>evaluated_at</code>:</dt>
+<code>reason</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.6">
-            <p id="section-10.1-5.6.1"><span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the denial was produced.<a href="#section-10.1-5.6.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.6.1"><span class="bcp14">OPTIONAL</span>.  String.  Machine-readable reason code for the denial, echoed unchanged from <code>context.reason</code> of the denied evaluation.  This is the decision's reason and is distinct from any requestability hint the PDP may carry in <code>context.access_request.reason</code>.<a href="#section-10.1-5.6.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.7">
@@ -2193,7 +2193,7 @@ Content-Type: application/json
 </dd>
         <dd class="break"></dd>
 </dl>
-<p id="section-10.1-6">The PEP determines the additional members of the <code>context</code> and <code>requested_access</code> objects from the JSON Schema referenced by the requestable denial's <code>form_schema_url</code>, when present.  Field values that are selected from a backing catalog are resolved according to the Catalogs Document referenced by <code>form_catalogs_url</code>; see <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-10.1-6" class="pilcrow">¶</a></p>
+<p id="section-10.1-6">The PEP determines the additional members of the <code>context</code> and <code>requested_access</code> objects from the JSON Schema referenced by the requestable denial's <code>request_schema_url</code>, when present.  Field values that are selected from a backing catalog are resolved according to the Catalogs Document referenced by <code>request_catalogs_url</code>; see <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-10.1-6" class="pilcrow">¶</a></p>
 <p id="section-10.1-7">If both <code>requested_access.requested_duration</code> and <code>requested_access.requested_until</code> are present, the Access Request Service <span class="bcp14">MUST</span> reject the submission unless the deployment defines an explicit reconciliation rule.  When a deployment permits both members, the approved access lifetime <span class="bcp14">MUST NOT</span> exceed the earlier resulting expiry.<a href="#section-10.1-7" class="pilcrow">¶</a></p>
 <p id="section-10.1-8">A PEP <span class="bcp14">MUST</span> submit an Access Request only for an AuthZEN Decision with <code>decision</code> equal to <code>false</code> and <code>context.access_request.requestable</code> equal to <code>true</code>.<a href="#section-10.1-8" class="pilcrow">¶</a></p>
 <p id="section-10.1-9">The submitted <code>denial</code> object for each requested item <span class="bcp14">MUST</span> include either <code>denial.request_context</code> or <code>denial.evaluation_id</code>.  The Access Request Service <span class="bcp14">MUST</span> reject a submission that lacks verifiable denial-binding material with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-9" class="pilcrow">¶</a></p>
@@ -2229,12 +2229,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
   "denial": {
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
     "evaluated_at": "2026-04-30T20:15:00Z",
-    "decision": {
-      "decision": false,
-      "context": {
-        "reason": "approval_required"
-      }
-    },
+    "reason": "approval_required",
     "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
     "template": "manager_approval"
   }
@@ -2274,10 +2269,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d14
   "denial": {
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M2",
     "evaluated_at": "2026-04-30T20:15:00Z",
-    "decision": {
-      "decision": false,
-      "context": {"reason": "approval_required"}
-    },
+    "reason": "approval_required",
     "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl",
     "template": "onboarding_bundle"
   }
@@ -3083,7 +3075,7 @@ Content-Type: application/problem+json
           <p id="section-16-2.4.1"><span class="bcp14">MUST</span> preserve the principal identity of the Subject, and <span class="bcp14">MUST</span> preserve the Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.  When the original evaluation conveyed an actor identity in the Subject (for example, via <code>subject.properties.act</code>), the PEP <span class="bcp14">MAY</span> preserve the actor in the submission's <code>subject</code> or normalize it to <code>client.actor</code>; the actor identity itself <span class="bcp14">MUST NOT</span> be dropped.<a href="#section-16-2.4.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-16-2.5">
-          <p id="section-16-2.5.1">When the requestable denial includes <code>form_schema_url</code> or <code>form_catalogs_url</code>, <span class="bcp14">MUST</span> construct the augmentations to the submission's <code>context</code> and <code>requested_access</code> objects according to <a href="#machine-readable-forms" class="auto internal xref">Section 8</a> and <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-16-2.5.1" class="pilcrow">¶</a></p>
+          <p id="section-16-2.5.1">When the requestable denial includes <code>request_schema_url</code> or <code>request_catalogs_url</code>, <span class="bcp14">MUST</span> construct the augmentations to the submission's <code>context</code> and <code>requested_access</code> objects according to <a href="#machine-readable-forms" class="auto internal xref">Section 8</a> and <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-16-2.5.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-16-2.6">
           <p id="section-16-2.6.1"><span class="bcp14">MUST</span> include <code>denial.evaluation_id</code> when <code>denial.request_context</code> is absent, and <span class="bcp14">SHOULD</span> include it when the PDP returned an evaluation identifier.<a href="#section-16-2.6.1" class="pilcrow">¶</a></p>
@@ -3135,10 +3127,10 @@ Content-Type: application/problem+json
           <p id="section-17-2.4.1"><span class="bcp14">SHOULD</span> include an expiration time or lifetime for the requestable denial hint.<a href="#section-17-2.4.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-17-2.5">
-          <p id="section-17-2.5.1"><span class="bcp14">MAY</span> include <code>form_url</code>, <code>form_schema_url</code>, and <code>form_catalogs_url</code> in the requestable denial when the Access Request requires additional submission fields beyond those produced by the original AuthZEN evaluation.<a href="#section-17-2.5.1" class="pilcrow">¶</a></p>
+          <p id="section-17-2.5.1"><span class="bcp14">MAY</span> include <code>form_url</code>, <code>request_schema_url</code>, and <code>request_catalogs_url</code> in the requestable denial when the Access Request requires additional submission fields beyond those produced by the original AuthZEN evaluation.<a href="#section-17-2.5.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-17-2.6">
-          <p id="section-17-2.6.1"><span class="bcp14">MUST</span> include <code>form_schema_url</code> when including <code>form_catalogs_url</code>.<a href="#section-17-2.6.1" class="pilcrow">¶</a></p>
+          <p id="section-17-2.6.1"><span class="bcp14">MUST</span> include <code>request_schema_url</code> when including <code>request_catalogs_url</code>.<a href="#section-17-2.6.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-17-2.7">
           <p id="section-17-2.7.1"><span class="bcp14">MUST</span> provide verifiable denial-binding material when returning <code>context.access_request.requestable=true</code>, either by including an integrity-protected <code>context.access_request.request_context</code> or by returning a stable evaluation identifier that the Access Request Service can resolve or validate.<a href="#section-17-2.7.1" class="pilcrow">¶</a></p>
@@ -3301,7 +3293,7 @@ Content-Type: application/problem+json
         <h3 id="name-trusting-urls-from-the-requ">
 <a href="#section-21.8" class="section-number selfRef">21.8. </a><a href="#name-trusting-urls-from-the-requ" class="section-name selfRef">Trusting URLs from the Requestable Denial</a>
         </h3>
-<p id="section-21.8-1">The <code>endpoint</code>, <code>form_url</code>, <code>form_schema_url</code>, <code>form_catalogs_url</code>, and the catalog <code>endpoint</code> values inside a Catalogs Document are all delivered to the PEP inside a denial response or document fetched on the basis of that response.  A compromised or misconfigured PDP, or an Access Request Service compelled by one, could direct the PEP at attacker-controlled hosts to harvest justifications, render hostile UI, substitute schemas and catalogs, or perform credential phishing against the requester.<a href="#section-21.8-1" class="pilcrow">¶</a></p>
+<p id="section-21.8-1">The <code>endpoint</code>, <code>form_url</code>, <code>request_schema_url</code>, <code>request_catalogs_url</code>, and the catalog <code>endpoint</code> values inside a Catalogs Document are all delivered to the PEP inside a denial response or document fetched on the basis of that response.  A compromised or misconfigured PDP, or an Access Request Service compelled by one, could direct the PEP at attacker-controlled hosts to harvest justifications, render hostile UI, substitute schemas and catalogs, or perform credential phishing against the requester.<a href="#section-21.8-1" class="pilcrow">¶</a></p>
 <p id="section-21.8-2">PEPs <span class="bcp14">SHOULD</span> verify that these URLs resolve to hosts trusted under the deployment, typically by requiring the same origin as the Access Request Endpoint advertised in PDP metadata or by maintaining an explicit allowlist of trusted Access Request Service hosts.  PEPs <span class="bcp14">MUST NOT</span> submit credentials to a host that is not trusted to receive them.<a href="#section-21.8-2" class="pilcrow">¶</a></p>
 </section>
 </div>
@@ -3691,8 +3683,8 @@ Content-Type: application/json
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
-      "form_schema_url": "https://requests.example.com/schemas/manager_approval.json",
-      "form_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json"
+      "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
+      "request_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json"
     }
   }
 }
@@ -3734,12 +3726,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
   "denial": {
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
     "evaluated_at": "2026-04-30T20:15:00Z",
-    "decision": {
-      "decision": false,
-      "context": {
-        "reason": "approval_required"
-      }
-    },
+    "reason": "approval_required",
     "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
     "template": "manager_approval"
   }
@@ -3938,7 +3925,7 @@ Content-Type: application/json
       "reason": "agent_class_approval_required",
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
-      "form_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
+      "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
     }
   }
 }
@@ -3998,10 +3985,7 @@ Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
   "denial": {
     "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
     "evaluated_at": "2026-05-12T15:00:00Z",
-    "decision": {
-      "decision": false,
-      "context": {"reason": "agent_authority_missing"}
-    },
+    "reason": "agent_authority_missing",
     "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
     "template": "agent_tool_class_approval"
   }
@@ -4308,7 +4292,7 @@ Content-Type: application/json
         <h3 id="name-form-and-catalog-translatio">
 <a href="#appendix-A.3" class="section-number selfRef">A.3. </a><a href="#name-form-and-catalog-translatio" class="section-name selfRef">Form and Catalog Translation</a>
         </h3>
-<p id="appendix-A.3-1">Most existing platforms have proprietary form description languages with field types beyond JSON Schema's native vocabulary, and proprietary catalog APIs with vendor-specific request and response shapes.  Implementations translate to the JSON Schema referenced by <code>form_schema_url</code> and to the Catalogs Document and Catalog Endpoint protocol defined in <a href="#catalog-references" class="auto internal xref">Section 9</a>.  Translation may be lossy for vendor-specific widgets and metadata; richer rendering details belong behind <code>form_url</code>, while the JSON Schema and Catalogs Document provide enough information for an autonomous PEP.  Deployments that expose tools or catalogs to autonomous agents through an agent protocol can additionally surface catalogs through that protocol; see <a href="#catalog-agent-protocol" class="auto internal xref">Section 9.6</a>.<a href="#appendix-A.3-1" class="pilcrow">¶</a></p>
+<p id="appendix-A.3-1">Most existing platforms have proprietary form description languages with field types beyond JSON Schema's native vocabulary, and proprietary catalog APIs with vendor-specific request and response shapes.  Implementations translate to the JSON Schema referenced by <code>request_schema_url</code> and to the Catalogs Document and Catalog Endpoint protocol defined in <a href="#catalog-references" class="auto internal xref">Section 9</a>.  Translation may be lossy for vendor-specific widgets and metadata; richer rendering details belong behind <code>form_url</code>, while the JSON Schema and Catalogs Document provide enough information for an autonomous PEP.  Deployments that expose tools or catalogs to autonomous agents through an agent protocol can additionally surface catalogs through that protocol; see <a href="#catalog-agent-protocol" class="auto internal xref">Section 9.6</a>.<a href="#appendix-A.3-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="notification-channels">
