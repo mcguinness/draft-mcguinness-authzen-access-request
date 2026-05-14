@@ -226,7 +226,7 @@ The `access_request` object has the following members:
 : OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP MUST compute the hint's expiry by adding `expires_in` to the time the Decision was produced; that production time is taken from `context.evaluated_at` when present, otherwise from the HTTP `Date` response header.  If neither time source is available, the PEP MUST treat the hint as expired.  PDPs SHOULD use `expires_at` instead of `expires_in` when precise expiry handling is required.
 
 `request_context`:
-: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged inside `denial.access_request.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{!RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
+: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged as `denial.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{!RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
 
 `display`:
 : OPTIONAL.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP MAY ignore this member.
@@ -479,7 +479,14 @@ The request body is a JSON object with the following members:
 : OPTIONAL.  The AuthZEN Context from the denied evaluation, augmented with submission-time fields such as business justification.
 
 `denial`:
-: REQUIRED when `items` is absent.  Object binding the Access Request to the denied AuthZEN Decision.  When `items` is present, this top-level `denial` is OPTIONAL only when every item carries its own per-item `denial`; otherwise it is REQUIRED, and its verifiable binding material MUST cover the submitted Subject and every Resource and Action in the `items` array.  An Access Request with `items` for which any item lacks a covering denial is malformed and MUST be rejected with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
+: Object binding the Access Request to the denied AuthZEN Decision.  REQUIRED in the following cases:
+
+    * `items` is absent: the `denial` binds the single submitted Subject, Resource, and Action.
+    * `items` is present and any item lacks a per-item `denial`: the top-level `denial` is a bundle denial whose verifiable binding material MUST cover the Subject and every Resource and Action in `items`.
+
+  OPTIONAL when `items` is present and every item carries its own per-item `denial`.
+
+  An Access Request whose denial binding does not cover the submitted Subject, Resource, and Action (for every item when `items` is present) MUST be rejected with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
 
 `requested_access`:
 : OPTIONAL.  Object containing request-specific information such as requested duration, requested role, requested entitlement, or requested scope.  This object does not define policy semantics and is interpreted by the Access Request Service.  The following well-known optional members are defined; additional members MAY be included subject to {{extension-naming}}:
@@ -511,16 +518,19 @@ The request body is a JSON object with the following members:
 The `denial` object has the following members:
 
 `decision`:
-: REQUIRED.  The denied AuthZEN Decision returned by the PDP, including its Decision Context.  The PEP MAY omit `context.access_request` from the embedded Decision Context when the same object is supplied in `denial.access_request`.
-
-`access_request`:
-: REQUIRED.  The `context.access_request` object from the denied decision.
+: REQUIRED.  The denied AuthZEN Decision returned by the PDP, including its Decision Context.  The PEP MAY omit `context.access_request` from the embedded Decision Context; the Access Request Service consumes the fields it needs (`denial.request_context` for binding, `denial.template` for routing) directly from `denial` rather than from the embedded `context.access_request`.
 
 `evaluation_id`:
-: REQUIRED when `denial.access_request.request_context` is absent; otherwise RECOMMENDED.  A stable identifier for the denied evaluation, captured by the PEP from `context.evaluation_id` in the AuthZEN Decision and echoed unchanged here ({{evaluation-identifier}}).  The Access Request Service MUST be able to resolve or validate `evaluation_id` before relying on it as denial-binding material.  `evaluation_id` provides the strongest audit binding between the original denial and the submitted Access Request and SHOULD be preferred over `evaluated_at` alone.
+: REQUIRED when `denial.request_context` is absent; otherwise RECOMMENDED.  A stable identifier for the denied evaluation, captured by the PEP from `context.evaluation_id` in the AuthZEN Decision and echoed unchanged here ({{evaluation-identifier}}).  The Access Request Service MUST be able to resolve or validate `evaluation_id` before relying on it as denial-binding material.  `evaluation_id` provides the strongest audit binding between the original denial and the submitted Access Request and SHOULD be preferred over `evaluated_at` alone.
 
 `evaluated_at`:
 : OPTIONAL.  {{RFC3339}} timestamp indicating when the denial was produced.
+
+`request_context`:
+: REQUIRED when `denial.evaluation_id` is absent; otherwise OPTIONAL.  String.  Integrity-protected binding material echoed unchanged from `context.access_request.request_context` of the denied evaluation ({{requestable-denial-context}}).  The PEP MUST NOT decode, modify, or interpret this value; it returns the original PDP-issued value byte-for-byte.
+
+`template`:
+: OPTIONAL.  String.  Echoed unchanged from `context.access_request.template` of the denied evaluation, when the PDP provided one.  The Access Request Service uses this value to route the request to the appropriate workflow.
 
 The PEP determines the additional members of the `context` and `requested_access` objects from the JSON Schema referenced by the requestable denial's `form_schema_url`, when present.  Field values that are selected from a backing catalog are resolved according to the Catalogs Document referenced by `form_catalogs_url`; see {{catalog-references}}.
 
@@ -528,7 +538,7 @@ If both `requested_access.requested_duration` and `requested_access.requested_un
 
 A PEP MUST submit an Access Request only for an AuthZEN Decision with `decision` equal to `false` and `context.access_request.requestable` equal to `true`.
 
-The submitted `denial` object for each requested item MUST include either `denial.access_request.request_context` or `denial.evaluation_id`.  The Access Request Service MUST reject a submission that lacks verifiable denial-binding material with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
+The submitted `denial` object for each requested item MUST include either `denial.request_context` or `denial.evaluation_id`.  The Access Request Service MUST reject a submission that lacks verifiable denial-binding material with `urn:openid:authzen:access-request:error:invalid_denial_binding`.
 
 A PEP SHOULD include an `Idempotency-Key` header, following the conventions described in {{!I-D.ietf-httpapi-idempotency-key-header}}.  The Idempotency-Key covers the entire submission body, including all members of the `items` array when present.
 
@@ -570,12 +580,8 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
         "reason": "approval_required"
       }
     },
-    "access_request": {
-      "requestable": true,
-      "template": "manager_approval",
-      "reason": "manager_approval_required",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl"
-    }
+    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+    "template": "manager_approval"
   }
 }
 ~~~
@@ -617,11 +623,8 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d14
       "decision": false,
       "context": {"reason": "approval_required"}
     },
-    "access_request": {
-      "requestable": true,
-      "template": "onboarding_bundle",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl"
-    }
+    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl",
+    "template": "onboarding_bundle"
   }
 }
 ~~~
@@ -775,6 +778,42 @@ The following task status values are defined:
 : All items in a bulk task ({{access-request-response}}) reached terminal status, but with mixed outcomes (for example, some items approved while others denied).  This status is only valid for tasks containing an `items` array.  A PEP receiving `partial` MUST consult `task.items[].status` to determine per-item outcomes and MUST NOT infer aggregate access permission.
 
 Implementations MAY define additional status values.  A PEP that receives an unknown status value MUST treat the task as not approved.
+
+### State Transitions {#state-transitions}
+
+A task is created in the `pending` state and transitions exactly once to one of the terminal states defined above.  Terminal states do not transition further.
+
+~~~ ascii-art
+                          (created)
+                              |
+                              v
+                       +-------------+
+                       |   pending   |
+                       +------+------+
+                              |
+   +----------+----------+----+----+-----------+-----------+
+   |          |          |        |           |           |
+   v          v          v        v           v           v
++--------+ +------+ +-------+ +----------+ +--------+ +---------+
+|approved| |denied| |expired| |cancelled | | failed | | partial |
++--------+ +------+ +-------+ +----------+ +--------+ +---------+
+                                                       (bulk only)
+~~~
+
+The following transitions are defined from `pending`:
+
+| To | Trigger |
+|---|---|
+| `approved` | Approval workflow completes successfully. |
+| `denied` | Approval workflow rejects the request. |
+| `expired` | `task.expires_at` is reached before the request reaches a terminal state. |
+| `cancelled` | The request is cancelled by the requester, approver, administrator, or PEP using the cancellation endpoint ({{cancellation}}). |
+| `failed` | A system error prevents the request from completing. |
+| `partial` | Bulk tasks only.  All items in the `items` array reach terminal status, with two or more distinct terminal statuses present.  See aggregation rules in {{access-request-response}}. |
+
+For tasks containing an `items` array, each item independently follows the same state machine; the aggregate `task.status` is computed from per-item statuses according to the aggregation rule in {{access-request-response}}.
+
+Implementations that define additional status values ({{task-status}}) extend the state machine.  Such extensions SHOULD specify the transitions into and out of the new state and document them alongside the value definition.
 
 ### Mapping Backend States {#status-mapping}
 
@@ -1080,7 +1119,7 @@ A PEP implementing this profile:
 * MUST use the `endpoint` from the denial context when present; otherwise it MUST use the `access_request_endpoint` from PDP metadata.
 * MUST preserve the principal identity of the Subject, and MUST preserve the Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.  When the original evaluation conveyed an actor identity in the Subject (for example, via `subject.properties.act`), the PEP MAY preserve the actor in the submission's `subject` or normalize it to `client.actor`; the actor identity itself MUST NOT be dropped.
 * When the requestable denial includes `form_schema_url` or `form_catalogs_url`, MUST construct the augmentations to the submission's `context` and `requested_access` objects according to {{machine-readable-forms}} and {{catalog-references}}.
-* MUST include `denial.evaluation_id` when `denial.access_request.request_context` is absent, and SHOULD include it when the PDP returned an evaluation identifier.
+* MUST include `denial.evaluation_id` when `denial.request_context` is absent, and SHOULD include it when the PDP returned an evaluation identifier.
 * SHOULD include an idempotency key for Access Request submissions.
 * MUST treat a Task Handle as opaque.
 * MUST NOT infer approval from a task identifier, link, or display text.
@@ -1113,8 +1152,8 @@ An Access Request Service implementing this profile:
 * MUST authenticate and authorize the PEP before accepting Access Request submissions.
 * MUST validate that the submission is based on a requestable denial.
 * MUST verify the denial-binding material for every requested item, applying the following rules:
-    * When `denial.access_request.request_context` is present, the service MUST verify its integrity.  When the value is a JWS, the service MUST verify the signature using a key resolved from the JWK Set advertised at the PDP's `jwks_uri` ({{discovery}}); JWS `kid` headers are matched against JWK `kid` parameters.
-    * When `denial.access_request.request_context` is absent, the service MUST resolve or validate `denial.evaluation_id`.
+    * When `denial.request_context` is present, the service MUST verify its integrity.  When the value is a JWS, the service MUST verify the signature using a key resolved from the JWK Set advertised at the PDP's `jwks_uri` ({{discovery}}); JWS `kid` headers are matched against JWK `kid` parameters.
+    * When `denial.request_context` is absent, the service MUST resolve or validate `denial.evaluation_id`.
     * The service MUST reject submissions whose binding material cannot be verified or whose claims do not bind to the submitted denial.
 * MUST bind the task to the submitted Subject, Resource, Action, Context, denial, requester, and client.
 * MUST return an opaque Task Handle for accepted requests.
@@ -1399,12 +1438,8 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
         "reason": "approval_required"
       }
     },
-    "access_request": {
-      "requestable": true,
-      "template": "manager_approval",
-      "reason": "manager_approval_required",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl"
-    }
+    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+    "template": "manager_approval"
   }
 }
 ~~~
@@ -1622,12 +1657,8 @@ Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
       "decision": false,
       "context": {"reason": "agent_authority_missing"}
     },
-    "access_request": {
-      "requestable": true,
-      "template": "agent_tool_class_approval",
-      "reason": "agent_class_approval_required",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
-    }
+    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+    "template": "agent_tool_class_approval"
   }
 }
 ~~~
