@@ -1613,10 +1613,9 @@ Table of Contents
    *  approved_at: OPTIONAL.  [RFC3339] timestamp indicating when the
       approval completed.
 
-   *  approved_until: OPTIONAL.  [RFC3339] timestamp indicating the
-      latest time through which the approval remains valid.  When
-      present, the PEP MUST NOT use the approval for re-evaluation after
-      this timestamp.
+   *  approved_until: REQUIRED.  [RFC3339] timestamp indicating the
+      latest time through which the approval remains valid.  The PEP
+      MUST NOT use the approval for re-evaluation after this timestamp.
 
    The approval object MAY additionally include a state member.  state
    is an opaque object populated by the Access Request Service or PDP,
@@ -1640,7 +1639,9 @@ Table of Contents
    enforce access past that timestamp.  PEPs that issue downstream
    credentials on the basis of the approved evaluation (for example, an
    OAuth Authorization Server issuing access tokens) MUST bound the
-   lifetime of those credentials by the approval expiry.
+   lifetime of those credentials by the earlier of the approval expiry
+   in the Approval Result and any approval expiry returned by the PDP
+   during re-evaluation.
 
    When the original submission carried an items array, the PEP re-
    evaluates each approved item separately, including that item's
@@ -1660,7 +1661,7 @@ Table of Contents
    of resources for a defined duration) reduces the number of denial-
    and-approval cycles by orders of magnitude.
 
-   An Approval Result MAY be associated with an approval scope: a
+   An Approval Result is associated with an approval scope: a
    description of the class of future Access Evaluations for which the
    approval may be considered.  This specification does not define a
    standard approval scope representation or matching algorithm.
@@ -1668,6 +1669,15 @@ Table of Contents
    broad an approval grants; this profile does not constrain that policy
    beyond the integrity, expiry, and audit requirements stated
    elsewhere.
+
+   Unless the Access Request Service or PDP records a broader or
+   narrower approval scope, the default approval scope is the original
+   denied Subject, Resource, Action, and relevant Context bound to the
+   Access Request.  For a bundled Access Request, the default approval
+   scope for each approved item is that item's Subject, Resource,
+   Action, and relevant Context.  This default scope is not serialized
+   in the Approval Result unless a profile or deployment defines a
+   representation for it.
 
    The PDP MUST only consider an Approval Result applicable when the
    current evaluation request is within the approval scope recorded for
@@ -1855,6 +1865,9 @@ Table of Contents
    *  client, client.actor, and client.source in an Access Request
       submission.
 
+   *  A Catalogs Document and a Catalog Reference object within a
+      Catalogs Document.
+
    *  A Catalog Item within a Catalog Response.
 
    *  task.display: user-interface hints attached to a Task Handle.
@@ -1901,6 +1914,11 @@ Table of Contents
    3.  A reverse-DNS-prefixed identifier (for example,
        vendor.example.com/foo) when the member is private to a single
        deployment and not intended for cross-implementation use.
+
+   The contents of approval.state are opaque to this specification and
+   are not subject to the member naming requirements above unless a
+   profile or deployment explicitly defines structure within
+   approval.state.
 
 15.3.  Forward Compatibility
 
@@ -2223,7 +2241,8 @@ Table of Contents
    the PEP, the PDP wraps the signed payload in JWE encrypted to the
    Access Request Service.
 
-   The Access Request Service, on receipt:
+   When request_context is a JWS-signed JWT using these claims, the
+   Access Request Service, on receipt:
 
    1.  parses the JWS header and resolves the verification key from the
        JWK Set at the PDP's jwks_uri;
@@ -2238,6 +2257,12 @@ Table of Contents
 
    5.  rejects with urn:openid:authzen:access-
        request:error:invalid_denial_binding on any failure.
+
+   When request_context uses another integrity-protected format, the
+   Access Request Service MUST perform equivalent verification for
+   issuer authenticity, audience or intended recipient, expiry when
+   present, replay resistance when provided by the format, and binding
+   to the submitted Subject, Resource, Action, and relevant Context.
 
 21.4.  Approval Replay
 
@@ -2959,17 +2984,35 @@ Table of Contents
               DOI 10.17487/RFC6750, October 2012,
               <https://www.rfc-editor.org/rfc/rfc6750>.
 
+   [RFC6901]  Bryan, P., Ed., Zyp, K., and M. Nottingham, Ed.,
+              "JavaScript Object Notation (JSON) Pointer", RFC 6901,
+              DOI 10.17487/RFC6901, April 2013,
+              <https://www.rfc-editor.org/rfc/rfc6901>.
+
    [RFC7515]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web
               Signature (JWS)", RFC 7515, DOI 10.17487/RFC7515, May
               2015, <https://www.rfc-editor.org/rfc/rfc7515>.
+
+   [RFC7516]  Jones, M. and J. Hildebrand, "JSON Web Encryption (JWE)",
+              RFC 7516, DOI 10.17487/RFC7516, May 2015,
+              <https://www.rfc-editor.org/rfc/rfc7516>.
 
    [RFC7517]  Jones, M., "JSON Web Key (JWK)", RFC 7517,
               DOI 10.17487/RFC7517, May 2015,
               <https://www.rfc-editor.org/rfc/rfc7517>.
 
+   [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web Token
+              (JWT)", RFC 7519, DOI 10.17487/RFC7519, May 2015,
+              <https://www.rfc-editor.org/rfc/rfc7519>.
+
    [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
               2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
               May 2017, <https://www.rfc-editor.org/rfc/rfc8174>.
+
+   [RFC8693]  Jones, M., Nadalin, A., Campbell, B., Ed., Bradley, J.,
+              and C. Mortimore, "OAuth 2.0 Token Exchange", RFC 8693,
+              DOI 10.17487/RFC8693, January 2020,
+              <https://www.rfc-editor.org/rfc/rfc8693>.
 
    [RFC9110]  Fielding, R., Ed., Nottingham, M., Ed., and J. Reschke,
               Ed., "HTTP Semantics", STD 97, RFC 9110,
@@ -2988,24 +3031,6 @@ Table of Contents
               profile-00, 30 April 2026,
               <https://datatracker.ietf.org/doc/html/draft-mcguinness-
               oauth-actor-profile-00>.
-
-   [RFC6901]  Bryan, P., Ed., Zyp, K., and M. Nottingham, Ed.,
-              "JavaScript Object Notation (JSON) Pointer", RFC 6901,
-              DOI 10.17487/RFC6901, April 2013,
-              <https://www.rfc-editor.org/rfc/rfc6901>.
-
-   [RFC7516]  Jones, M. and J. Hildebrand, "JSON Web Encryption (JWE)",
-              RFC 7516, DOI 10.17487/RFC7516, May 2015,
-              <https://www.rfc-editor.org/rfc/rfc7516>.
-
-   [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web Token
-              (JWT)", RFC 7519, DOI 10.17487/RFC7519, May 2015,
-              <https://www.rfc-editor.org/rfc/rfc7519>.
-
-   [RFC8693]  Jones, M., Nadalin, A., Campbell, B., Ed., Bradley, J.,
-              and C. Mortimore, "OAuth 2.0 Token Exchange", RFC 8693,
-              DOI 10.17487/RFC8693, January 2020,
-              <https://www.rfc-editor.org/rfc/rfc8693>.
 
    [RFC9396]  Lodderstedt, T., Richer, J., and B. Campbell, "OAuth 2.0
               Rich Authorization Requests", RFC 9396,

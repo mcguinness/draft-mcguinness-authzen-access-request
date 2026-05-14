@@ -2786,20 +2786,21 @@ Content-Type: application/json
             <p id="section-12.1-2.2.1"><code>approved_at</code>: <span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the approval completed.<a href="#section-12.1-2.2.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-12.1-2.3">
-            <p id="section-12.1-2.3.1"><code>approved_until</code>: <span class="bcp14">OPTIONAL</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating the latest time through which the approval remains valid.  When present, the PEP <span class="bcp14">MUST NOT</span> use the approval for re-evaluation after this timestamp.<a href="#section-12.1-2.3.1" class="pilcrow">¶</a></p>
+            <p id="section-12.1-2.3.1"><code>approved_until</code>: <span class="bcp14">REQUIRED</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating the latest time through which the approval remains valid.  The PEP <span class="bcp14">MUST NOT</span> use the approval for re-evaluation after this timestamp.<a href="#section-12.1-2.3.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 <p id="section-12.1-3">The <code>approval</code> object <span class="bcp14">MAY</span> additionally include a <code>state</code> member.  <code>state</code> is an opaque object populated by the Access Request Service or PDP, carrying whatever the PDP needs at re-evaluation time (for example, a signed reference, an extended lookup token, or deployment-specific state).  The PEP <span class="bcp14">MUST NOT</span> modify or interpret the contents of <code>approval.state</code>.<a href="#section-12.1-3" class="pilcrow">¶</a></p>
 <p id="section-12.1-4">The PEP <span class="bcp14">MUST</span> include the <code>approval</code> object unchanged at <code>context.approval</code> inside the AuthZEN re-evaluation request.  The PDP receives the same <code>approval</code> shape it produced (id, timestamps, and any <code>state</code>) and uses it to identify and verify the approval.<a href="#section-12.1-4" class="pilcrow">¶</a></p>
 <p id="section-12.1-5">The PDP <span class="bcp14">MUST</span> evaluate the new request using current policy and the approval reference.  The PDP <span class="bcp14">MAY</span> still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.<a href="#section-12.1-5" class="pilcrow">¶</a></p>
-<p id="section-12.1-6">When the re-evaluation response indicates an approval expiry (typically as <code>context.approval.approved_until</code>), the PEP <span class="bcp14">MUST NOT</span> enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) <span class="bcp14">MUST</span> bound the lifetime of those credentials by the approval expiry.<a href="#section-12.1-6" class="pilcrow">¶</a></p>
+<p id="section-12.1-6">When the re-evaluation response indicates an approval expiry (typically as <code>context.approval.approved_until</code>), the PEP <span class="bcp14">MUST NOT</span> enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) <span class="bcp14">MUST</span> bound the lifetime of those credentials by the earlier of the approval expiry in the Approval Result and any approval expiry returned by the PDP during re-evaluation.<a href="#section-12.1-6" class="pilcrow">¶</a></p>
 <p id="section-12.1-7">When the original submission carried an <code>items</code> array, the PEP re-evaluates each approved item separately, including that item's <code>result.approval</code> at <code>context.approval</code> in the item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.<a href="#section-12.1-7" class="pilcrow">¶</a></p>
 <p id="section-12.1-8">Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.<a href="#section-12.1-8" class="pilcrow">¶</a></p>
-<p id="section-12.1-9">An Approval Result <span class="bcp14">MAY</span> be associated with an approval scope: a description of the class of future Access Evaluations for which the approval may be considered.  This specification does not define a standard approval scope representation or matching algorithm.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.<a href="#section-12.1-9" class="pilcrow">¶</a></p>
-<p id="section-12.1-10">The PDP <span class="bcp14">MUST</span> only consider an Approval Result applicable when the current evaluation request is within the approval scope recorded for that Approval Result.<a href="#section-12.1-10" class="pilcrow">¶</a></p>
-<p id="section-12.1-11">A PEP <span class="bcp14">MUST NOT</span> treat an Approval Result as authorizing any future Access Evaluation solely on the basis that the Access Request was approved.  A PEP <span class="bcp14">MAY</span> include the Approval Result in a subsequent Access Evaluation (by placing the <code>approval</code> object at <code>context.approval</code> as described above), but the PDP remains responsible for determining whether the Approval Result applies under current policy.  A PEP <span class="bcp14">MAY</span> cache or retain an Approval Result, but <span class="bcp14">MUST NOT</span> independently infer that a future request is covered by that approval unless directed by the PDP or by a profile-defined mechanism.<a href="#section-12.1-11" class="pilcrow">¶</a></p>
-<p id="section-12.1-12">Non-normative re-evaluation request:<a href="#section-12.1-12" class="pilcrow">¶</a></p>
-<div class="lang-json sourcecode" id="section-12.1-13">
+<p id="section-12.1-9">An Approval Result is associated with an approval scope: a description of the class of future Access Evaluations for which the approval may be considered.  This specification does not define a standard approval scope representation or matching algorithm.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.<a href="#section-12.1-9" class="pilcrow">¶</a></p>
+<p id="section-12.1-10">Unless the Access Request Service or PDP records a broader or narrower approval scope, the default approval scope is the original denied Subject, Resource, Action, and relevant Context bound to the Access Request.  For a bundled Access Request, the default approval scope for each approved item is that item's Subject, Resource, Action, and relevant Context.  This default scope is not serialized in the Approval Result unless a profile or deployment defines a representation for it.<a href="#section-12.1-10" class="pilcrow">¶</a></p>
+<p id="section-12.1-11">The PDP <span class="bcp14">MUST</span> only consider an Approval Result applicable when the current evaluation request is within the approval scope recorded for that Approval Result.<a href="#section-12.1-11" class="pilcrow">¶</a></p>
+<p id="section-12.1-12">A PEP <span class="bcp14">MUST NOT</span> treat an Approval Result as authorizing any future Access Evaluation solely on the basis that the Access Request was approved.  A PEP <span class="bcp14">MAY</span> include the Approval Result in a subsequent Access Evaluation (by placing the <code>approval</code> object at <code>context.approval</code> as described above), but the PDP remains responsible for determining whether the Approval Result applies under current policy.  A PEP <span class="bcp14">MAY</span> cache or retain an Approval Result, but <span class="bcp14">MUST NOT</span> independently infer that a future request is covered by that approval unless directed by the PDP or by a profile-defined mechanism.<a href="#section-12.1-12" class="pilcrow">¶</a></p>
+<p id="section-12.1-13">Non-normative re-evaluation request:<a href="#section-12.1-13" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-12.1-14">
 <pre>
 {
   "subject": {
@@ -2822,10 +2823,10 @@ Content-Type: application/json
     "time": "2026-04-30T20:43:00Z"
   }
 }
-</pre><a href="#section-12.1-13" class="pilcrow">¶</a>
+</pre><a href="#section-12.1-14" class="pilcrow">¶</a>
 </div>
-<p id="section-12.1-14">Non-normative re-evaluation response:<a href="#section-12.1-14" class="pilcrow">¶</a></p>
-<div class="lang-json sourcecode" id="section-12.1-15">
+<p id="section-12.1-15">Non-normative re-evaluation response:<a href="#section-12.1-15" class="pilcrow">¶</a></p>
+<div class="lang-json sourcecode" id="section-12.1-16">
 <pre>
 {
   "decision": true,
@@ -2836,7 +2837,7 @@ Content-Type: application/json
     }
   }
 }
-</pre><a href="#section-12.1-15" class="pilcrow">¶</a>
+</pre><a href="#section-12.1-16" class="pilcrow">¶</a>
 </div>
 </section>
 </div>
@@ -2986,19 +2987,22 @@ Content-Type: application/problem+json
             <p id="section-15.1-2.4.1"><code>client</code>, <code>client.actor</code>, and <code>client.source</code> in an Access Request submission.<a href="#section-15.1-2.4.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.1-2.5">
-            <p id="section-15.1-2.5.1">A Catalog Item within a Catalog Response.<a href="#section-15.1-2.5.1" class="pilcrow">¶</a></p>
+            <p id="section-15.1-2.5.1">A Catalogs Document and a Catalog Reference object within a Catalogs Document.<a href="#section-15.1-2.5.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.1-2.6">
-            <p id="section-15.1-2.6.1"><code>task.display</code>: user-interface hints attached to a Task Handle.<a href="#section-15.1-2.6.1" class="pilcrow">¶</a></p>
+            <p id="section-15.1-2.6.1">A Catalog Item within a Catalog Response.<a href="#section-15.1-2.6.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.1-2.7">
-            <p id="section-15.1-2.7.1"><code>task.links</code>: link relations to related URLs.<a href="#section-15.1-2.7.1" class="pilcrow">¶</a></p>
+            <p id="section-15.1-2.7.1"><code>task.display</code>: user-interface hints attached to a Task Handle.<a href="#section-15.1-2.7.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.1-2.8">
-            <p id="section-15.1-2.8.1"><code>result</code> and the additions defined under each <code>result.mode</code>.<a href="#section-15.1-2.8.1" class="pilcrow">¶</a></p>
+            <p id="section-15.1-2.8.1"><code>task.links</code>: link relations to related URLs.<a href="#section-15.1-2.8.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.1-2.9">
-            <p id="section-15.1-2.9.1"><code>approval.state</code> in a Re-evaluation Mode result: opaque profile-specific or deployment-specific state carried through the PEP to the PDP at re-evaluation time.<a href="#section-15.1-2.9.1" class="pilcrow">¶</a></p>
+            <p id="section-15.1-2.9.1"><code>result</code> and the additions defined under each <code>result.mode</code>.<a href="#section-15.1-2.9.1" class="pilcrow">¶</a></p>
+</li>
+          <li class="normal" id="section-15.1-2.10">
+            <p id="section-15.1-2.10.1"><code>approval.state</code> in a Re-evaluation Mode result: opaque profile-specific or deployment-specific state carried through the PEP to the PDP at re-evaluation time.<a href="#section-15.1-2.10.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 <p id="section-15.1-3">This specification also defines extensibility for enumerated values:<a href="#section-15.1-3" class="pilcrow">¶</a></p>
@@ -3033,6 +3037,7 @@ Content-Type: application/problem+json
             <p id="section-15.2-2.3.1">A reverse-DNS-prefixed identifier (for example, <code>vendor.example.com/foo</code>) when the member is private to a single deployment and not intended for cross-implementation use.<a href="#section-15.2-2.3.1" class="pilcrow">¶</a></p>
 </li>
         </ol>
+<p id="section-15.2-3">The contents of <code>approval.state</code> are opaque to this specification and are not subject to the member naming requirements above unless a profile or deployment explicitly defines structure within <code>approval.state</code>.<a href="#section-15.2-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="forward-compatibility">
@@ -3308,7 +3313,7 @@ Content-Type: application/problem+json
         </ul>
 <p id="section-21.3-4">When <code>items</code> is present in the submission (bulk), the binding claims cover the entire <code>items</code> array (for example, an <code>items</code> claim listing each Resource and Action, or a <code>binding_hash</code> computed over the full item list).<a href="#section-21.3-4" class="pilcrow">¶</a></p>
 <p id="section-21.3-5">PDPs <span class="bcp14">MAY</span> add deployment-specific claims (policy version, factors, risk score, tenant identifier) when the Access Request Service needs them for routing or audit.  When such claims must remain opaque to the PEP, the PDP wraps the signed payload in JWE encrypted to the Access Request Service.<a href="#section-21.3-5" class="pilcrow">¶</a></p>
-<p id="section-21.3-6">The Access Request Service, on receipt:<a href="#section-21.3-6" class="pilcrow">¶</a></p>
+<p id="section-21.3-6">When <code>request_context</code> is a JWS-signed JWT using these claims, the Access Request Service, on receipt:<a href="#section-21.3-6" class="pilcrow">¶</a></p>
 <ol start="1" type="1" class="normal type-1" id="section-21.3-7">
 <li id="section-21.3-7.1">
             <p id="section-21.3-7.1.1">parses the JWS header and resolves the verification key from the JWK Set at the PDP's <code>jwks_uri</code>;<a href="#section-21.3-7.1.1" class="pilcrow">¶</a></p>
@@ -3326,6 +3331,7 @@ Content-Type: application/problem+json
             <p id="section-21.3-7.5.1">rejects with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code> on any failure.<a href="#section-21.3-7.5.1" class="pilcrow">¶</a></p>
 </li>
         </ol>
+<p id="section-21.3-8">When <code>request_context</code> uses another integrity-protected format, the Access Request Service <span class="bcp14">MUST</span> perform equivalent verification for issuer authenticity, audience or intended recipient, expiry when present, replay resistance when provided by the format, and binding to the submitted Subject, Resource, Action, and relevant Context.<a href="#section-21.3-8" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="approval-replay">
@@ -4255,17 +4261,33 @@ Content-Type: application/json
         <dd>
 <span class="refAuthor">Jones, M.</span> and <span class="refAuthor">D. Hardt</span>, <span class="refTitle">"The OAuth 2.0 Authorization Framework: Bearer Token Usage"</span>, <span class="seriesInfo">RFC 6750</span>, <span class="seriesInfo">DOI 10.17487/RFC6750</span>, <time datetime="2012-10" class="refDate">October 2012</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc6750">https://www.rfc-editor.org/rfc/rfc6750</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="RFC6901">[RFC6901]</dt>
+        <dd>
+<span class="refAuthor">Bryan, P., Ed.</span>, <span class="refAuthor">Zyp, K.</span>, and <span class="refAuthor">M. Nottingham, Ed.</span>, <span class="refTitle">"JavaScript Object Notation (JSON) Pointer"</span>, <span class="seriesInfo">RFC 6901</span>, <span class="seriesInfo">DOI 10.17487/RFC6901</span>, <time datetime="2013-04" class="refDate">April 2013</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc6901">https://www.rfc-editor.org/rfc/rfc6901</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="RFC7515">[RFC7515]</dt>
         <dd>
 <span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">N. Sakimura</span>, <span class="refTitle">"JSON Web Signature (JWS)"</span>, <span class="seriesInfo">RFC 7515</span>, <span class="seriesInfo">DOI 10.17487/RFC7515</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7515">https://www.rfc-editor.org/rfc/rfc7515</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC7516">[RFC7516]</dt>
+        <dd>
+<span class="refAuthor">Jones, M.</span> and <span class="refAuthor">J. Hildebrand</span>, <span class="refTitle">"JSON Web Encryption (JWE)"</span>, <span class="seriesInfo">RFC 7516</span>, <span class="seriesInfo">DOI 10.17487/RFC7516</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7516">https://www.rfc-editor.org/rfc/rfc7516</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC7517">[RFC7517]</dt>
         <dd>
 <span class="refAuthor">Jones, M.</span>, <span class="refTitle">"JSON Web Key (JWK)"</span>, <span class="seriesInfo">RFC 7517</span>, <span class="seriesInfo">DOI 10.17487/RFC7517</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7517">https://www.rfc-editor.org/rfc/rfc7517</a>&gt;</span>. </dd>
 <dd class="break"></dd>
+<dt id="RFC7519">[RFC7519]</dt>
+        <dd>
+<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">N. Sakimura</span>, <span class="refTitle">"JSON Web Token (JWT)"</span>, <span class="seriesInfo">RFC 7519</span>, <span class="seriesInfo">DOI 10.17487/RFC7519</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7519">https://www.rfc-editor.org/rfc/rfc7519</a>&gt;</span>. </dd>
+<dd class="break"></dd>
 <dt id="RFC8174">[RFC8174]</dt>
         <dd>
 <span class="refAuthor">Leiba, B.</span>, <span class="refTitle">"Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words"</span>, <span class="seriesInfo">BCP 14</span>, <span class="seriesInfo">RFC 8174</span>, <span class="seriesInfo">DOI 10.17487/RFC8174</span>, <time datetime="2017-05" class="refDate">May 2017</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8174">https://www.rfc-editor.org/rfc/rfc8174</a>&gt;</span>. </dd>
+<dd class="break"></dd>
+<dt id="RFC8693">[RFC8693]</dt>
+        <dd>
+<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Nadalin, A.</span>, <span class="refAuthor">Campbell, B., Ed.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">C. Mortimore</span>, <span class="refTitle">"OAuth 2.0 Token Exchange"</span>, <span class="seriesInfo">RFC 8693</span>, <span class="seriesInfo">DOI 10.17487/RFC8693</span>, <time datetime="2020-01" class="refDate">January 2020</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8693">https://www.rfc-editor.org/rfc/rfc8693</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC9110">[RFC9110]</dt>
         <dd>
@@ -4287,22 +4309,6 @@ Content-Type: application/json
 <dt id="I-D.mcguinness-oauth-actor-profile">[I-D.mcguinness-oauth-actor-profile]</dt>
         <dd>
 <span class="refAuthor">McGuinness, K.</span>, <span class="refTitle">"OAuth Actor Profile for Delegation"</span>, <span class="refContent">Work in Progress</span>, <span class="seriesInfo">Internet-Draft, draft-mcguinness-oauth-actor-profile-00</span>, <time datetime="2026-04-30" class="refDate">30 April 2026</time>, <span>&lt;<a href="https://datatracker.ietf.org/doc/html/draft-mcguinness-oauth-actor-profile-00">https://datatracker.ietf.org/doc/html/draft-mcguinness-oauth-actor-profile-00</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="RFC6901">[RFC6901]</dt>
-        <dd>
-<span class="refAuthor">Bryan, P., Ed.</span>, <span class="refAuthor">Zyp, K.</span>, and <span class="refAuthor">M. Nottingham, Ed.</span>, <span class="refTitle">"JavaScript Object Notation (JSON) Pointer"</span>, <span class="seriesInfo">RFC 6901</span>, <span class="seriesInfo">DOI 10.17487/RFC6901</span>, <time datetime="2013-04" class="refDate">April 2013</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc6901">https://www.rfc-editor.org/rfc/rfc6901</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="RFC7516">[RFC7516]</dt>
-        <dd>
-<span class="refAuthor">Jones, M.</span> and <span class="refAuthor">J. Hildebrand</span>, <span class="refTitle">"JSON Web Encryption (JWE)"</span>, <span class="seriesInfo">RFC 7516</span>, <span class="seriesInfo">DOI 10.17487/RFC7516</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7516">https://www.rfc-editor.org/rfc/rfc7516</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="RFC7519">[RFC7519]</dt>
-        <dd>
-<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">N. Sakimura</span>, <span class="refTitle">"JSON Web Token (JWT)"</span>, <span class="seriesInfo">RFC 7519</span>, <span class="seriesInfo">DOI 10.17487/RFC7519</span>, <time datetime="2015-05" class="refDate">May 2015</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc7519">https://www.rfc-editor.org/rfc/rfc7519</a>&gt;</span>. </dd>
-<dd class="break"></dd>
-<dt id="RFC8693">[RFC8693]</dt>
-        <dd>
-<span class="refAuthor">Jones, M.</span>, <span class="refAuthor">Nadalin, A.</span>, <span class="refAuthor">Campbell, B., Ed.</span>, <span class="refAuthor">Bradley, J.</span>, and <span class="refAuthor">C. Mortimore</span>, <span class="refTitle">"OAuth 2.0 Token Exchange"</span>, <span class="seriesInfo">RFC 8693</span>, <span class="seriesInfo">DOI 10.17487/RFC8693</span>, <time datetime="2020-01" class="refDate">January 2020</time>, <span>&lt;<a href="https://www.rfc-editor.org/rfc/rfc8693">https://www.rfc-editor.org/rfc/rfc8693</a>&gt;</span>. </dd>
 <dd class="break"></dd>
 <dt id="RFC9396">[RFC9396]</dt>
         <dd>
