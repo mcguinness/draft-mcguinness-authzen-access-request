@@ -1419,7 +1419,10 @@ svg :is([fill="white"], [fill^="#fff"]) {
                 <p id="section-toc.1-1.26.2.4.1"><a href="#appendix-A.4" class="auto internal xref">A.4</a>.  <a href="#name-notification-channels" class="internal xref">Notification Channels</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.26.2.5">
-                <p id="section-toc.1-1.26.2.5.1"><a href="#appendix-A.5" class="auto internal xref">A.5</a>.  <a href="#name-evaluators-and-workflow-des" class="internal xref">Evaluators and Workflow Design</a></p>
+                <p id="section-toc.1-1.26.2.5.1"><a href="#appendix-A.5" class="auto internal xref">A.5</a>.  <a href="#name-time-and-clock-skew" class="internal xref">Time and Clock Skew</a></p>
+</li>
+              <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.26.2.6">
+                <p id="section-toc.1-1.26.2.6.1"><a href="#appendix-A.6" class="auto internal xref">A.6</a>.  <a href="#name-evaluators-and-workflow-des" class="internal xref">Evaluators and Workflow Design</a></p>
 </li>
             </ul>
 </li>
@@ -2193,8 +2196,9 @@ Content-Type: application/json
 <p id="section-10.1-9">The submitted <code>denial</code> object for each requested item <span class="bcp14">MUST</span> include either <code>denial.request_context</code> or <code>denial.evaluation_id</code>.  The Access Request Service <span class="bcp14">MUST</span> reject a submission that lacks verifiable denial-binding material with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-9" class="pilcrow">¶</a></p>
 <p id="section-10.1-10">A PEP <span class="bcp14">SHOULD</span> include an <code>Idempotency-Key</code> header, following the conventions described in <span>[<a href="#I-D.ietf-httpapi-idempotency-key-header" class="cite xref">I-D.ietf-httpapi-idempotency-key-header</a>]</span>.  The Idempotency-Key covers the entire submission body, including all members of the <code>items</code> array when present.<a href="#section-10.1-10" class="pilcrow">¶</a></p>
 <p id="section-10.1-11">The Access Request Service <span class="bcp14">SHOULD</span> treat a repeated submission with the same <code>Idempotency-Key</code>, the same authenticated requester, and an equivalent submission body as the same request, returning the same Task Handle while the original request remains available.  A submission with the same <code>Idempotency-Key</code> and authenticated requester but a materially different submission body <span class="bcp14">MUST</span> be rejected with <code>urn:openid:authzen:access-request:error:duplicate_request</code>.<a href="#section-10.1-11" class="pilcrow">¶</a></p>
-<p id="section-10.1-12">Non-normative example:<a href="#section-10.1-12" class="pilcrow">¶</a></p>
-<div class="lang-http sourcecode" id="section-10.1-13">
+<p id="section-10.1-12">The Access Request Service <span class="bcp14">SHOULD</span> retain Idempotency-Key state at least until <code>task.expires_at</code> and <span class="bcp14">SHOULD</span> continue to retain it for at least 24 hours after the task reaches a terminal status.  This window lets retries from delayed PEP restarts find the original task rather than spawning a duplicate.  After the retention window elapses, the Access Request Service <span class="bcp14">MAY</span> reclaim the Idempotency-Key; a submission presenting a previously seen Idempotency-Key whose state has been reclaimed is processed as a new submission.<a href="#section-10.1-12" class="pilcrow">¶</a></p>
+<p id="section-10.1-13">Non-normative example:<a href="#section-10.1-13" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-10.1-14">
 <pre>
 POST /access/v1/requests HTTP/1.1
 Host: pdp.example.com
@@ -2228,10 +2232,10 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
     "template": "manager_approval"
   }
 }
-</pre><a href="#section-10.1-13" class="pilcrow">¶</a>
+</pre><a href="#section-10.1-14" class="pilcrow">¶</a>
 </div>
-<p id="section-10.1-14">Non-normative bulk-submission example:<a href="#section-10.1-14" class="pilcrow">¶</a></p>
-<div class="lang-http sourcecode" id="section-10.1-15">
+<p id="section-10.1-15">Non-normative bulk-submission example:<a href="#section-10.1-15" class="pilcrow">¶</a></p>
+<div class="lang-http sourcecode" id="section-10.1-16">
 <pre>
 POST /access/v1/requests HTTP/1.1
 Host: pdp.example.com
@@ -2268,7 +2272,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d14
     "template": "onboarding_bundle"
   }
 }
-</pre><a href="#section-10.1-15" class="pilcrow">¶</a>
+</pre><a href="#section-10.1-16" class="pilcrow">¶</a>
 </div>
 </section>
 </div>
@@ -2466,6 +2470,7 @@ Accept: application/json
 </pre><a href="#section-11-5" class="pilcrow">¶</a>
 </div>
 <p id="section-11-6">A successful response returns a JSON object containing a <code>task</code> member.  Completed task responses include a <code>result</code> member according to the rules in <a href="#completed-task-response" class="auto internal xref">Section 11.3</a>.<a href="#section-11-6" class="pilcrow">¶</a></p>
+<p id="section-11-7">When a task is <code>pending</code>, a PEP <span class="bcp14">MAY</span> poll the Task Status Endpoint to determine completion.  PEPs <span class="bcp14">SHOULD</span> use exponential backoff: a starting interval of several seconds, growing to no more than one minute, with jitter applied to spread load across many concurrent pollers.  If the Access Request Service returns the <code>Retry-After</code> HTTP header (Section 10.2.3 of <span>[<a href="#RFC9110" class="cite xref">RFC9110</a>]</span>), the PEP <span class="bcp14">MUST</span> wait at least the indicated duration before issuing the next poll.  The PEP <span class="bcp14">MUST</span> stop polling once <code>task.expires_at</code> is reached or the task reaches a terminal status (<a href="#state-transitions" class="auto internal xref">Section 11.1.1</a>).  PEPs subscribed to per-task callbacks (<a href="#callback-completion" class="auto internal xref">Section 13</a>) or to deployment-level event subscriptions <span class="bcp14">MAY</span> skip polling entirely and rely on push notification, falling back to a single status retrieval after each notification to obtain any enforceable <code>result</code>.<a href="#section-11-7" class="pilcrow">¶</a></p>
 <div id="task-status">
 <section id="section-11.1">
         <h3 id="name-task-status-values">
@@ -4366,47 +4371,57 @@ Content-Type: application/json
 <p id="appendix-A.4-1">Implementations frequently already have webhook subscriptions or other deployment-level event channels.  Per-task callbacks (<a href="#callback-completion" class="auto internal xref">Section 13</a>) are an alternative; deployments may rely on existing webhook infrastructure or event-streaming bindings defined by companion specifications for completion notification.<a href="#appendix-A.4-1" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="evaluators-and-workflow-design">
+<div id="time-and-clock-skew">
 <section id="appendix-A.5">
-        <h3 id="name-evaluators-and-workflow-des">
-<a href="#appendix-A.5" class="section-number selfRef">A.5. </a><a href="#name-evaluators-and-workflow-des" class="section-name selfRef">Evaluators and Workflow Design</a>
+        <h3 id="name-time-and-clock-skew">
+<a href="#appendix-A.5" class="section-number selfRef">A.5. </a><a href="#name-time-and-clock-skew" class="section-name selfRef">Time and Clock Skew</a>
         </h3>
-<p id="appendix-A.5-1">The Access Request Service determines what kind of evaluator processes a given submission.  Evaluators commonly include:<a href="#appendix-A.5-1" class="pilcrow">¶</a></p>
+<p id="appendix-A.5-1">This profile uses <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamps in multiple places: <code>context.evaluated_at</code>, <code>context.access_request.expires_at</code>, <code>task.expires_at</code>, <code>approval.approved_at</code>, and <code>approval.approved_until</code>.  Each timestamp is produced on one host (PDP, Access Request Service, or PEP) and may be compared against a clock on another host, so clock skew between hosts can produce incorrect freshness or expiry decisions.<a href="#appendix-A.5-1" class="pilcrow">¶</a></p>
+<p id="appendix-A.5-2">Implementations <span class="bcp14">SHOULD</span> allow a small skew tolerance when comparing a remote-host timestamp against the local clock.  A tolerance of 30 seconds is typical; tolerances above 60 seconds are <span class="bcp14">NOT RECOMMENDED</span>.  A PEP comparing <code>approval.approved_until</code> to local time <span class="bcp14">MAY</span> treat the approval as valid until <code>approved_until</code> plus the tolerance.  An Access Request Service comparing <code>context.access_request.expires_at</code> (the requestable-denial hint expiry) to its local clock <span class="bcp14">MAY</span> accept submissions arriving up to the tolerance after that timestamp.<a href="#appendix-A.5-2" class="pilcrow">¶</a></p>
+<p id="appendix-A.5-3">Hosts that produce timestamps <span class="bcp14">SHOULD</span> synchronize their clocks against a reliable time source (for example, NTP or PTP) to keep skew well below the tolerance window.  Deployments with stricter requirements (for example, regulatory or audit constraints) <span class="bcp14">MAY</span> define a tighter tolerance and document it as part of their deployment profile.<a href="#appendix-A.5-3" class="pilcrow">¶</a></p>
+</section>
+</div>
+<div id="evaluators-and-workflow-design">
+<section id="appendix-A.6">
+        <h3 id="name-evaluators-and-workflow-des">
+<a href="#appendix-A.6" class="section-number selfRef">A.6. </a><a href="#name-evaluators-and-workflow-des" class="section-name selfRef">Evaluators and Workflow Design</a>
+        </h3>
+<p id="appendix-A.6-1">The Access Request Service determines what kind of evaluator processes a given submission.  Evaluators commonly include:<a href="#appendix-A.6-1" class="pilcrow">¶</a></p>
 <ul class="normal">
-<li class="normal" id="appendix-A.5-2.1">
-            <p id="appendix-A.5-2.1.1">Human approvers acting through a user interface (an owner, manager, security reviewer, or delegate).<a href="#appendix-A.5-2.1.1" class="pilcrow">¶</a></p>
+<li class="normal" id="appendix-A.6-2.1">
+            <p id="appendix-A.6-2.1.1">Human approvers acting through a user interface (an owner, manager, security reviewer, or delegate).<a href="#appendix-A.6-2.1.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="appendix-A.5-2.2">
-            <p id="appendix-A.5-2.2.1">Automated policy engines that apply static or dynamic rules (separation-of-duties checks, ownership rules, conflict-of-interest constraints, organizational policy).<a href="#appendix-A.5-2.2.1" class="pilcrow">¶</a></p>
+          <li class="normal" id="appendix-A.6-2.2">
+            <p id="appendix-A.6-2.2.1">Automated policy engines that apply static or dynamic rules (separation-of-duties checks, ownership rules, conflict-of-interest constraints, organizational policy).<a href="#appendix-A.6-2.2.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="appendix-A.5-2.3">
-            <p id="appendix-A.5-2.3.1">Risk engines that score the request against runtime signals and approve, deny, or escalate based on score thresholds.<a href="#appendix-A.5-2.3.1" class="pilcrow">¶</a></p>
+          <li class="normal" id="appendix-A.6-2.3">
+            <p id="appendix-A.6-2.3.1">Risk engines that score the request against runtime signals and approve, deny, or escalate based on score thresholds.<a href="#appendix-A.6-2.3.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="appendix-A.5-2.4">
-            <p id="appendix-A.5-2.4.1">AI supervisors or LLM-based evaluators that summarize requested authority, reason about stated intent, and approve, deny, or hand off to another evaluator.<a href="#appendix-A.5-2.4.1" class="pilcrow">¶</a></p>
+          <li class="normal" id="appendix-A.6-2.4">
+            <p id="appendix-A.6-2.4.1">AI supervisors or LLM-based evaluators that summarize requested authority, reason about stated intent, and approve, deny, or hand off to another evaluator.<a href="#appendix-A.6-2.4.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="appendix-A.5-2.5">
-            <p id="appendix-A.5-2.5.1">Hybrid pipelines that combine these (for example, an automated risk check that escalates to a human reviewer only for non-trivial cases).<a href="#appendix-A.5-2.5.1" class="pilcrow">¶</a></p>
+          <li class="normal" id="appendix-A.6-2.5">
+            <p id="appendix-A.6-2.5.1">Hybrid pipelines that combine these (for example, an automated risk check that escalates to a human reviewer only for non-trivial cases).<a href="#appendix-A.6-2.5.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
-<p id="appendix-A.5-3">This profile does not constrain which evaluator a deployment uses or how evaluators are combined.  An Access Request can be resolved entirely without human involvement, entirely by a human approver, or by any mixture.  The protocol's synchronous-completion response, callback notification, and re-evaluation semantics apply uniformly across evaluator types.  The approver-eligibility, self-approval, and separation-of-duties requirements of <a href="#approver-eligibility" class="auto internal xref">Section 21.6</a> apply to whichever entity completes a workflow step, whether human or automated.<a href="#appendix-A.5-3" class="pilcrow">¶</a></p>
-<p id="appendix-A.5-4">When the calling population includes high-volume PEPs (gateways aggregating many users, OAuth Authorization Servers serving fleets of clients, or autonomous agents that discover and request many fine-grained permissions), the protocol's per-denial submission shape is sufficient on the wire but must be paired with workflow design that does not require interactive human review for every submission.  Without such design, evaluation volume overwhelms human reviewers and the deployment is unusable at scale.<a href="#appendix-A.5-4" class="pilcrow">¶</a></p>
-<p id="appendix-A.5-5">Common workflow patterns that absorb volume include:<a href="#appendix-A.5-5" class="pilcrow">¶</a></p>
+<p id="appendix-A.6-3">This profile does not constrain which evaluator a deployment uses or how evaluators are combined.  An Access Request can be resolved entirely without human involvement, entirely by a human approver, or by any mixture.  The protocol's synchronous-completion response, callback notification, and re-evaluation semantics apply uniformly across evaluator types.  The approver-eligibility, self-approval, and separation-of-duties requirements of <a href="#approver-eligibility" class="auto internal xref">Section 21.6</a> apply to whichever entity completes a workflow step, whether human or automated.<a href="#appendix-A.6-3" class="pilcrow">¶</a></p>
+<p id="appendix-A.6-4">When the calling population includes high-volume PEPs (gateways aggregating many users, OAuth Authorization Servers serving fleets of clients, or autonomous agents that discover and request many fine-grained permissions), the protocol's per-denial submission shape is sufficient on the wire but must be paired with workflow design that does not require interactive human review for every submission.  Without such design, evaluation volume overwhelms human reviewers and the deployment is unusable at scale.<a href="#appendix-A.6-4" class="pilcrow">¶</a></p>
+<p id="appendix-A.6-5">Common workflow patterns that absorb volume include:<a href="#appendix-A.6-5" class="pilcrow">¶</a></p>
 <ul class="normal">
-<li class="normal" id="appendix-A.5-6.1">
-            <p id="appendix-A.5-6.1.1">Auto-approval rules that resolve low-risk requests synchronously, returning <code>201 Created</code> with a populated <code>result</code> and never engaging a human reviewer (see <a href="#access-request-response" class="auto internal xref">Section 10.2</a>).<a href="#appendix-A.5-6.1.1" class="pilcrow">¶</a></p>
+<li class="normal" id="appendix-A.6-6.1">
+            <p id="appendix-A.6-6.1.1">Auto-approval rules that resolve low-risk requests synchronously, returning <code>201 Created</code> with a populated <code>result</code> and never engaging a human reviewer (see <a href="#access-request-response" class="auto internal xref">Section 10.2</a>).<a href="#appendix-A.6-6.1.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="appendix-A.5-6.2">
-            <p id="appendix-A.5-6.2.1">Broad-scope approvals that grant a class of future evaluations from a single decision (for example, "approve agent X to call tool Y for the next 30 days"), so subsequent same-class submissions either auto-approve or are unnecessary because re-evaluation already permits the access.<a href="#appendix-A.5-6.2.1" class="pilcrow">¶</a></p>
+          <li class="normal" id="appendix-A.6-6.2">
+            <p id="appendix-A.6-6.2.1">Broad-scope approvals that grant a class of future evaluations from a single decision (for example, "approve agent X to call tool Y for the next 30 days"), so subsequent same-class submissions either auto-approve or are unnecessary because re-evaluation already permits the access.<a href="#appendix-A.6-6.2.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="appendix-A.5-6.3">
-            <p id="appendix-A.5-6.3.1">Bulk approval, where an evaluator acts on a batch of related submissions in a single workflow step.<a href="#appendix-A.5-6.3.1" class="pilcrow">¶</a></p>
+          <li class="normal" id="appendix-A.6-6.3">
+            <p id="appendix-A.6-6.3.1">Bulk approval, where an evaluator acts on a batch of related submissions in a single workflow step.<a href="#appendix-A.6-6.3.1" class="pilcrow">¶</a></p>
 </li>
-          <li class="normal" id="appendix-A.5-6.4">
-            <p id="appendix-A.5-6.4.1">Pre-approval or standing grants established out of band (for example, when an agent is provisioned), so the caller never reaches a denial that requires interactive approval.<a href="#appendix-A.5-6.4.1" class="pilcrow">¶</a></p>
+          <li class="normal" id="appendix-A.6-6.4">
+            <p id="appendix-A.6-6.4.1">Pre-approval or standing grants established out of band (for example, when an agent is provisioned), so the caller never reaches a denial that requires interactive approval.<a href="#appendix-A.6-6.4.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
-<p id="appendix-A.5-7">This profile defines the substrate; it does not define approval workflow.  The Access Request Service is responsible for implementing the evaluator policy and the workflow primitives that route submissions appropriately.  The protocol's bulk submission, idempotency, synchronous-completion response, and approval-expiry semantics provide the inputs an Access Request Service needs to apply these patterns.<a href="#appendix-A.5-7" class="pilcrow">¶</a></p>
+<p id="appendix-A.6-7">This profile defines the substrate; it does not define approval workflow.  The Access Request Service is responsible for implementing the evaluator policy and the workflow primitives that route submissions appropriately.  The protocol's bulk submission, idempotency, synchronous-completion response, and approval-expiry semantics provide the inputs an Access Request Service needs to apply these patterns.<a href="#appendix-A.6-7" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>

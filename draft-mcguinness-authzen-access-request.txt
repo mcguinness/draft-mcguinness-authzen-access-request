@@ -143,7 +143,8 @@ Table of Contents
      A.2.  Subjects, Principals, and Actors
      A.3.  Form and Catalog Translation
      A.4.  Notification Channels
-     A.5.  Evaluators and Workflow Design
+     A.5.  Time and Clock Skew
+     A.6.  Evaluators and Workflow Design
    Appendix B.  Acknowledgements
    Appendix C.  Document History
    Author's Address
@@ -1039,6 +1040,15 @@ Table of Contents
    but a materially different submission body MUST be rejected with
    urn:openid:authzen:access-request:error:duplicate_request.
 
+   The Access Request Service SHOULD retain Idempotency-Key state at
+   least until task.expires_at and SHOULD continue to retain it for at
+   least 24 hours after the task reaches a terminal status.  This window
+   lets retries from delayed PEP restarts find the original task rather
+   than spawning a duplicate.  After the retention window elapses, the
+   Access Request Service MAY reclaim the Idempotency-Key; a submission
+   presenting a previously seen Idempotency-Key whose state has been
+   reclaimed is processed as a new submission.
+
    Non-normative example:
 
    POST /access/v1/requests HTTP/1.1
@@ -1304,6 +1314,20 @@ Table of Contents
    A successful response returns a JSON object containing a task member.
    Completed task responses include a result member according to the
    rules in Section 11.3.
+
+   When a task is pending, a PEP MAY poll the Task Status Endpoint to
+   determine completion.  PEPs SHOULD use exponential backoff: a
+   starting interval of several seconds, growing to no more than one
+   minute, with jitter applied to spread load across many concurrent
+   pollers.  If the Access Request Service returns the Retry-After HTTP
+   header (Section 10.2.3 of [RFC9110]), the PEP MUST wait at least the
+   indicated duration before issuing the next poll.  The PEP MUST stop
+   polling once task.expires_at is reached or the task reaches a
+   terminal status (Section 11.1.1).  PEPs subscribed to per-task
+   callbacks (Section 13) or to deployment-level event subscriptions MAY
+   skip polling entirely and rely on push notification, falling back to
+   a single status retrieval after each notification to obtain any
+   enforceable result.
 
 11.1.  Task Status Values
 
@@ -3091,7 +3115,32 @@ A.4.  Notification Channels
    webhook infrastructure or event-streaming bindings defined by
    companion specifications for completion notification.
 
-A.5.  Evaluators and Workflow Design
+A.5.  Time and Clock Skew
+
+   This profile uses [RFC3339] timestamps in multiple places:
+   context.evaluated_at, context.access_request.expires_at,
+   task.expires_at, approval.approved_at, and approval.approved_until.
+   Each timestamp is produced on one host (PDP, Access Request Service,
+   or PEP) and may be compared against a clock on another host, so clock
+   skew between hosts can produce incorrect freshness or expiry
+   decisions.
+
+   Implementations SHOULD allow a small skew tolerance when comparing a
+   remote-host timestamp against the local clock.  A tolerance of 30
+   seconds is typical; tolerances above 60 seconds are NOT RECOMMENDED.
+   A PEP comparing approval.approved_until to local time MAY treat the
+   approval as valid until approved_until plus the tolerance.  An Access
+   Request Service comparing context.access_request.expires_at (the
+   requestable-denial hint expiry) to its local clock MAY accept
+   submissions arriving up to the tolerance after that timestamp.
+
+   Hosts that produce timestamps SHOULD synchronize their clocks against
+   a reliable time source (for example, NTP or PTP) to keep skew well
+   below the tolerance window.  Deployments with stricter requirements
+   (for example, regulatory or audit constraints) MAY define a tighter
+   tolerance and document it as part of their deployment profile.
+
+A.6.  Evaluators and Workflow Design
 
    The Access Request Service determines what kind of evaluator
    processes a given submission.  Evaluators commonly include:
