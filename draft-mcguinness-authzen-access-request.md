@@ -1071,14 +1071,14 @@ A profile SHOULD:
 
 This base specification does not enumerate profiles.  Conformance to a profile is determined by the presence and processing of the profile's registered or namespaced members; this specification does not require declarative profile negotiation.
 
-# PEP Processing Rules
+# PEP Processing Rules {#pep-processing-rules}
 
 A PEP implementing this profile:
 
 * MUST treat `decision: false` as a denial, even when the Decision Context contains an `access_request` object.
 * MUST NOT submit an Access Request unless the denied Decision contains `context.access_request.requestable` set to `true`.
 * MUST use the `endpoint` from the denial context when present; otherwise it MUST use the `access_request_endpoint` from PDP metadata.
-* MUST preserve the Subject, Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.
+* MUST preserve the principal identity of the Subject, and MUST preserve the Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.  When the original evaluation conveyed an actor identity in the Subject (for example, via `subject.properties.act`), the PEP MAY preserve the actor in the submission's `subject` or normalize it to `client.actor`; the actor identity itself MUST NOT be dropped.
 * When the requestable denial includes `form_schema_url` or `form_catalogs_url`, MUST construct the augmentations to the submission's `context` and `requested_access` objects according to {{machine-readable-forms}} and {{catalog-references}}.
 * MUST include `denial.evaluation_id` when `denial.access_request.request_context` is absent, and SHOULD include it when the PDP returned an evaluation identifier.
 * SHOULD include an idempotency key for Access Request submissions.
@@ -1387,6 +1387,9 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
   "context": {
     "business_justification": "Needed for customer renewal review"
   },
+  "requested_access": {
+    "requested_duration": "PT4H"
+  },
   "denial": {
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
     "evaluated_at": "2026-04-30T20:15:00Z",
@@ -1418,7 +1421,14 @@ Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C
     "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
     "status": "pending",
     "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-    "expires_at": "2026-04-30T23:00:00Z"
+    "expires_at": "2026-04-30T23:00:00Z",
+    "links": {
+      "cancel": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4/cancel"
+    },
+    "display": {
+      "title": "Access request submitted",
+      "description": "Your manager has been asked to approve access."
+    }
   }
 }
 ~~~
@@ -1438,6 +1448,7 @@ Content-Type: application/json
     "mode": "reevaluate",
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "approved_at": "2026-04-30T20:42:00Z",
       "approved_until": "2026-05-01T00:42:00Z"
     },
     "approval_context": {
@@ -1551,7 +1562,7 @@ Content-Type: application/json
       "template": "agent_tool_class_approval",
       "reason": "agent_class_approval_required",
       "expires_in": 600,
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0sySDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
       "form_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
     }
   }
@@ -1615,7 +1626,7 @@ Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
       "requestable": true,
       "template": "agent_tool_class_approval",
       "reason": "agent_class_approval_required",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0sySDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
+      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
     }
   }
 }
@@ -1633,7 +1644,7 @@ Location: https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C
     "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
     "status": "pending",
     "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
-    "expires_at": "2026-05-19T15:00:00Z"
+    "expires_at": "2026-05-20T00:00:00Z"
   }
 }
 ~~~
@@ -1760,7 +1771,9 @@ Re-evaluation Mode aligns directly with this pattern: provisioning changes platf
 
 For deployments where an autonomous actor (an AI agent, service, or workload) submits Access Requests on behalf of a human or organizational principal, the AuthZEN Subject needs to convey both identities so the PDP and Access Request Service can apply policy and route approvals on either.
 
-This profile does not define a Subject shape for actor delegation.  Implementations SHOULD follow the conventions defined in {{?I-D.mcguinness-oauth-actor-profile}}, which standardizes an `act` claim representing the immediate actor with required `act.sub` and `act.iss` members and a RECOMMENDED `sub_profile` member (taking values such as `ai_agent`, `service`, or `user`).  Nested `act` objects represent delegation chains.  Under this profile, an Access Request submission's `subject` carries the principal, and the actor is conveyed as an `act` claim or equivalent member; the canonical actor identifier is the (`act.iss`, `act.sub`) pair.
+This profile does not define a Subject shape for actor delegation.  Implementations SHOULD follow the conventions defined in {{?I-D.mcguinness-oauth-actor-profile}}, which standardizes an `act` claim representing the immediate actor with required `act.sub` and `act.iss` members and a RECOMMENDED `sub_profile` member (taking values such as `ai_agent`, `service`, or `user`).  Nested `act` objects represent delegation chains.  Under this profile, an Access Request submission's `subject` carries the principal, and the actor is conveyed as an `act` claim within the subject or as the equivalent `client.actor` member defined in this profile; the canonical actor identifier is the (`act.iss`, `act.sub`) pair regardless of which carrier is used.
+
+A PEP that captures an actor identity in the original AuthZEN evaluation's `subject` (for example, via `subject.properties.act`) MAY preserve the actor in the submission's `subject` or normalize it to `client.actor`.  The base profile's PEP preservation rule ({{pep-processing-rules}}) requires that the principal identity, Resource, Action, and relevant Context be preserved; the actor representation MAY be reshaped between the AuthZEN request and the Access Request submission to use whichever carrier the deployment standardizes on.
 
 Approval routing at the Access Request Service may consider both identities (the principal's owner and the actor's deployment).  This profile does not define routing policy; it only requires that the necessary identities be representable in the submission.
 
