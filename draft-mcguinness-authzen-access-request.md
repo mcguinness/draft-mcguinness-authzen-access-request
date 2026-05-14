@@ -37,7 +37,11 @@ normative:
   RFC6749:
   RFC6750:
   RFC7515:
+  RFC7516:
   RFC7517:
+  RFC7519:
+  RFC6901:
+  RFC8693:
   I-D.bhutton-json-schema:
   I-D.bhutton-json-schema-validation:
   I-D.ietf-httpapi-idempotency-key-header:
@@ -230,7 +234,7 @@ The `access_request` object has the following members:
 : OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP MUST compute the hint's expiry by adding `expires_in` to the time the Decision was produced; that production time is taken from `context.evaluated_at` when present, otherwise from the HTTP `Date` response header.  If neither time source is available, the PEP MUST treat the hint as expired.  PDPs SHOULD use `expires_at` instead of `expires_in` when precise expiry handling is required.
 
 `request_context`:
-: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged as `denial.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{?RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{?RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
+: OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged as `denial.request_context` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
 
 `display`:
 : OPTIONAL.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP MAY ignore this member.
@@ -317,7 +321,7 @@ The Catalogs Document is a sibling artifact to the form schema; it does not modi
 The Catalogs Document is a JSON object retrieved from `request_catalogs_url` using HTTP `GET`.  It has the following members:
 
 `fields`:
-: REQUIRED.  Object.  Each member name is a JSON Pointer ({{?RFC6901}}) into the form data instance described by the form schema, identifying a field whose value is selected from a catalog.  Each member value is a Catalog Reference object.
+: REQUIRED.  Object.  Each member name is a JSON Pointer ({{RFC6901}}) into the form data instance described by the form schema, identifying a field whose value is selected from a catalog.  Each member value is a Catalog Reference object.
 
 Implementations MAY include additional members for documentation or vendor metadata; consumers MUST ignore members they do not recognize.
 
@@ -330,13 +334,13 @@ A Catalog Reference object has the following members:
 : OPTIONAL.  String.  Query parameter used to pass a free-text search term to the Catalog Endpoint.  Defaults to `q`.
 
 `scope_params`:
-: OPTIONAL.  Object.  Each member name is the query parameter sent to the Catalog Endpoint and the value is a JSON Pointer ({{?RFC6901}}) into the form data instance identifying the source field.  The PEP MUST resolve each pointer at request time and MUST NOT call the Catalog Endpoint until every referenced source field has a value.
+: OPTIONAL.  Object.  Each member name is the query parameter sent to the Catalog Endpoint and the value is a JSON Pointer ({{RFC6901}}) into the form data instance identifying the source field.  The PEP MUST resolve each pointer at request time and MUST NOT call the Catalog Endpoint until every referenced source field has a value.
 
 `value_path`:
-: OPTIONAL.  String.  JSON Pointer ({{?RFC6901}}) into a Catalog Item, identifying the value the PEP places into the form field.  Defaults to `/value`.
+: OPTIONAL.  String.  JSON Pointer ({{RFC6901}}) into a Catalog Item, identifying the value the PEP places into the form field.  Defaults to `/value`.
 
 `label_path`:
-: OPTIONAL.  String.  JSON Pointer ({{?RFC6901}}) into a Catalog Item, identifying a human-readable label.  Defaults to `/label`.
+: OPTIONAL.  String.  JSON Pointer ({{RFC6901}}) into a Catalog Item, identifying a human-readable label.  Defaults to `/label`.
 
 Non-normative example:
 
@@ -369,7 +373,7 @@ The Catalog Endpoint MUST accept the following query parameters:
 
 The Catalog Endpoint MAY accept additional deployment-specific parameters; receivers MUST ignore parameters they do not recognize.
 
-A Catalog Endpoint SHOULD share an origin with the Access Request Endpoint and SHOULD accept the same caller credentials.  Deployments that host catalogs on a different origin MUST establish a documented mechanism for obtaining credentials accepted by the Catalog Endpoint, for example through OAuth 2.0 Token Exchange {{?RFC8693}}; this profile does not define cross-origin credential acquisition.
+A Catalog Endpoint SHOULD share an origin with the Access Request Endpoint and SHOULD accept the same caller credentials.  Deployments that host catalogs on a different origin MUST establish a documented mechanism for obtaining credentials accepted by the Catalog Endpoint, for example through OAuth 2.0 Token Exchange {{RFC8693}}; this profile does not define cross-origin credential acquisition.
 
 A Catalog Endpoint MUST:
 
@@ -928,7 +932,7 @@ The `result.mode` value is `reevaluate`.  The result MUST include an `approval` 
 
 * `id`: REQUIRED.  String.  Stable identifier of the approval.
 * `approved_at`: OPTIONAL.  {{RFC3339}} timestamp indicating when the approval completed.
-* `approved_until`: OPTIONAL.  {{RFC3339}} timestamp indicating the latest time through which the approval remains valid.  When present, the PEP MUST NOT use the approval for re-evaluation after this timestamp.
+* `approved_until`: REQUIRED.  {{RFC3339}} timestamp indicating the latest time through which the approval remains valid.  The PEP MUST NOT use the approval for re-evaluation after this timestamp.
 
 The `approval` object MAY additionally include a `state` member.  `state` is an opaque object populated by the Access Request Service or PDP, carrying whatever the PDP needs at re-evaluation time (for example, a signed reference, an extended lookup token, or deployment-specific state).  The PEP MUST NOT modify or interpret the contents of `approval.state`.
 
@@ -936,13 +940,15 @@ The PEP MUST include the `approval` object unchanged at `context.approval` insid
 
 The PDP MUST evaluate the new request using current policy and the approval reference.  The PDP MAY still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.
 
-When the re-evaluation response indicates an approval expiry (typically as `context.approval.approved_until`), the PEP MUST NOT enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) MUST bound the lifetime of those credentials by the approval expiry.
+When the re-evaluation response indicates an approval expiry (typically as `context.approval.approved_until`), the PEP MUST NOT enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) MUST bound the lifetime of those credentials by the earlier of the approval expiry in the Approval Result and any approval expiry returned by the PDP during re-evaluation.
 
 When the original submission carried an `items` array, the PEP re-evaluates each approved item separately, including that item's `result.approval` at `context.approval` in the item's re-evaluation request as described above.  This profile does not define an aggregate re-evaluation that covers multiple items in one AuthZEN call.
 
 Approval results in this mode typically cover a class of future evaluations rather than a single submission.  An approval that grants the requester an entitlement, role, scope, or other persistent state causes subsequent AuthZEN evaluations matching that state to succeed without further Access Requests.  Deployments serving high-volume callers, such as autonomous agents that discover and request many fine-grained permissions over time, rely on this property: a single broad-scope approval (for example, one that grants access to a class of resources for a defined duration) reduces the number of denial-and-approval cycles by orders of magnitude.
 
-An Approval Result MAY be associated with an approval scope: a description of the class of future Access Evaluations for which the approval may be considered.  This specification does not define a standard approval scope representation or matching algorithm.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.
+An Approval Result is associated with an approval scope: a description of the class of future Access Evaluations for which the approval may be considered.  This specification does not define a standard approval scope representation or matching algorithm.  Approval workflow policy at the Access Request Service determines how broad an approval grants; this profile does not constrain that policy beyond the integrity, expiry, and audit requirements stated elsewhere.
+
+Unless the Access Request Service or PDP records a broader or narrower approval scope, the default approval scope is the original denied Subject, Resource, Action, and relevant Context bound to the Access Request.  For a bundled Access Request, the default approval scope for each approved item is that item's Subject, Resource, Action, and relevant Context.  This default scope is not serialized in the Approval Result unless a profile or deployment defines a representation for it.
 
 The PDP MUST only consider an Approval Result applicable when the current evaluation request is within the approval scope recorded for that Approval Result.
 
@@ -1082,6 +1088,7 @@ Additional members beyond those defined in this document MAY appear only at the 
 * `context` in an Access Request submission: augments the AuthZEN Context.
 * `requested_access` in an Access Request submission.
 * `client`, `client.actor`, and `client.source` in an Access Request submission.
+* A Catalogs Document and a Catalog Reference object within a Catalogs Document.
 * A Catalog Item within a Catalog Response.
 * `task.display`: user-interface hints attached to a Task Handle.
 * `task.links`: link relations to related URLs.
@@ -1103,6 +1110,8 @@ A member name or value added at an extension point MUST be one of the following:
 1. A name registered in the AuthZEN Access Request Member Names registry ({{iana-member-names}}).  Registry-eligible names are short, lowercase, snake_case identifiers carrying semantics that are useful across multiple implementations.
 2. An absolute URI (HTTPS or URN) when the member is profile-specific and not appropriate for the registry.  Profiles SHOULD use a stable URI under the profile's change controller.
 3. A reverse-DNS-prefixed identifier (for example, `vendor.example.com/foo`) when the member is private to a single deployment and not intended for cross-implementation use.
+
+The contents of `approval.state` are opaque to this specification and are not subject to the member naming requirements above unless a profile or deployment explicitly defines structure within `approval.state`.
 
 ## Forward Compatibility
 
@@ -1229,13 +1238,15 @@ When `items` is present in the submission (bulk), the binding claims cover the e
 
 PDPs MAY add deployment-specific claims (policy version, factors, risk score, tenant identifier) when the Access Request Service needs them for routing or audit.  When such claims must remain opaque to the PEP, the PDP wraps the signed payload in JWE encrypted to the Access Request Service.
 
-The Access Request Service, on receipt:
+When `request_context` is a JWS-signed JWT using these claims, the Access Request Service, on receipt:
 
 1. parses the JWS header and resolves the verification key from the JWK Set at the PDP's `jwks_uri`;
 2. verifies the signature, the `aud` claim, and the expiry;
 3. checks `jti` against recently-seen tokens to detect replay;
 4. compares the binding claims (inline or hashed) against the submission's Subject, Resource, and Action (or per-item for bulk submissions);
 5. rejects with `urn:openid:authzen:access-request:error:invalid_denial_binding` on any failure.
+
+When `request_context` uses another integrity-protected format, the Access Request Service MUST perform equivalent verification for issuer authenticity, audience or intended recipient, expiry when present, replay resistance when provided by the format, and binding to the submitted Subject, Resource, Action, and relevant Context.
 
 ## Approval Replay
 
@@ -1279,7 +1290,7 @@ Callback endpoints can be abused for spoofing, replay, and request forgery.  Cal
 
 ## PEP Acting on Behalf of the Subject
 
-A PEP submitting an Access Request typically acts on behalf of the Subject identified in the original AuthZEN evaluation.  The Access Request Service MUST verify that the authenticated caller is authorized to act for that Subject for that Resource and Action, including that the caller is a recognized PEP and that the Subject has consented or been delegated to where required.  Deployments requiring explicit delegation MAY use OAuth 2.0 Token Exchange {{?RFC8693}} so the PEP presents a token that names the Subject as the on-behalf-of party.
+A PEP submitting an Access Request typically acts on behalf of the Subject identified in the original AuthZEN evaluation.  The Access Request Service MUST verify that the authenticated caller is authorized to act for that Subject for that Resource and Action, including that the caller is a recognized PEP and that the Subject has consented or been delegated to where required.  Deployments requiring explicit delegation MAY use OAuth 2.0 Token Exchange {{RFC8693}} so the PEP presents a token that names the Subject as the on-behalf-of party.
 
 ## Idempotency Key Abuse
 
