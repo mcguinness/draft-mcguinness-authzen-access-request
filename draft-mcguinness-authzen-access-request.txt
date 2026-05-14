@@ -1120,6 +1120,16 @@ Table of Contents
    status retrieval.  A response MAY also include an HTTP Location
    header equal to task.status_endpoint.
 
+   The response object has the following top-level members:
+
+   task:  REQUIRED.  Task Handle returned for the submitted Access
+      Request.
+
+   result:  OPTIONAL except where required by Section 11.3.  Completion
+      result for the task.  A PEP MUST NOT treat this member as approval
+      unless the task is approved and the result is enforceable under
+      Section 12.
+
    When the Access Request Service is able to resolve the request
    synchronously (for example, when policy auto-approves and
    provisioning completes within the request), the Access Request
@@ -1327,9 +1337,9 @@ Table of Contents
 
 11.1.1.  State Transitions
 
-   A task is created in the pending state and transitions exactly once
-   to one of the terminal states defined above.  Terminal states do not
-   transition further.
+   In the base state machine, a task is created in the pending state and
+   transitions exactly once to one of the terminal states defined above.
+   Terminal states do not transition further.
 
                              (created)
                                  |
@@ -1374,8 +1384,9 @@ Table of Contents
                                  Table 1
 
    For tasks containing an items array, each item independently follows
-   the same state machine; the aggregate task.status is computed from
-   per-item statuses according to the aggregation rule in Section 10.2.
+   the same base state machine; the aggregate task.status is computed
+   from per-item statuses according to the aggregation rule in
+   Section 10.2.
 
    Implementations that define additional status values (Section 11.1)
    extend the state machine.  Such extensions SHOULD specify the
@@ -1784,9 +1795,10 @@ Table of Contents
 15.1.  Extension Points
 
    Additional members beyond those defined in this document MAY appear
-   at the following locations.  No other object members may be extended
-   without a revision of this specification or a profile that explicitly
-   redefines them.
+   only at the following locations, and those members MUST follow the
+   naming rules in Section 15.2.  No other object members may be
+   extended without a revision of this specification or a profile that
+   explicitly redefines them.
 
    *  context.access_request.display: user-interface hints in a
       requestable denial.
@@ -2232,7 +2244,8 @@ Table of Contents
 
 22.  IANA Considerations
 
-   This document has no IANA actions.
+   This document has no IANA actions.  OpenID Foundation registry
+   requests are listed in Section 23.
 
 23.  OpenID Foundation Registry Considerations
 
