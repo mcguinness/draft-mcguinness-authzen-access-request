@@ -1053,7 +1053,7 @@ svg :is([fill="white"], [fill^="#fff"]) {
 </tr></thead>
 <tfoot><tr>
 <td class="left">McGuinness</td>
-<td class="center">Expires 14 November 2026</td>
+<td class="center">Expires 15 November 2026</td>
 <td class="right">[Page]</td>
 </tr></tfoot>
 </table>
@@ -1066,12 +1066,12 @@ svg :is([fill="white"], [fill^="#fff"]) {
 <dd class="internet-draft">draft-mcguinness-authzen-access-request-latest</dd>
 <dt class="label-published">Published:</dt>
 <dd class="published">
-<time datetime="2026-05-13" class="published">13 May 2026</time>
+<time datetime="2026-05-14" class="published">14 May 2026</time>
     </dd>
 <dt class="label-intended-status">Intended Status:</dt>
 <dd class="intended-status">Standards Track</dd>
 <dt class="label-expires">Expires:</dt>
-<dd class="expires"><time datetime="2026-11-14">14 November 2026</time></dd>
+<dd class="expires"><time datetime="2026-11-15">15 November 2026</time></dd>
 <dt class="label-authors">Author:</dt>
 <dd class="authors">
 <div class="author">
@@ -1105,7 +1105,7 @@ svg :is([fill="white"], [fill^="#fff"]) {
         time. It is inappropriate to use Internet-Drafts as reference
         material or to cite them other than as "work in progress."<a href="#section-boilerplate.1-3" class="pilcrow">¶</a></p>
 <p id="section-boilerplate.1-4">
-        This Internet-Draft will expire on 14 November 2026.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
+        This Internet-Draft will expire on 15 November 2026.<a href="#section-boilerplate.1-4" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="copyright">
@@ -2991,7 +2991,7 @@ Content-Type: application/problem+json
           <p id="section-16-2.3.1"><span class="bcp14">MUST</span> use the <code>endpoint</code> from the denial context when present; otherwise it <span class="bcp14">MUST</span> use the <code>access_request_endpoint</code> from PDP metadata.<a href="#section-16-2.3.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-16-2.4">
-          <p id="section-16-2.4.1"><span class="bcp14">MUST</span> preserve the Subject, Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.<a href="#section-16-2.4.1" class="pilcrow">¶</a></p>
+          <p id="section-16-2.4.1"><span class="bcp14">MUST</span> preserve the principal identity of the Subject, and <span class="bcp14">MUST</span> preserve the Resource, Action, and relevant Context of the denied evaluation when submitting the Access Request.  When the original evaluation conveyed an actor identity in the Subject (for example, via <code>subject.properties.act</code>), the PEP <span class="bcp14">MAY</span> preserve the actor in the submission's <code>subject</code> or normalize it to <code>client.actor</code>; the actor identity itself <span class="bcp14">MUST NOT</span> be dropped.<a href="#section-16-2.4.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-16-2.5">
           <p id="section-16-2.5.1">When the requestable denial includes <code>form_schema_url</code> or <code>form_catalogs_url</code>, <span class="bcp14">MUST</span> construct the augmentations to the submission's <code>context</code> and <code>requested_access</code> objects according to <a href="#machine-readable-forms" class="auto internal xref">Section 8</a> and <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-16-2.5.1" class="pilcrow">¶</a></p>
@@ -3639,6 +3639,9 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
   "context": {
     "business_justification": "Needed for customer renewal review"
   },
+  "requested_access": {
+    "requested_duration": "PT4H"
+  },
   "denial": {
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
     "evaluated_at": "2026-04-30T20:15:00Z",
@@ -3676,7 +3679,14 @@ Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C
     "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
     "status": "pending",
     "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-    "expires_at": "2026-04-30T23:00:00Z"
+    "expires_at": "2026-04-30T23:00:00Z",
+    "links": {
+      "cancel": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4/cancel"
+    },
+    "display": {
+      "title": "Access request submitted",
+      "description": "Your manager has been asked to approve access."
+    }
   }
 }
 </pre><a href="#section-24.1.4-1" class="pilcrow">¶</a>
@@ -3702,6 +3712,7 @@ Content-Type: application/json
     "mode": "reevaluate",
     "approval": {
       "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+      "approved_at": "2026-04-30T20:42:00Z",
       "approved_until": "2026-05-01T00:42:00Z"
     },
     "approval_context": {
@@ -3841,7 +3852,7 @@ Content-Type: application/json
       "template": "agent_tool_class_approval",
       "reason": "agent_class_approval_required",
       "expires_in": 600,
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0sySDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
       "form_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
     }
   }
@@ -3910,7 +3921,7 @@ Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
       "requestable": true,
       "template": "agent_tool_class_approval",
       "reason": "agent_class_approval_required",
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0sySDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
+      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
     }
   }
 }
@@ -3934,7 +3945,7 @@ Location: https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C
     "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
     "status": "pending",
     "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
-    "expires_at": "2026-05-19T15:00:00Z"
+    "expires_at": "2026-05-20T00:00:00Z"
   }
 }
 </pre><a href="#section-24.2.4-1" class="pilcrow">¶</a>
@@ -4205,9 +4216,10 @@ Content-Type: application/json
 <a href="#appendix-A.2" class="section-number selfRef">A.2. </a><a href="#name-subjects-principals-and-act" class="section-name selfRef">Subjects, Principals, and Actors</a>
         </h3>
 <p id="appendix-A.2-1">For deployments where an autonomous actor (an AI agent, service, or workload) submits Access Requests on behalf of a human or organizational principal, the AuthZEN Subject needs to convey both identities so the PDP and Access Request Service can apply policy and route approvals on either.<a href="#appendix-A.2-1" class="pilcrow">¶</a></p>
-<p id="appendix-A.2-2">This profile does not define a Subject shape for actor delegation.  Implementations <span class="bcp14">SHOULD</span> follow the conventions defined in <span>[<a href="#I-D.mcguinness-oauth-actor-profile" class="cite xref">I-D.mcguinness-oauth-actor-profile</a>]</span>, which standardizes an <code>act</code> claim representing the immediate actor with required <code>act.sub</code> and <code>act.iss</code> members and a <span class="bcp14">RECOMMENDED</span> <code>sub_profile</code> member (taking values such as <code>ai_agent</code>, <code>service</code>, or <code>user</code>).  Nested <code>act</code> objects represent delegation chains.  Under this profile, an Access Request submission's <code>subject</code> carries the principal, and the actor is conveyed as an <code>act</code> claim or equivalent member; the canonical actor identifier is the (<code>act.iss</code>, <code>act.sub</code>) pair.<a href="#appendix-A.2-2" class="pilcrow">¶</a></p>
-<p id="appendix-A.2-3">Approval routing at the Access Request Service may consider both identities (the principal's owner and the actor's deployment).  This profile does not define routing policy; it only requires that the necessary identities be representable in the submission.<a href="#appendix-A.2-3" class="pilcrow">¶</a></p>
-<p id="appendix-A.2-4">Cross-implementation interoperability for agent flows depends on adoption of a common actor convention.  Implementations using a different convention can interoperate within a single deployment but may not interoperate across deployments that handle agent identity differently.  Deployments and profiles that depend on agent-versus-principal distinction <span class="bcp14">SHOULD</span> document the Subject shape and actor convention they use as part of their profile or implementation guide; the agent driver use cases described in this profile's Introduction assume a common convention is in place.<a href="#appendix-A.2-4" class="pilcrow">¶</a></p>
+<p id="appendix-A.2-2">This profile does not define a Subject shape for actor delegation.  Implementations <span class="bcp14">SHOULD</span> follow the conventions defined in <span>[<a href="#I-D.mcguinness-oauth-actor-profile" class="cite xref">I-D.mcguinness-oauth-actor-profile</a>]</span>, which standardizes an <code>act</code> claim representing the immediate actor with required <code>act.sub</code> and <code>act.iss</code> members and a <span class="bcp14">RECOMMENDED</span> <code>sub_profile</code> member (taking values such as <code>ai_agent</code>, <code>service</code>, or <code>user</code>).  Nested <code>act</code> objects represent delegation chains.  Under this profile, an Access Request submission's <code>subject</code> carries the principal, and the actor is conveyed as an <code>act</code> claim within the subject or as the equivalent <code>client.actor</code> member defined in this profile; the canonical actor identifier is the (<code>act.iss</code>, <code>act.sub</code>) pair regardless of which carrier is used.<a href="#appendix-A.2-2" class="pilcrow">¶</a></p>
+<p id="appendix-A.2-3">A PEP that captures an actor identity in the original AuthZEN evaluation's <code>subject</code> (for example, via <code>subject.properties.act</code>) <span class="bcp14">MAY</span> preserve the actor in the submission's <code>subject</code> or normalize it to <code>client.actor</code>.  The base profile's PEP preservation rule (<a href="#pep-processing-rules" class="auto internal xref">Section 16</a>) requires that the principal identity, Resource, Action, and relevant Context be preserved; the actor representation <span class="bcp14">MAY</span> be reshaped between the AuthZEN request and the Access Request submission to use whichever carrier the deployment standardizes on.<a href="#appendix-A.2-3" class="pilcrow">¶</a></p>
+<p id="appendix-A.2-4">Approval routing at the Access Request Service may consider both identities (the principal's owner and the actor's deployment).  This profile does not define routing policy; it only requires that the necessary identities be representable in the submission.<a href="#appendix-A.2-4" class="pilcrow">¶</a></p>
+<p id="appendix-A.2-5">Cross-implementation interoperability for agent flows depends on adoption of a common actor convention.  Implementations using a different convention can interoperate within a single deployment but may not interoperate across deployments that handle agent identity differently.  Deployments and profiles that depend on agent-versus-principal distinction <span class="bcp14">SHOULD</span> document the Subject shape and actor convention they use as part of their profile or implementation guide; the agent driver use cases described in this profile's Introduction assume a common convention is in place.<a href="#appendix-A.2-5" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="form-and-catalog-translation">

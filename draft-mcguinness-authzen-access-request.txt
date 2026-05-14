@@ -4,8 +4,8 @@
 
 Network Working Group                                      K. McGuinness
 Internet-Draft                                               Independent
-Intended status: Standards Track                             13 May 2026
-Expires: 14 November 2026
+Intended status: Standards Track                             14 May 2026
+Expires: 15 November 2026
 
 
               AuthZEN Access Request and Approval Profile
@@ -39,7 +39,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 14 November 2026.
+   This Internet-Draft will expire on 15 November 2026.
 
 Copyright Notice
 
@@ -1825,8 +1825,13 @@ Table of Contents
       otherwise it MUST use the access_request_endpoint from PDP
       metadata.
 
-   *  MUST preserve the Subject, Resource, Action, and relevant Context
-      of the denied evaluation when submitting the Access Request.
+   *  MUST preserve the principal identity of the Subject, and MUST
+      preserve the Resource, Action, and relevant Context of the denied
+      evaluation when submitting the Access Request.  When the original
+      evaluation conveyed an actor identity in the Subject (for example,
+      via subject.properties.act), the PEP MAY preserve the actor in the
+      submission's subject or normalize it to client.actor; the actor
+      identity itself MUST NOT be dropped.
 
    *  When the requestable denial includes form_schema_url or
       form_catalogs_url, MUST construct the augmentations to the
@@ -2371,6 +2376,9 @@ Table of Contents
      "context": {
        "business_justification": "Needed for customer renewal review"
      },
+     "requested_access": {
+       "requested_duration": "PT4H"
+     },
      "denial": {
        "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
        "evaluated_at": "2026-04-30T20:15:00Z",
@@ -2400,7 +2408,14 @@ Table of Contents
        "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
        "status": "pending",
        "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-       "expires_at": "2026-04-30T23:00:00Z"
+       "expires_at": "2026-04-30T23:00:00Z",
+       "links": {
+         "cancel": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4/cancel"
+       },
+       "display": {
+         "title": "Access request submitted",
+         "description": "Your manager has been asked to approve access."
+       }
      }
    }
 
@@ -2418,6 +2433,7 @@ Table of Contents
        "mode": "reevaluate",
        "approval": {
          "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+         "approved_at": "2026-04-30T20:42:00Z",
          "approved_until": "2026-05-01T00:42:00Z"
        },
        "approval_context": {
@@ -2529,7 +2545,7 @@ Table of Contents
          "template": "agent_tool_class_approval",
          "reason": "agent_class_approval_required",
          "expires_in": 600,
-         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0sySDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
          "form_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
        }
      }
@@ -2596,7 +2612,7 @@ Table of Contents
          "requestable": true,
          "template": "agent_tool_class_approval",
          "reason": "agent_class_approval_required",
-         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0sySDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
+         "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA"
        }
      }
    }
@@ -2612,7 +2628,7 @@ Table of Contents
        "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
        "status": "pending",
        "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
-       "expires_at": "2026-05-19T15:00:00Z"
+       "expires_at": "2026-05-20T00:00:00Z"
      }
    }
 
@@ -2870,9 +2886,19 @@ A.2.  Subjects, Principals, and Actors
    members and a RECOMMENDED sub_profile member (taking values such as
    ai_agent, service, or user).  Nested act objects represent delegation
    chains.  Under this profile, an Access Request submission's subject
-   carries the principal, and the actor is conveyed as an act claim or
-   equivalent member; the canonical actor identifier is the (act.iss,
-   act.sub) pair.
+   carries the principal, and the actor is conveyed as an act claim
+   within the subject or as the equivalent client.actor member defined
+   in this profile; the canonical actor identifier is the (act.iss,
+   act.sub) pair regardless of which carrier is used.
+
+   A PEP that captures an actor identity in the original AuthZEN
+   evaluation's subject (for example, via subject.properties.act) MAY
+   preserve the actor in the submission's subject or normalize it to
+   client.actor.  The base profile's PEP preservation rule (Section 16)
+   requires that the principal identity, Resource, Action, and relevant
+   Context be preserved; the actor representation MAY be reshaped
+   between the AuthZEN request and the Access Request submission to use
+   whichever carrier the deployment standardizes on.
 
    Approval routing at the Access Request Service may consider both
    identities (the principal's owner and the actor's deployment).  This
