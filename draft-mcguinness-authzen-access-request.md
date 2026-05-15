@@ -227,9 +227,6 @@ The `access_request` object has the following members:
 `expires_at`:
 : OPTIONAL.  String containing an {{RFC3339}} timestamp.  Indicates when the requestable denial hint expires.
 
-`expires_in`:
-: OPTIONAL.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP MUST compute the hint's expiry by adding `expires_in` to the time the Decision was produced; that production time is taken from `context.evaluated_at` when present, otherwise from the HTTP `Date` response header.  If neither time source is available, the PEP MUST treat the hint as expired.  PDPs SHOULD use `expires_at` instead of `expires_in` when precise expiry handling is required.
-
 `binding_token`:
 : OPTIONAL.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP MUST NOT decode, modify, or interpret this value.  The PEP returns it unchanged as `denial.binding_token` when submitting the Access Request ({{access-request-submission}}).  When present, the value MUST be integrity protected in a way the Access Request Service can verify, and SHOULD be a JSON Web Signature (JWS) {{RFC7515}} in compact serialization, signed by the PDP, with a payload (such as a JWT {{RFC7519}}) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) {{RFC7516}} MAY be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.
 
@@ -244,8 +241,6 @@ The `access_request` object has the following members:
 
 `request_catalogs_url`:
 : OPTIONAL.  HTTPS URI.  URL of a Catalogs Document describing how the PEP resolves form fields whose values are selected from a backing catalog.  See {{catalog-references}}.
-
-If both `expires_at` and `expires_in` are present, `expires_at` takes precedence and the PEP MUST ignore `expires_in`.
 
 The Decision's reason (why the evaluation returned `false`) is conveyed by `context.reason` per the AuthZEN Authorization API and is echoed by the PEP as `denial.reason` when submitting an Access Request.
 
@@ -263,7 +258,7 @@ The following is a non-normative example:
     "access_request": {
       "endpoint": "https://pdp.example.com/access/v1/requests",
       "template": "manager_approval",
-      "expires_in": 600,
+      "expires_at": "2026-04-30T20:25:00Z",
       "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
       "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
@@ -494,7 +489,6 @@ The request body is a JSON object with the following members:
 `requested_access`:
 : OPTIONAL.  Object containing request-specific information such as requested duration, requested role, requested entitlement, or requested scope.  This object does not define policy semantics and is interpreted by the Access Request Service.  The following well-known optional members are defined; additional members MAY be included subject to {{extension-naming}}:
 
-  * `requested_duration`: String.  ISO 8601 duration (for example, `PT4H` or `P30D`) requesting time-bounded access.
   * `requested_until`: String.  {{RFC3339}} timestamp requesting access through a specific absolute time.
   * `emergency`: Boolean.  When `true`, requests an expedited or emergency-access path subject to additional auditing.
 
@@ -505,14 +499,13 @@ The request body is a JSON object with the following members:
 : OPTIONAL.  Object identifying the PEP or calling application submitting the Access Request, supplementing the authenticated caller identity.  The following members are defined; implementations MAY include additional members.
 
   * `id`: OPTIONAL.  String.  Stable identifier for the calling application or PEP deployment.
-  * `instance_id`: OPTIONAL.  String.  Identifier for a specific running instance of the PEP.
   * `name`: OPTIONAL.  String.  Human-readable name of the calling application.
   * `actor`: OPTIONAL.  Object identifying the immediate actor on whose behalf the PEP submits the Access Request, when that actor differs from the Subject or when the deployment needs to audit the actor separately.  The following members are defined; implementations MAY include additional members.
     * `id`: REQUIRED.  String.  Stable identifier for the actor.
     * `issuer`: OPTIONAL.  String.  Issuer, authority, tenant, or identity provider for the actor identifier.
     * `type`: OPTIONAL.  String.  Actor category, such as `user`, `service`, `workload`, or `ai_agent`.
   * `source`: OPTIONAL.  Object.  Audit-trail context describing where the request originated.  The following members are defined; implementations MAY include additional members.
-    * `conversation_id`: OPTIONAL.  String.  Identifier of a chat or agent conversation that produced the request.
+    * `session_id`: OPTIONAL.  String.  Identifier of a bounded interaction context that produced the request, such as a chat or agent conversation, a web or mobile application session, a CLI invocation, or a long-running workflow thread.  This is an audit-origin identifier and is distinct from any authentication or authorization session associated with the caller.
     * `external_url`: OPTIONAL.  HTTPS URI.  URL of an external system (ticket, document, dashboard, chat thread) that motivated the request.
     * `integration_id`: OPTIONAL.  String.  Identifier of an upstream integration or workflow that produced the request.
 
@@ -536,8 +529,6 @@ The `denial` object has the following members.  Each field maps directly to a si
 : OPTIONAL.  String.  Echoed unchanged from `context.access_request.template` of the denied evaluation, when the PDP provided one.  The Access Request Service uses this value to route the request to the appropriate workflow.
 
 The PEP determines the additional members of the `context` and `requested_access` objects from the JSON Schema referenced by the requestable denial's `request_schema_url`, when present.  Field values that are selected from a backing catalog are resolved according to the Catalogs Document referenced by `request_catalogs_url`; see {{catalog-references}}.
-
-If both `requested_access.requested_duration` and `requested_access.requested_until` are present, the Access Request Service MUST reject the submission unless the deployment defines an explicit reconciliation rule.  When a deployment permits both members, the approved access lifetime MUST NOT exceed the earlier resulting expiry.
 
 A PEP MUST submit an Access Request only for an AuthZEN Decision with `decision` equal to `false` and a `context.access_request` object present in the Decision Context.
 
@@ -574,7 +565,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
     "business_justification": "Needed for customer renewal review"
   },
   "requested_access": {
-    "requested_duration": "PT4H"
+    "requested_until": "2026-05-01T00:15:00Z"
   },
   "denial": {
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
@@ -614,7 +605,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d14
     "business_justification": "Onboarding to the renewal review project"
   },
   "requested_access": {
-    "requested_duration": "P14D"
+    "requested_until": "2026-05-14T20:15:00Z"
   },
   "denial": {
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M2",
@@ -1297,9 +1288,27 @@ Mitigations:
 * Catalog Endpoints SHOULD apply rate limits and abuse detection commensurate with the sensitivity of the catalog they expose.
 * PEPs SHOULD prefer searching with `search_param` over bulk enumeration.
 
-## Task Handle Leakage
+## Task Handle Leakage {#task-handle-leakage}
 
 Task handles can reveal workflow state or be used to poll for sensitive information.  Task handles MUST be opaque, unguessable, and protected by authentication and authorization checks.  A leaked task handle MUST NOT be sufficient to retrieve task status without caller authorization.
+
+## PEP-Facing vs End-Client-Facing Surfaces
+
+Several members of the task response and approval result are intended for PEP-to-Access-Request-Service or PEP-to-PDP machine interactions, not for direct use by end clients (browsers, mobile applications, agent runtime UIs, or other non-PEP callers acting on behalf of the Subject).  The following are PEP-facing:
+
+* `task.status_endpoint`: the polling URL for the Access Request Service.
+* `task.links.cancel`: the cancellation endpoint.
+* `approval.id` and `approval.state`: round-trip material the PEP places at `context.approval` during re-evaluation.
+
+PEPs SHOULD NOT forward these members to end clients or other non-PEP callers.  Forwarding `status_endpoint` or `links.cancel` creates a direct end-client-to-Access-Request-Service channel that bypasses the PEP's enforcement and authorization context; forwarding `approval.id` or `approval.state` allows an end client to attempt to inject the approval reference into other PEPs or other evaluations.  Possession of these values is not itself authorization (see {{task-handle-leakage}} and the PDP applicability rules in {{completion-semantics}}), but exposing them broadens the attack surface unnecessarily.
+
+End-client-facing surfaces are conveyed separately and are intended to be human-rendered with their own authorization controls:
+
+* `task.links.ticket`: URL where the requester (Subject) can view the request and its status.
+* `task.links.review`: URL where an approver or administrator can review or act on the request.
+* `task.display`: localizable user-interface hints.
+
+When a PEP renders user-facing status to an end client, it SHOULD do so by rendering `task.display` and `task.links.ticket` rather than by exposing the machine surfaces.
 
 ## Callback Security
 
@@ -1395,10 +1404,9 @@ Initial entries registered by this specification:
 
 | Name | Extension Point | Description |
 |---|---|---|
-| `requested_duration` | `requested_access` | ISO 8601 duration requesting time-bounded access. |
 | `requested_until` | `requested_access` | RFC 3339 timestamp requesting access through a specific absolute time. |
 | `emergency` | `requested_access` | Boolean requesting an expedited or emergency-access path. |
-| `conversation_id` | `client.source` | Identifier of a chat or agent conversation that produced the request. |
+| `session_id` | `client.source` | Identifier of a bounded interaction context that produced the request (chat or agent conversation, application session, CLI invocation, workflow thread). |
 | `external_url` | `client.source` | URL of an external system that motivated the request. |
 | `integration_id` | `client.source` | Identifier of an upstream integration or workflow that produced the request. |
 | `description` | Catalog Item | Human-readable description of the catalog item. |
@@ -1455,7 +1463,7 @@ Content-Type: application/json
     "reason": "approval_required",
     "access_request": {
       "template": "manager_approval",
-      "expires_in": 600,
+      "expires_at": "2026-04-30T20:25:00Z",
       "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
       "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
@@ -1490,7 +1498,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
     "business_justification": "Needed for customer renewal review"
   },
   "requested_access": {
-    "requested_duration": "PT4H"
+    "requested_until": "2026-05-01T00:15:00Z"
   },
   "denial": {
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
@@ -1653,7 +1661,7 @@ Content-Type: application/json
     "reason": "agent_authority_missing",
     "access_request": {
       "template": "agent_tool_class_approval",
-      "expires_in": 600,
+      "expires_at": "2026-05-12T15:10:00Z",
       "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
       "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
     }
@@ -1663,7 +1671,7 @@ Content-Type: application/json
 
 ### Submitting the Access Request
 
-The agent's runtime submits a request and supplies actor and source members so the Access Request Service can route approval to the agent's owner and record the conversation that triggered the request.  The agent persists the Task Handle, releases the calling thread, and continues other in-flight work; approval may take minutes to days, and execution resumes when the callback fires.
+The agent's runtime submits a request and supplies actor and source members so the Access Request Service can route approval to the agent's owner and record the session that triggered the request.  The agent persists the Task Handle, releases the calling thread, and continues other in-flight work; approval may take minutes to days, and execution resumes when the callback fires.
 
 ~~~ http
 POST /access/v1/requests HTTP/1.1
@@ -1688,23 +1696,22 @@ Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
     "business_justification": "Assembling Q2 renewal report for customer ACME-1042"
   },
   "requested_access": {
-    "requested_duration": "P7D"
+    "requested_until": "2026-05-19T15:00:00Z"
   },
   "client": {
     "id": "renewal_assistant",
-    "instance_id": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M",
     "actor": {
       "id": "agent_renewal_assistant_v3",
       "issuer": "https://agents.example.com",
       "type": "ai_agent"
     },
     "source": {
-      "conversation_id": "conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N"
+      "session_id": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N"
     }
   },
   "callback": {
     "endpoint": "https://agents.example.com/callbacks/access-requests",
-    "state": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M/conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
+    "state": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
     "events": ["approved", "denied", "expired"]
   },
   "denial": {
@@ -1745,7 +1752,7 @@ Authorization: Bearer mF_9.B5f-4.1JqM
 Content-Type: application/json
 
 {
-  "state": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M/conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
+  "state": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
   "task": {
     "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
     "status": "approved",
