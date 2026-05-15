@@ -4,8 +4,8 @@
 
 Network Working Group                                      K. McGuinness
 Internet-Draft                                               Independent
-Intended status: Standards Track                             14 May 2026
-Expires: 15 November 2026
+Intended status: Standards Track                             15 May 2026
+Expires: 16 November 2026
 
 
               AuthZEN Access Request and Approval Profile
@@ -39,7 +39,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 15 November 2026.
+   This Internet-Draft will expire on 16 November 2026.
 
 Copyright Notice
 
@@ -100,18 +100,19 @@ Table of Contents
    21. Security Considerations
      21.1.  Denial Remains Denial
      21.2.  Confused Deputy and Request Substitution
-     21.3.  Request Context Integrity
-     21.4.  Approval Replay
-     21.5.  Overbroad Approval
-     21.6.  Approver Eligibility and Separation of Duties
-     21.7.  Emergency Access
-     21.8.  Trusting URLs from the Requestable Denial
-     21.9.  Catalog Disclosure
-     21.10. Task Handle Leakage
-     21.11. Callback Security
-     21.12. PEP Acting on Behalf of the Subject
-     21.13. Idempotency Key Abuse
-     21.14. Availability
+     21.3.  Approval Reference Substitution
+     21.4.  Request Context Integrity
+     21.5.  Approval Replay
+     21.6.  Overbroad Approval
+     21.7.  Approver Eligibility and Separation of Duties
+     21.8.  Emergency Access
+     21.9.  Trusting URLs from the Requestable Denial
+     21.10. Catalog Disclosure
+     21.11. Task Handle Leakage
+     21.12. Callback Security
+     21.13. PEP Acting on Behalf of the Subject
+     21.14. Idempotency Key Abuse
+     21.15. Availability
    22. IANA Considerations
    23. OpenID Foundation Registry Considerations
      23.1.  AuthZEN Policy Decision Point Metadata Registry
@@ -1608,7 +1609,10 @@ Table of Contents
    approval member.  The approval object identifies the approval that
    completed the Access Request task and has the following members:
 
-   *  id: REQUIRED.  String.  Stable identifier of the approval.
+   *  id: REQUIRED.  String.  Stable, opaque, and unguessable identifier
+      of the approval.  The value MUST contain sufficient entropy to
+      prevent practical guessing and MUST NOT encode semantics that a
+      PEP is expected to parse.
 
    *  approved_at: OPTIONAL.  [RFC3339] timestamp indicating when the
       approval completed.
@@ -1617,22 +1621,69 @@ Table of Contents
       latest time through which the approval remains valid.  The PEP
       MUST NOT use the approval for re-evaluation after this timestamp.
 
-   The approval object MAY additionally include a state member.  state
-   is an opaque object populated by the Access Request Service or PDP,
-   carrying whatever the PDP needs at re-evaluation time (for example, a
-   signed reference, an extended lookup token, or deployment-specific
-   state).  The PEP MUST NOT modify or interpret the contents of
-   approval.state.
+   The approval object MAY additionally include a binding member.
+   binding is an opaque value populated by the Access Request Service or
+   PDP, carrying proof or verifier state the PDP needs at re-evaluation
+   time (for example, a signed reference, an extended lookup token, or
+   deployment-specific state).  The PEP MUST NOT modify or interpret the
+   contents of approval.binding.
+
+   The evaluation_id of the original denied evaluation is denial-binding
+   material for the Access Request submission; it is not the
+   authorization handle used during re-evaluation.  During re-
+   evaluation, the chain back to the approved Access Request and
+   original denial is represented by the approval object.  The PDP MUST
+   be able to resolve or verify approval.id, approval.binding, or both,
+   and bind the approval to the Access Request task, the original denied
+   evaluation when recorded, the approved Subject, Resource, Action,
+   relevant Context, approval scope, and approval expiry.
+
+   The PDP MUST NOT authorize a re-evaluation solely because the request
+   contains a known approval.id.  The PDP MUST verify that the approval
+   reference presented in context.approval is applicable to the
+   authenticated caller or requester, current Subject, Resource, Action,
+   relevant Context, approval scope, and approval expiry.  A swapped,
+   replayed, expired, or otherwise non-applicable approval reference
+   MUST be ignored or rejected, and the PDP MUST evaluate the request as
+   not approved by that reference.
+
+   An approval reference has two deployment patterns:
+
+   *  Lookup: the PDP resolves approval.id in trusted server-side state.
+
+   *  Bound reference: the PDP verifies approval.binding, which carries
+      integrity-protected proof or verifier state.
+
+   Deployments MAY use both patterns together.  In all cases, the PDP
+   MUST verify the approval against trusted state or integrity-protected
+   binding material; neither approval.id nor approval.binding is a
+   bearer grant by itself.
+
+   The approval record or verifiable binding material MUST contain, or
+   allow the PDP to determine, at least the approval identifier, Access
+   Request task identifier, original denied evaluation identifier when
+   available, approved Subject, approved Resource and Action or approval
+   scope, requester and client binding, approval status, approved_at
+   when available, approved_until, and any revocation or cancellation
+   state.
 
    The PEP MUST include the approval object unchanged at
    context.approval inside the AuthZEN re-evaluation request.  The PDP
    receives the same approval shape it produced (id, timestamps, and any
-   state) and uses it to identify and verify the approval.
+   binding) and uses it to identify and verify the approval.
 
    The PDP MUST evaluate the new request using current policy and the
    approval reference.  The PDP MAY still deny access if policy,
    subject, resource, action, context, approval lifetime, or risk state
    no longer permits access.
+
+   The PDP MUST check current approval status during re-evaluation,
+   including whether the approval has been revoked, cancelled,
+   superseded, or otherwise invalidated before approved_until.  The
+   approved_until timestamp is a PEP-side maximum reuse and enforcement
+   bound; it does not prevent the PDP from denying earlier because of
+   revocation, cancellation, policy change, risk change, or other
+   current state.
 
    When the re-evaluation response indicates an approval expiry
    (typically as context.approval.approved_until), the PEP MUST NOT
@@ -1876,9 +1927,9 @@ Table of Contents
 
    *  result and the additions defined under each result.mode.
 
-   *  approval.state in a Re-evaluation Mode result: opaque profile-
-      specific or deployment-specific state carried through the PEP to
-      the PDP at re-evaluation time.
+   *  approval.binding in a Re-evaluation Mode result: opaque profile-
+      specific or deployment-specific verifier state carried through the
+      PEP to the PDP at re-evaluation time.
 
    This specification also defines extensibility for enumerated values:
 
@@ -1915,10 +1966,10 @@ Table of Contents
        vendor.example.com/foo) when the member is private to a single
        deployment and not intended for cross-implementation use.
 
-   The contents of approval.state are opaque to this specification and
+   The contents of approval.binding are opaque to this specification and
    are not subject to the member naming requirements above unless a
    profile or deployment explicitly defines structure within
-   approval.state.
+   approval.binding.
 
 15.3.  Forward Compatibility
 
@@ -2182,7 +2233,26 @@ Table of Contents
    approval results to the Subject, Resource, Action, Context, task, and
    requester.  PDPs MUST validate this binding during re-evaluation.
 
-21.3.  Request Context Integrity
+21.3.  Approval Reference Substitution
+
+   A hostile or compromised PEP could attempt to submit an approval.id
+   or approval.binding obtained from another Access Request during re-
+   evaluation.  An approval reference is not a bearer grant by itself.
+   PDPs MUST resolve or verify the approval reference and confirm that
+   it is bound to the authenticated caller or requester, current
+   Subject, Resource, Action, relevant Context, approval scope, and
+   approval expiry before using it as an input to an allow decision.
+   Possession of a valid-looking approval identifier is insufficient to
+   authorize access.
+
+   When approval state is carried by reference, the PDP or Access
+   Request Service MUST protect the backing approval record against
+   unauthorized lookup and mutation.  When approval binding material is
+   carried by value, for example in approval.binding, the PDP MUST
+   verify integrity, issuer, audience or intended recipient, expiry, and
+   binding before accepting it.
+
+21.4.  Request Context Integrity
 
    The request_context member round-trips PDP-issued state through the
    PEP to the Access Request Service.  Without integrity protection, a
@@ -2264,7 +2334,7 @@ Table of Contents
    present, replay resistance when provided by the format, and binding
    to the submitted Subject, Resource, Action, and relevant Context.
 
-21.4.  Approval Replay
+21.5.  Approval Replay
 
    Approval references can be replayed if not time-bounded.  Approval
    results MUST expire.  Re-evaluation Mode SHOULD bind approval
@@ -2273,7 +2343,7 @@ Table of Contents
    responsible for defining the token's audience restriction, lifetime,
    and binding to the approved request.
 
-21.5.  Overbroad Approval
+21.6.  Overbroad Approval
 
    This profile does not define an approval policy language.
    Implementations MUST NOT treat the template, reason,
@@ -2281,7 +2351,7 @@ Table of Contents
    policy.  Actual approval scope and enforcement semantics are
    determined by the PDP and Access Request Service.
 
-21.6.  Approver Eligibility and Separation of Duties
+21.7.  Approver Eligibility and Separation of Duties
 
    Approval workflows can violate enterprise access policy if an
    approver is not eligible to approve the requested access.  Access
@@ -2293,7 +2363,7 @@ Table of Contents
    local policy explicitly allows that exception and records it for
    audit.
 
-21.7.  Emergency Access
+21.8.  Emergency Access
 
    The requested_access.emergency member is a request signal, not an
    authorization override.  Implementations that support emergency or
@@ -2303,7 +2373,7 @@ Table of Contents
    requests and approvals SHOULD be retained and auditable according to
    the deployment's security and compliance policy.
 
-21.8.  Trusting URLs from the Requestable Denial
+21.9.  Trusting URLs from the Requestable Denial
 
    The endpoint, form_url, request_schema_url, request_catalogs_url, and
    the catalog endpoint values inside a Catalogs Document are all
@@ -2321,7 +2391,7 @@ Table of Contents
    MUST NOT submit credentials to a host that is not trusted to receive
    them.
 
-21.9.  Catalog Disclosure
+21.10.  Catalog Disclosure
 
    Catalog Endpoints (Section 9) can leak sensitive information about
    applications, entitlements, organizational structure, or finance
@@ -2342,7 +2412,7 @@ Table of Contents
    *  PEPs SHOULD prefer searching with search_param over bulk
       enumeration.
 
-21.10.  Task Handle Leakage
+21.11.  Task Handle Leakage
 
    Task handles can reveal workflow state or be used to poll for
    sensitive information.  Task handles MUST be opaque, unguessable, and
@@ -2350,7 +2420,7 @@ Table of Contents
    handle MUST NOT be sufficient to retrieve task status without caller
    authorization.
 
-21.11.  Callback Security
+21.12.  Callback Security
 
    Callback endpoints can be abused for spoofing, replay, and request
    forgery.  Callback notifications MUST be authenticated.  PEPs SHOULD
@@ -2358,7 +2428,7 @@ Table of Contents
    and state values, and treat callbacks as notifications unless they
    contain an enforceable result under this profile.
 
-21.12.  PEP Acting on Behalf of the Subject
+21.13.  PEP Acting on Behalf of the Subject
 
    A PEP submitting an Access Request typically acts on behalf of the
    Subject identified in the original AuthZEN evaluation.  The Access
@@ -2370,13 +2440,13 @@ Table of Contents
    [RFC8693] so the PEP presents a token that names the Subject as the
    on-behalf-of party.
 
-21.13.  Idempotency Key Abuse
+21.14.  Idempotency Key Abuse
 
    Idempotency keys can be used to correlate requests.  Implementations
    SHOULD scope idempotency keys to the authenticated caller and avoid
    storing them longer than necessary.
 
-21.14.  Availability
+21.15.  Availability
 
    Approval workflows can introduce latency and dependency on external
    systems.  PEPs SHOULD fail closed when task status cannot be
@@ -2654,6 +2724,10 @@ Table of Contents
 
 24.1.6.  Re-evaluation After Approval
 
+   The re-evaluation request does not repeat the original evaluation_id.
+   The PDP resolves the approval.id (and approval.binding, when present)
+   to the approved Access Request task and original denied evaluation.
+
    POST /access/v1/evaluation HTTP/1.1
    Host: pdp.example.com
    Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
@@ -2860,7 +2934,10 @@ Table of Contents
 24.2.6.  Completed Task
 
    The agent retrieves the completed task and obtains an approval
-   reference scoped to the CRM tool class for seven days.
+   reference scoped to the CRM tool class for seven days.  This example
+   includes approval.binding to show a deployment where the PDP verifies
+   integrity-protected binding material during re-evaluation rather than
+   relying only on a server-side lookup by approval.id.
 
    HTTP/1.1 200 OK
    Content-Type: application/json
@@ -2875,7 +2952,8 @@ Table of Contents
        "approval": {
          "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
          "approved_at": "2026-05-12T17:30:00Z",
-         "approved_until": "2026-05-19T17:30:00Z"
+         "approved_until": "2026-05-19T17:30:00Z",
+         "binding": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
        }
      }
    }
@@ -2886,6 +2964,11 @@ Table of Contents
    authorizes it against the approval reference.  Subsequent same-class
    CRM tool invocations within the approval lifetime are also authorized
    without a new Access Request.
+
+   The re-evaluation request does not repeat the original evaluation_id.
+   The PDP resolves the approval.id (and approval.binding, when present)
+   to the approved Access Request task, original denied evaluation, and
+   approved CRM tool-class scope.
 
    POST /access/v1/evaluation HTTP/1.1
    Host: pdp.example.com
@@ -2916,7 +2999,8 @@ Table of Contents
        "approval": {
          "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
          "approved_at": "2026-05-12T17:30:00Z",
-         "approved_until": "2026-05-19T17:30:00Z"
+         "approved_until": "2026-05-19T17:30:00Z",
+         "binding": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
        }
      }
    }
@@ -3194,7 +3278,7 @@ A.6.  Evaluators and Workflow Design
    by any mixture.  The protocol's synchronous-completion response,
    callback notification, and re-evaluation semantics apply uniformly
    across evaluator types.  The approver-eligibility, self-approval, and
-   separation-of-duties requirements of Section 21.6 apply to whichever
+   separation-of-duties requirements of Section 21.7 apply to whichever
    entity completes a workflow step, whether human or automated.
 
    When the calling population includes high-volume PEPs (gateways
