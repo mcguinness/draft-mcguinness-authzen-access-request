@@ -442,12 +442,10 @@ Table of Contents
    template:  OPTIONAL.  String.  An opaque template identifier that can
       guide the Access Request Service.  Implementations typically map
       template to a stable identifier of the approval workflow, request
-      schema, or governance policy that applies to this denial.  The
-      value is not a policy language and MUST NOT be interpreted by the
-      PEP except for display or request submission.
-
-   reason:  OPTIONAL.  String.  A stable, machine-readable reason code
-      for the requestable denial.
+      schema, governance policy, or categorical source code that applies
+      to this denial.  The value is not a policy language and MUST NOT
+      be interpreted by the PEP except for display or request
+      submission.
 
    expires_at:  OPTIONAL.  String containing an [RFC3339] timestamp.
       Indicates when the requestable denial hint expires.
@@ -500,13 +498,9 @@ Table of Contents
    If both expires_at and expires_in are present, expires_at takes
    precedence and the PEP MUST ignore expires_in.
 
-   The reason member of the access_request object is independent of any
-   reason member that the PDP may include directly in context.  The
-   outer context.reason describes why the Decision was denied (echoed by
-   the PEP as denial.reason when submitting an Access Request);
-   context.access_request.reason describes why the denial is requestable
-   and which approval flow applies (used by the PEP at evaluation time
-   but not echoed in the submission).
+   The Decision's reason (why the evaluation returned false) is conveyed
+   by context.reason per the AuthZEN Authorization API and is echoed by
+   the PEP as denial.reason when submitting an Access Request.
 
    The PDP MUST provide enough denial-binding material for the Access
    Request Service to verify that a submitted Access Request corresponds
@@ -527,7 +521,6 @@ Table of Contents
        "access_request": {
          "endpoint": "https://pdp.example.com/access/v1/requests",
          "template": "manager_approval",
-         "reason": "manager_approval_required",
          "expires_in": 600,
          "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
          "form_url": "https://requests.example.com/forms/manager_approval",
@@ -988,9 +981,7 @@ Table of Contents
 
    reason:  OPTIONAL.  String.  Machine-readable reason code for the
       denial, echoed unchanged from context.reason of the denied
-      evaluation.  This is the decision's reason and is distinct from
-      any requestability hint the PDP may carry in
-      context.access_request.reason.
+      evaluation.
 
    request_context:  REQUIRED when denial.evaluation_id is absent;
       otherwise OPTIONAL.  String.  Integrity-protected binding material
@@ -2346,10 +2337,10 @@ Table of Contents
 21.6.  Overbroad Approval
 
    This profile does not define an approval policy language.
-   Implementations MUST NOT treat the template, reason,
-   requested_access, or display fields as sufficient authorization
-   policy.  Actual approval scope and enforcement semantics are
-   determined by the PDP and Access Request Service.
+   Implementations MUST NOT treat the template, requested_access, or
+   display fields as sufficient authorization policy.  Actual approval
+   scope and enforcement semantics are determined by the PDP and Access
+   Request Service.
 
 21.7.  Approver Eligibility and Separation of Duties
 
@@ -2635,7 +2626,6 @@ Table of Contents
        "reason": "approval_required",
        "access_request": {
          "template": "manager_approval",
-         "reason": "manager_approval_required",
          "expires_in": 600,
          "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
          "form_url": "https://requests.example.com/forms/manager_approval",
@@ -2828,7 +2818,6 @@ Table of Contents
        "reason": "agent_authority_missing",
        "access_request": {
          "template": "agent_tool_class_approval",
-         "reason": "agent_class_approval_required",
          "expires_in": 600,
          "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
          "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"

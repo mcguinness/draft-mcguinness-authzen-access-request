@@ -1664,60 +1664,54 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 <dt id="section-7-4.3">
 <code>template</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-4.4">
-          <p id="section-7-4.4.1"><span class="bcp14">OPTIONAL</span>.  String.  An opaque template identifier that can guide the Access Request Service.  Implementations typically map <code>template</code> to a stable identifier of the approval workflow, request schema, or governance policy that applies to this denial.  The value is not a policy language and <span class="bcp14">MUST NOT</span> be interpreted by the PEP except for display or request submission.<a href="#section-7-4.4.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.4.1"><span class="bcp14">OPTIONAL</span>.  String.  An opaque template identifier that can guide the Access Request Service.  Implementations typically map <code>template</code> to a stable identifier of the approval workflow, request schema, governance policy, or categorical source code that applies to this denial.  The value is not a policy language and <span class="bcp14">MUST NOT</span> be interpreted by the PEP except for display or request submission.<a href="#section-7-4.4.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.5">
-<code>reason</code>:</dt>
+<code>expires_at</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-4.6">
-          <p id="section-7-4.6.1"><span class="bcp14">OPTIONAL</span>.  String.  A stable, machine-readable reason code for the requestable denial.<a href="#section-7-4.6.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.6.1"><span class="bcp14">OPTIONAL</span>.  String containing an <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp.  Indicates when the requestable denial hint expires.<a href="#section-7-4.6.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.7">
-<code>expires_at</code>:</dt>
+<code>expires_in</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-4.8">
-          <p id="section-7-4.8.1"><span class="bcp14">OPTIONAL</span>.  String containing an <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp.  Indicates when the requestable denial hint expires.<a href="#section-7-4.8.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.8.1"><span class="bcp14">OPTIONAL</span>.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP <span class="bcp14">MUST</span> compute the hint's expiry by adding <code>expires_in</code> to the time the Decision was produced; that production time is taken from <code>context.evaluated_at</code> when present, otherwise from the HTTP <code>Date</code> response header.  If neither time source is available, the PEP <span class="bcp14">MUST</span> treat the hint as expired.  PDPs <span class="bcp14">SHOULD</span> use <code>expires_at</code> instead of <code>expires_in</code> when precise expiry handling is required.<a href="#section-7-4.8.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.9">
-<code>expires_in</code>:</dt>
+<code>request_context</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-4.10">
-          <p id="section-7-4.10.1"><span class="bcp14">OPTIONAL</span>.  Number.  Lifetime in seconds of the requestable denial hint from the time the Decision was produced.  The PEP <span class="bcp14">MUST</span> compute the hint's expiry by adding <code>expires_in</code> to the time the Decision was produced; that production time is taken from <code>context.evaluated_at</code> when present, otherwise from the HTTP <code>Date</code> response header.  If neither time source is available, the PEP <span class="bcp14">MUST</span> treat the hint as expired.  PDPs <span class="bcp14">SHOULD</span> use <code>expires_at</code> instead of <code>expires_in</code> when precise expiry handling is required.<a href="#section-7-4.10.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.10.1"><span class="bcp14">OPTIONAL</span>.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value.  The PEP returns it unchanged as <code>denial.request_context</code> when submitting the Access Request (<a href="#access-request-submission" class="auto internal xref">Section 10.1</a>).  When present, the value <span class="bcp14">MUST</span> be integrity protected in a way the Access Request Service can verify, and <span class="bcp14">SHOULD</span> be a JSON Web Signature (JWS) <span>[<a href="#RFC7515" class="cite xref">RFC7515</a>]</span> in compact serialization, signed by the PDP, with a payload (such as a JWT <span>[<a href="#RFC7519" class="cite xref">RFC7519</a>]</span>) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) <span>[<a href="#RFC7516" class="cite xref">RFC7516</a>]</span> <span class="bcp14">MAY</span> be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.<a href="#section-7-4.10.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.11">
-<code>request_context</code>:</dt>
+<code>display</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-4.12">
-          <p id="section-7-4.12.1"><span class="bcp14">OPTIONAL</span>.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value.  The PEP returns it unchanged as <code>denial.request_context</code> when submitting the Access Request (<a href="#access-request-submission" class="auto internal xref">Section 10.1</a>).  When present, the value <span class="bcp14">MUST</span> be integrity protected in a way the Access Request Service can verify, and <span class="bcp14">SHOULD</span> be a JSON Web Signature (JWS) <span>[<a href="#RFC7515" class="cite xref">RFC7515</a>]</span> in compact serialization, signed by the PDP, with a payload (such as a JWT <span>[<a href="#RFC7519" class="cite xref">RFC7519</a>]</span>) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) <span>[<a href="#RFC7516" class="cite xref">RFC7516</a>]</span> <span class="bcp14">MAY</span> be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.<a href="#section-7-4.12.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.12.1"><span class="bcp14">OPTIONAL</span>.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP <span class="bcp14">MAY</span> ignore this member.<a href="#section-7-4.12.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.13">
-<code>display</code>:</dt>
+<code>form_url</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-4.14">
-          <p id="section-7-4.14.1"><span class="bcp14">OPTIONAL</span>.  Object.  Localizable user-interface hints such as title, description, or recommended call-to-action text.  The PEP <span class="bcp14">MAY</span> ignore this member.<a href="#section-7-4.14.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.14.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  URL of a form, hosted by the Access Request Service or another service trusted by the deployment, where the requester can supply additional information required for the Access Request.  Suitable for PEPs that render the form for a human user.  See <a href="#machine-readable-forms" class="auto internal xref">Section 8</a>.<a href="#section-7-4.14.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.15">
-<code>form_url</code>:</dt>
+<code>request_schema_url</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-4.16">
-          <p id="section-7-4.16.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  URL of a form, hosted by the Access Request Service or another service trusted by the deployment, where the requester can supply additional information required for the Access Request.  Suitable for PEPs that render the form for a human user.  See <a href="#machine-readable-forms" class="auto internal xref">Section 8</a>.<a href="#section-7-4.16.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.16.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  URL where the Access Request Service publishes a machine-readable description of the augmentations the PEP must add to the submission's <code>context</code> and <code>requested_access</code> objects.  <span class="bcp14">RECOMMENDED</span> to be a JSON Schema <span>[<a href="#I-D.bhutton-json-schema" class="cite xref">I-D.bhutton-json-schema</a>]</span> <span>[<a href="#I-D.bhutton-json-schema-validation" class="cite xref">I-D.bhutton-json-schema-validation</a>]</span> document.  Suitable for autonomous PEPs and for PEPs that render forms natively against a schema.  See <a href="#machine-readable-forms" class="auto internal xref">Section 8</a>.<a href="#section-7-4.16.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.17">
-<code>request_schema_url</code>:</dt>
-        <dd style="margin-left: 1.5em" id="section-7-4.18">
-          <p id="section-7-4.18.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  URL where the Access Request Service publishes a machine-readable description of the augmentations the PEP must add to the submission's <code>context</code> and <code>requested_access</code> objects.  <span class="bcp14">RECOMMENDED</span> to be a JSON Schema <span>[<a href="#I-D.bhutton-json-schema" class="cite xref">I-D.bhutton-json-schema</a>]</span> <span>[<a href="#I-D.bhutton-json-schema-validation" class="cite xref">I-D.bhutton-json-schema-validation</a>]</span> document.  Suitable for autonomous PEPs and for PEPs that render forms natively against a schema.  See <a href="#machine-readable-forms" class="auto internal xref">Section 8</a>.<a href="#section-7-4.18.1" class="pilcrow">¶</a></p>
-</dd>
-        <dd class="break"></dd>
-<dt id="section-7-4.19">
 <code>request_catalogs_url</code>:</dt>
-        <dd style="margin-left: 1.5em" id="section-7-4.20">
-          <p id="section-7-4.20.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  URL of a Catalogs Document describing how the PEP resolves form fields whose values are selected from a backing catalog.  See <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-7-4.20.1" class="pilcrow">¶</a></p>
+        <dd style="margin-left: 1.5em" id="section-7-4.18">
+          <p id="section-7-4.18.1"><span class="bcp14">OPTIONAL</span>.  HTTPS URI.  URL of a Catalogs Document describing how the PEP resolves form fields whose values are selected from a backing catalog.  See <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-7-4.18.1" class="pilcrow">¶</a></p>
 </dd>
       <dd class="break"></dd>
 </dl>
 <p id="section-7-5">If both <code>expires_at</code> and <code>expires_in</code> are present, <code>expires_at</code> takes precedence and the PEP <span class="bcp14">MUST</span> ignore <code>expires_in</code>.<a href="#section-7-5" class="pilcrow">¶</a></p>
-<p id="section-7-6">The <code>reason</code> member of the <code>access_request</code> object is independent of any <code>reason</code> member that the PDP may include directly in <code>context</code>.  The outer <code>context.reason</code> describes why the Decision was denied (echoed by the PEP as <code>denial.reason</code> when submitting an Access Request); <code>context.access_request.reason</code> describes why the denial is requestable and which approval flow applies (used by the PEP at evaluation time but not echoed in the submission).<a href="#section-7-6" class="pilcrow">¶</a></p>
+<p id="section-7-6">The Decision's reason (why the evaluation returned <code>false</code>) is conveyed by <code>context.reason</code> per the AuthZEN Authorization API and is echoed by the PEP as <code>denial.reason</code> when submitting an Access Request.<a href="#section-7-6" class="pilcrow">¶</a></p>
 <p id="section-7-7">The PDP <span class="bcp14">MUST</span> provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore <span class="bcp14">MUST</span> either include an integrity-protected <code>request_context</code>, or include <code>context.evaluation_id</code> (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>) that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP <span class="bcp14">MUST NOT</span> include <code>context.access_request</code> in the Decision Context.<a href="#section-7-7" class="pilcrow">¶</a></p>
 <p id="section-7-8">The following is a non-normative example:<a href="#section-7-8" class="pilcrow">¶</a></p>
 <div class="lang-json sourcecode" id="section-7-9">
@@ -1731,7 +1725,6 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
     "access_request": {
       "endpoint": "https://pdp.example.com/access/v1/requests",
       "template": "manager_approval",
-      "reason": "manager_approval_required",
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
@@ -2177,7 +2170,7 @@ Content-Type: application/json
 <dt id="section-10.1-5.5">
 <code>reason</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.6">
-            <p id="section-10.1-5.6.1"><span class="bcp14">OPTIONAL</span>.  String.  Machine-readable reason code for the denial, echoed unchanged from <code>context.reason</code> of the denied evaluation.  This is the decision's reason and is distinct from any requestability hint the PDP may carry in <code>context.access_request.reason</code>.<a href="#section-10.1-5.6.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.6.1"><span class="bcp14">OPTIONAL</span>.  String.  Machine-readable reason code for the denial, echoed unchanged from <code>context.reason</code> of the denied evaluation.<a href="#section-10.1-5.6.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.7">
@@ -3373,7 +3366,7 @@ Content-Type: application/problem+json
         <h3 id="name-overbroad-approval">
 <a href="#section-21.6" class="section-number selfRef">21.6. </a><a href="#name-overbroad-approval" class="section-name selfRef">Overbroad Approval</a>
         </h3>
-<p id="section-21.6-1">This profile does not define an approval policy language.  Implementations <span class="bcp14">MUST NOT</span> treat the <code>template</code>, <code>reason</code>, <code>requested_access</code>, or <code>display</code> fields as sufficient authorization policy.  Actual approval scope and enforcement semantics are determined by the PDP and Access Request Service.<a href="#section-21.6-1" class="pilcrow">¶</a></p>
+<p id="section-21.6-1">This profile does not define an approval policy language.  Implementations <span class="bcp14">MUST NOT</span> treat the <code>template</code>, <code>requested_access</code>, or <code>display</code> fields as sufficient authorization policy.  Actual approval scope and enforcement semantics are determined by the PDP and Access Request Service.<a href="#section-21.6-1" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="approver-eligibility">
@@ -3782,7 +3775,6 @@ Content-Type: application/json
     "reason": "approval_required",
     "access_request": {
       "template": "manager_approval",
-      "reason": "manager_approval_required",
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
@@ -4024,7 +4016,6 @@ Content-Type: application/json
     "reason": "agent_authority_missing",
     "access_request": {
       "template": "agent_tool_class_approval",
-      "reason": "agent_class_approval_required",
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
       "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
