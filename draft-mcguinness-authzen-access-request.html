@@ -1281,7 +1281,7 @@ svg :is([fill="white"], [fill^="#fff"]) {
                 <p id="section-toc.1-1.21.2.3.1"><a href="#section-21.3" class="auto internal xref">21.3</a>.  <a href="#name-approval-reference-substitu" class="internal xref">Approval Reference Substitution</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.4">
-                <p id="section-toc.1-1.21.2.4.1"><a href="#section-21.4" class="auto internal xref">21.4</a>.  <a href="#name-request-context-integrity" class="internal xref">Request Context Integrity</a></p>
+                <p id="section-toc.1-1.21.2.4.1"><a href="#section-21.4" class="auto internal xref">21.4</a>.  <a href="#name-binding-token-integrity" class="internal xref">Binding Token Integrity</a></p>
 </li>
               <li class="compact toc ulBare ulEmpty" id="section-toc.1-1.21.2.5">
                 <p id="section-toc.1-1.21.2.5.1"><a href="#section-21.5" class="auto internal xref">21.5</a>.  <a href="#name-approval-replay" class="internal xref">Approval Replay</a></p>
@@ -1625,7 +1625,7 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 <p id="section-6-1">A PDP supporting this profile <span class="bcp14">MUST</span> publish an <code>access_request_endpoint</code> in PDP metadata.  The endpoint value <span class="bcp14">MUST</span> be an HTTPS URI.<a href="#section-6-1" class="pilcrow">¶</a></p>
 <p id="section-6-2">A PDP supporting this profile <span class="bcp14">SHOULD</span> include the following capability URN in the <code>capabilities</code> array:<a href="#section-6-2" class="pilcrow">¶</a></p>
 <p id="section-6-3"><code>urn:openid:authzen:capability:access-request</code><a href="#section-6-3" class="pilcrow">¶</a></p>
-<p id="section-6-4">A PDP that issues signed values for use under this profile (for example, a JWS-signed <code>request_context</code>; see <a href="#requestable-denial-context" class="auto internal xref">Section 7</a>) <span class="bcp14">MUST</span> publish a <code>jwks_uri</code> in PDP metadata.  The value is an HTTPS URI of a JWK Set <span>[<a href="#RFC7517" class="cite xref">RFC7517</a>]</span> document containing the public keys used to verify signatures issued by the PDP.<a href="#section-6-4" class="pilcrow">¶</a></p>
+<p id="section-6-4">A PDP that issues signed values for use under this profile (for example, a JWS-signed <code>binding_token</code>; see <a href="#requestable-denial-context" class="auto internal xref">Section 7</a>) <span class="bcp14">MUST</span> publish a <code>jwks_uri</code> in PDP metadata.  The value is an HTTPS URI of a JWK Set <span>[<a href="#RFC7517" class="cite xref">RFC7517</a>]</span> document containing the public keys used to verify signatures issued by the PDP.<a href="#section-6-4" class="pilcrow">¶</a></p>
 <p id="section-6-5">Each JWK in the set <span class="bcp14">SHOULD</span> include a <code>kid</code> parameter so JWS signatures issued with a <code>kid</code> header can be resolved to the corresponding verification key, and <span class="bcp14">SHOULD</span> include a <code>use</code> parameter distinguishing signing keys (<code>use: "sig"</code>) from any other keys advertised.<a href="#section-6-5" class="pilcrow">¶</a></p>
 <p id="section-6-6">Verifiers cache the JWK Set per HTTP cache headers and refresh it on key-rotation events.  An unrecognized <code>kid</code> <span class="bcp14">SHOULD</span> cause the verifier to refresh the JWK Set before rejecting the input.<a href="#section-6-6" class="pilcrow">¶</a></p>
 <p id="section-6-7">The following is a non-normative metadata example:<a href="#section-6-7" class="pilcrow">¶</a></p>
@@ -1680,9 +1680,9 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.9">
-<code>request_context</code>:</dt>
+<code>binding_token</code>:</dt>
         <dd style="margin-left: 1.5em" id="section-7-4.10">
-          <p id="section-7-4.10.1"><span class="bcp14">OPTIONAL</span>.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value.  The PEP returns it unchanged as <code>denial.request_context</code> when submitting the Access Request (<a href="#access-request-submission" class="auto internal xref">Section 10.1</a>).  When present, the value <span class="bcp14">MUST</span> be integrity protected in a way the Access Request Service can verify, and <span class="bcp14">SHOULD</span> be a JSON Web Signature (JWS) <span>[<a href="#RFC7515" class="cite xref">RFC7515</a>]</span> in compact serialization, signed by the PDP, with a payload (such as a JWT <span>[<a href="#RFC7519" class="cite xref">RFC7519</a>]</span>) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) <span>[<a href="#RFC7516" class="cite xref">RFC7516</a>]</span> <span class="bcp14">MAY</span> be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.<a href="#section-7-4.10.1" class="pilcrow">¶</a></p>
+          <p id="section-7-4.10.1"><span class="bcp14">OPTIONAL</span>.  String.  Opaque context to be returned to the Access Request Service when submitting the access request.  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value.  The PEP returns it unchanged as <code>denial.binding_token</code> when submitting the Access Request (<a href="#access-request-submission" class="auto internal xref">Section 10.1</a>).  When present, the value <span class="bcp14">MUST</span> be integrity protected in a way the Access Request Service can verify, and <span class="bcp14">SHOULD</span> be a JSON Web Signature (JWS) <span>[<a href="#RFC7515" class="cite xref">RFC7515</a>]</span> in compact serialization, signed by the PDP, with a payload (such as a JWT <span>[<a href="#RFC7519" class="cite xref">RFC7519</a>]</span>) that the Access Request Service can verify and bind to the original denied evaluation.  JSON Web Encryption (JWE) <span>[<a href="#RFC7516" class="cite xref">RFC7516</a>]</span> <span class="bcp14">MAY</span> be used in addition to integrity protection when the payload contains information that must not be visible to the PEP, for example by encrypting a signed payload.<a href="#section-7-4.10.1" class="pilcrow">¶</a></p>
 </dd>
         <dd class="break"></dd>
 <dt id="section-7-4.11">
@@ -1712,7 +1712,7 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 </dl>
 <p id="section-7-5">If both <code>expires_at</code> and <code>expires_in</code> are present, <code>expires_at</code> takes precedence and the PEP <span class="bcp14">MUST</span> ignore <code>expires_in</code>.<a href="#section-7-5" class="pilcrow">¶</a></p>
 <p id="section-7-6">The Decision's reason (why the evaluation returned <code>false</code>) is conveyed by <code>context.reason</code> per the AuthZEN Authorization API and is echoed by the PEP as <code>denial.reason</code> when submitting an Access Request.<a href="#section-7-6" class="pilcrow">¶</a></p>
-<p id="section-7-7">The PDP <span class="bcp14">MUST</span> provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore <span class="bcp14">MUST</span> either include an integrity-protected <code>request_context</code>, or include <code>context.evaluation_id</code> (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>) that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP <span class="bcp14">MUST NOT</span> include <code>context.access_request</code> in the Decision Context.<a href="#section-7-7" class="pilcrow">¶</a></p>
+<p id="section-7-7">The PDP <span class="bcp14">MUST</span> provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore <span class="bcp14">MUST</span> either include an integrity-protected <code>binding_token</code>, or include <code>context.evaluation_id</code> (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>) that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP <span class="bcp14">MUST NOT</span> include <code>context.access_request</code> in the Decision Context.<a href="#section-7-7" class="pilcrow">¶</a></p>
 <p id="section-7-8">The following is a non-normative example:<a href="#section-7-8" class="pilcrow">¶</a></p>
 <div class="lang-json sourcecode" id="section-7-9">
 <pre>
@@ -1726,7 +1726,7 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
       "endpoint": "https://pdp.example.com/access/v1/requests",
       "template": "manager_approval",
       "expires_in": 600,
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+      "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
       "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
       "request_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json",
@@ -1747,7 +1747,7 @@ appear in all capitals, as shown here.<a href="#section-2-1" class="pilcrow">¶<
 <p id="section-7.1-1">This profile defines <code>evaluation_id</code> as a first-class identifier for an AuthZEN evaluation, used by the Access Request Service to bind a submitted Access Request to the denied evaluation it remediates (<a href="#access-request-submission" class="auto internal xref">Section 10.1</a>).<a href="#section-7.1-1" class="pilcrow">¶</a></p>
 <p id="section-7.1-2">A PDP returns <code>evaluation_id</code> as a member of the AuthZEN Decision Context: <code>context.evaluation_id</code>, a string.  The PEP echoes the captured identifier as <code>denial.evaluation_id</code> when submitting an Access Request.<a href="#section-7.1-2" class="pilcrow">¶</a></p>
 <p id="section-7.1-3"><code>evaluation_id</code> <span class="bcp14">MUST</span> be stable for a given evaluation: subsequent retrievals or echoes of the same evaluation <span class="bcp14">MUST</span> return the same identifier.  PDPs <span class="bcp14">SHOULD</span> generate identifiers that are unique within the PDP's namespace (for example, ULIDs or UUIDs).  An identifier <span class="bcp14">MAY</span> be reused across distinct evaluations only after the original evaluation's binding window has expired.<a href="#section-7.1-3" class="pilcrow">¶</a></p>
-<p id="section-7.1-4">A PDP that returns <code>context.access_request</code> without an integrity-protected <code>request_context</code> <span class="bcp14">MUST</span> include <code>evaluation_id</code> so the Access Request Service has verifiable denial-binding material.<a href="#section-7.1-4" class="pilcrow">¶</a></p>
+<p id="section-7.1-4">A PDP that returns <code>context.access_request</code> without an integrity-protected <code>binding_token</code> <span class="bcp14">MUST</span> include <code>evaluation_id</code> so the Access Request Service has verifiable denial-binding material.<a href="#section-7.1-4" class="pilcrow">¶</a></p>
 <p id="section-7.1-5">A PDP <span class="bcp14">MAY</span> return <code>evaluated_at</code> as a member of the AuthZEN Decision Context: <code>context.evaluated_at</code>, an <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating when the Decision was produced.  The PEP echoes the captured timestamp as <code>denial.evaluated_at</code> when submitting an Access Request.<a href="#section-7.1-5" class="pilcrow">¶</a></p>
 </section>
 </div>
@@ -2153,12 +2153,12 @@ Content-Type: application/json
 </dd>
         <dd class="break"></dd>
 </dl>
-<p id="section-10.1-4">The <code>denial</code> object has the following members.  Each field maps directly to a single member of the PDP's denied evaluation response; the <code>denial</code> object does not echo the full AuthZEN Decision because the binding material (<code>evaluation_id</code> and <code>request_context</code>) provides stronger evidence of the denial than a verbatim JSON echo could.<a href="#section-10.1-4" class="pilcrow">¶</a></p>
+<p id="section-10.1-4">The <code>denial</code> object has the following members.  Each field maps directly to a single member of the PDP's denied evaluation response; the <code>denial</code> object does not echo the full AuthZEN Decision because the binding material (<code>evaluation_id</code> and <code>binding_token</code>) provides stronger evidence of the denial than a verbatim JSON echo could.<a href="#section-10.1-4" class="pilcrow">¶</a></p>
 <span class="break"></span><dl class="dlParallel" id="section-10.1-5">
           <dt id="section-10.1-5.1">
 <code>evaluation_id</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.2">
-            <p id="section-10.1-5.2.1"><span class="bcp14">REQUIRED</span> when <code>denial.request_context</code> is absent; otherwise <span class="bcp14">RECOMMENDED</span>.  A stable identifier for the denied evaluation, captured by the PEP from <code>context.evaluation_id</code> in the AuthZEN Decision and echoed unchanged here (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>).  The Access Request Service <span class="bcp14">MUST</span> be able to resolve or validate <code>evaluation_id</code> before relying on it as denial-binding material.  <code>evaluation_id</code> provides the strongest audit binding between the original denial and the submitted Access Request and <span class="bcp14">SHOULD</span> be preferred over <code>evaluated_at</code> alone.<a href="#section-10.1-5.2.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.2.1"><span class="bcp14">REQUIRED</span> when <code>denial.binding_token</code> is absent; otherwise <span class="bcp14">RECOMMENDED</span>.  A stable identifier for the denied evaluation, captured by the PEP from <code>context.evaluation_id</code> in the AuthZEN Decision and echoed unchanged here (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>).  The Access Request Service <span class="bcp14">MUST</span> be able to resolve or validate <code>evaluation_id</code> before relying on it as denial-binding material.  <code>evaluation_id</code> provides the strongest audit binding between the original denial and the submitted Access Request and <span class="bcp14">SHOULD</span> be preferred over <code>evaluated_at</code> alone.<a href="#section-10.1-5.2.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.3">
@@ -2174,9 +2174,9 @@ Content-Type: application/json
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.7">
-<code>request_context</code>:</dt>
+<code>binding_token</code>:</dt>
           <dd style="margin-left: 1.5em" id="section-10.1-5.8">
-            <p id="section-10.1-5.8.1"><span class="bcp14">REQUIRED</span> when <code>denial.evaluation_id</code> is absent; otherwise <span class="bcp14">OPTIONAL</span>.  String.  Integrity-protected binding material echoed unchanged from <code>context.access_request.request_context</code> of the denied evaluation (<a href="#requestable-denial-context" class="auto internal xref">Section 7</a>).  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value; it returns the original PDP-issued value byte-for-byte.<a href="#section-10.1-5.8.1" class="pilcrow">¶</a></p>
+            <p id="section-10.1-5.8.1"><span class="bcp14">REQUIRED</span> when <code>denial.evaluation_id</code> is absent; otherwise <span class="bcp14">OPTIONAL</span>.  String.  Integrity-protected binding material echoed unchanged from <code>context.access_request.binding_token</code> of the denied evaluation (<a href="#requestable-denial-context" class="auto internal xref">Section 7</a>).  The PEP <span class="bcp14">MUST NOT</span> decode, modify, or interpret this value; it returns the original PDP-issued value byte-for-byte.<a href="#section-10.1-5.8.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-10.1-5.9">
@@ -2189,7 +2189,7 @@ Content-Type: application/json
 <p id="section-10.1-6">The PEP determines the additional members of the <code>context</code> and <code>requested_access</code> objects from the JSON Schema referenced by the requestable denial's <code>request_schema_url</code>, when present.  Field values that are selected from a backing catalog are resolved according to the Catalogs Document referenced by <code>request_catalogs_url</code>; see <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-10.1-6" class="pilcrow">¶</a></p>
 <p id="section-10.1-7">If both <code>requested_access.requested_duration</code> and <code>requested_access.requested_until</code> are present, the Access Request Service <span class="bcp14">MUST</span> reject the submission unless the deployment defines an explicit reconciliation rule.  When a deployment permits both members, the approved access lifetime <span class="bcp14">MUST NOT</span> exceed the earlier resulting expiry.<a href="#section-10.1-7" class="pilcrow">¶</a></p>
 <p id="section-10.1-8">A PEP <span class="bcp14">MUST</span> submit an Access Request only for an AuthZEN Decision with <code>decision</code> equal to <code>false</code> and a <code>context.access_request</code> object present in the Decision Context.<a href="#section-10.1-8" class="pilcrow">¶</a></p>
-<p id="section-10.1-9">The submitted <code>denial</code> object for each requested item <span class="bcp14">MUST</span> include either <code>denial.request_context</code> or <code>denial.evaluation_id</code>.  The Access Request Service <span class="bcp14">MUST</span> reject a submission that lacks verifiable denial-binding material with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-9" class="pilcrow">¶</a></p>
+<p id="section-10.1-9">The submitted <code>denial</code> object for each requested item <span class="bcp14">MUST</span> include either <code>denial.binding_token</code> or <code>denial.evaluation_id</code>.  The Access Request Service <span class="bcp14">MUST</span> reject a submission that lacks verifiable denial-binding material with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code>.<a href="#section-10.1-9" class="pilcrow">¶</a></p>
 <p id="section-10.1-10">A PEP <span class="bcp14">SHOULD</span> include an <code>Idempotency-Key</code> header, following the conventions described in <span>[<a href="#I-D.ietf-httpapi-idempotency-key-header" class="cite xref">I-D.ietf-httpapi-idempotency-key-header</a>]</span>.  The Idempotency-Key covers the entire submission body, including all members of the <code>items</code> array when present.<a href="#section-10.1-10" class="pilcrow">¶</a></p>
 <p id="section-10.1-11">The Access Request Service <span class="bcp14">SHOULD</span> treat a repeated submission with the same <code>Idempotency-Key</code>, the same authenticated requester, and an equivalent submission body as the same request, returning the same Task Handle while the original request remains available.  A submission with the same <code>Idempotency-Key</code> and authenticated requester but a materially different submission body <span class="bcp14">MUST</span> be rejected with <code>urn:openid:authzen:access-request:error:duplicate_request</code>.<a href="#section-10.1-11" class="pilcrow">¶</a></p>
 <p id="section-10.1-12">The Access Request Service <span class="bcp14">SHOULD</span> retain Idempotency-Key state at least until <code>task.expires_at</code> and <span class="bcp14">SHOULD</span> continue to retain it for at least 24 hours after the task reaches a terminal status.  This window lets retries from delayed PEP restarts find the original task rather than spawning a duplicate.  After the retention window elapses, the Access Request Service <span class="bcp14">MAY</span> reclaim the Idempotency-Key; a submission presenting a previously seen Idempotency-Key whose state has been reclaimed is processed as a new submission.<a href="#section-10.1-12" class="pilcrow">¶</a></p>
@@ -2224,7 +2224,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
     "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
-    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+    "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
     "template": "manager_approval"
   }
 }
@@ -2264,7 +2264,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d14
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M2",
     "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
-    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl",
+    "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJidW5kbGVfaWQiOiJidW5fMDFIWDVTVUJNMSIsIml0ZW1zIjpbeyJyZXNvdXJjZSI6ImRvY3VtZW50OnE0LXBsYW4iLCJhY3Rpb24iOiJjYW5fcmVhZCJ9LHsicmVzb3VyY2UiOiJjaGFubmVsOmVuZ2luZWVyaW5nIiwiYWN0aW9uIjoiY2FuX3Bvc3QifV19.bXBfc2lnbmF0dXJl",
     "template": "onboarding_bundle"
   }
 }
@@ -2785,8 +2785,8 @@ Content-Type: application/json
             <p id="section-12.1-2.3.1"><code>approved_until</code>: <span class="bcp14">REQUIRED</span>.  <span>[<a href="#RFC3339" class="cite xref">RFC3339</a>]</span> timestamp indicating the latest time through which the approval remains valid.  The PEP <span class="bcp14">MUST NOT</span> use the approval for re-evaluation after this timestamp.<a href="#section-12.1-2.3.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
-<p id="section-12.1-3">The <code>approval</code> object <span class="bcp14">MAY</span> additionally include a <code>binding</code> member.  <code>binding</code> is an opaque value populated by the Access Request Service or PDP, carrying proof or verifier state the PDP needs at re-evaluation time (for example, a signed reference, an extended lookup token, or deployment-specific state).  The PEP <span class="bcp14">MUST NOT</span> modify or interpret the contents of <code>approval.binding</code>.<a href="#section-12.1-3" class="pilcrow">¶</a></p>
-<p id="section-12.1-4">The <code>evaluation_id</code> of the original denied evaluation is denial-binding material for the Access Request submission; it is not the authorization handle used during re-evaluation.  During re-evaluation, the chain back to the approved Access Request and original denial is represented by the <code>approval</code> object.  The PDP <span class="bcp14">MUST</span> be able to resolve or verify <code>approval.id</code>, <code>approval.binding</code>, or both, and bind the approval to the Access Request task, the original denied evaluation when recorded, the approved Subject, Resource, Action, relevant Context, approval scope, and approval expiry.<a href="#section-12.1-4" class="pilcrow">¶</a></p>
+<p id="section-12.1-3">The <code>approval</code> object <span class="bcp14">MAY</span> additionally include a <code>state</code> member.  <code>state</code> is an opaque value populated by the Access Request Service or PDP, carrying proof or verifier state the PDP needs at re-evaluation time (for example, a signed reference, an extended lookup token, or deployment-specific state).  The PEP <span class="bcp14">MUST NOT</span> modify or interpret the contents of <code>approval.state</code>.<a href="#section-12.1-3" class="pilcrow">¶</a></p>
+<p id="section-12.1-4">The <code>evaluation_id</code> of the original denied evaluation is denial-binding material for the Access Request submission; it is not the authorization handle used during re-evaluation.  During re-evaluation, the chain back to the approved Access Request and original denial is represented by the <code>approval</code> object.  The PDP <span class="bcp14">MUST</span> be able to resolve or verify <code>approval.id</code>, <code>approval.state</code>, or both, and bind the approval to the Access Request task, the original denied evaluation when recorded, the approved Subject, Resource, Action, relevant Context, approval scope, and approval expiry.<a href="#section-12.1-4" class="pilcrow">¶</a></p>
 <p id="section-12.1-5">The PDP <span class="bcp14">MUST NOT</span> authorize a re-evaluation solely because the request contains a known <code>approval.id</code>.  The PDP <span class="bcp14">MUST</span> verify that the approval reference presented in <code>context.approval</code> is applicable to the authenticated caller or requester, current Subject, Resource, Action, relevant Context, approval scope, and approval expiry.  A swapped, replayed, expired, or otherwise non-applicable approval reference <span class="bcp14">MUST</span> be ignored or rejected, and the PDP <span class="bcp14">MUST</span> evaluate the request as not approved by that reference.<a href="#section-12.1-5" class="pilcrow">¶</a></p>
 <p id="section-12.1-6">An approval reference has two deployment patterns:<a href="#section-12.1-6" class="pilcrow">¶</a></p>
 <ul class="normal">
@@ -2794,12 +2794,12 @@ Content-Type: application/json
             <p id="section-12.1-7.1.1">Lookup: the PDP resolves <code>approval.id</code> in trusted server-side state.<a href="#section-12.1-7.1.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-12.1-7.2">
-            <p id="section-12.1-7.2.1">Bound reference: the PDP verifies <code>approval.binding</code>, which carries integrity-protected proof or verifier state.<a href="#section-12.1-7.2.1" class="pilcrow">¶</a></p>
+            <p id="section-12.1-7.2.1">Bound reference: the PDP verifies <code>approval.state</code>, which carries integrity-protected proof or verifier state.<a href="#section-12.1-7.2.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
-<p id="section-12.1-8">Deployments <span class="bcp14">MAY</span> use both patterns together.  In all cases, the PDP <span class="bcp14">MUST</span> verify the approval against trusted state or integrity-protected binding material; neither <code>approval.id</code> nor <code>approval.binding</code> is a bearer grant by itself.<a href="#section-12.1-8" class="pilcrow">¶</a></p>
+<p id="section-12.1-8">Deployments <span class="bcp14">MAY</span> use both patterns together.  In all cases, the PDP <span class="bcp14">MUST</span> verify the approval against trusted state or integrity-protected binding material; neither <code>approval.id</code> nor <code>approval.state</code> is a bearer grant by itself.<a href="#section-12.1-8" class="pilcrow">¶</a></p>
 <p id="section-12.1-9">The approval record or verifiable binding material <span class="bcp14">MUST</span> contain, or allow the PDP to determine, at least the approval identifier, Access Request task identifier, original denied evaluation identifier when available, approved Subject, approved Resource and Action or approval scope, requester and client binding, approval status, <code>approved_at</code> when available, <code>approved_until</code>, and any revocation or cancellation state.<a href="#section-12.1-9" class="pilcrow">¶</a></p>
-<p id="section-12.1-10">The PEP <span class="bcp14">MUST</span> include the <code>approval</code> object unchanged at <code>context.approval</code> inside the AuthZEN re-evaluation request.  The PDP receives the same <code>approval</code> shape it produced (id, timestamps, and any <code>binding</code>) and uses it to identify and verify the approval.<a href="#section-12.1-10" class="pilcrow">¶</a></p>
+<p id="section-12.1-10">The PEP <span class="bcp14">MUST</span> include the <code>approval</code> object unchanged at <code>context.approval</code> inside the AuthZEN re-evaluation request.  The PDP receives the same <code>approval</code> shape it produced (id, timestamps, and any <code>state</code>) and uses it to identify and verify the approval.<a href="#section-12.1-10" class="pilcrow">¶</a></p>
 <p id="section-12.1-11">The PDP <span class="bcp14">MUST</span> evaluate the new request using current policy and the approval reference.  The PDP <span class="bcp14">MAY</span> still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.<a href="#section-12.1-11" class="pilcrow">¶</a></p>
 <p id="section-12.1-12">The PDP <span class="bcp14">MUST</span> check current approval status during re-evaluation, including whether the approval has been revoked, cancelled, superseded, or otherwise invalidated before <code>approved_until</code>.  The <code>approved_until</code> timestamp is a PEP-side maximum reuse and enforcement bound; it does not prevent the PDP from denying earlier because of revocation, cancellation, policy change, risk change, or other current state.<a href="#section-12.1-12" class="pilcrow">¶</a></p>
 <p id="section-12.1-13">When the re-evaluation response indicates an approval expiry (typically as <code>context.approval.approved_until</code>), the PEP <span class="bcp14">MUST NOT</span> enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) <span class="bcp14">MUST</span> bound the lifetime of those credentials by the earlier of the approval expiry in the Approval Result and any approval expiry returned by the PDP during re-evaluation.<a href="#section-12.1-13" class="pilcrow">¶</a></p>
@@ -3012,7 +3012,7 @@ Content-Type: application/problem+json
             <p id="section-15.1-2.9.1"><code>result</code> and the additions defined under each <code>result.mode</code>.<a href="#section-15.1-2.9.1" class="pilcrow">¶</a></p>
 </li>
           <li class="normal" id="section-15.1-2.10">
-            <p id="section-15.1-2.10.1"><code>approval.binding</code> in a Re-evaluation Mode result: opaque profile-specific or deployment-specific verifier state carried through the PEP to the PDP at re-evaluation time.<a href="#section-15.1-2.10.1" class="pilcrow">¶</a></p>
+            <p id="section-15.1-2.10.1"><code>approval.state</code> in a Re-evaluation Mode result: opaque profile-specific or deployment-specific verifier state carried through the PEP to the PDP at re-evaluation time.<a href="#section-15.1-2.10.1" class="pilcrow">¶</a></p>
 </li>
         </ul>
 <p id="section-15.1-3">This specification also defines extensibility for enumerated values:<a href="#section-15.1-3" class="pilcrow">¶</a></p>
@@ -3047,7 +3047,7 @@ Content-Type: application/problem+json
             <p id="section-15.2-2.3.1">A reverse-DNS-prefixed identifier (for example, <code>vendor.example.com/foo</code>) when the member is private to a single deployment and not intended for cross-implementation use.<a href="#section-15.2-2.3.1" class="pilcrow">¶</a></p>
 </li>
         </ol>
-<p id="section-15.2-3">The contents of <code>approval.binding</code> are opaque to this specification and are not subject to the member naming requirements above unless a profile or deployment explicitly defines structure within <code>approval.binding</code>.<a href="#section-15.2-3" class="pilcrow">¶</a></p>
+<p id="section-15.2-3">The contents of <code>approval.state</code> are opaque to this specification and are not subject to the member naming requirements above unless a profile or deployment explicitly defines structure within <code>approval.state</code>.<a href="#section-15.2-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="forward-compatibility">
@@ -3110,7 +3110,7 @@ Content-Type: application/problem+json
           <p id="section-16-2.5.1">When the requestable denial includes <code>request_schema_url</code> or <code>request_catalogs_url</code>, <span class="bcp14">MUST</span> construct the augmentations to the submission's <code>context</code> and <code>requested_access</code> objects according to <a href="#machine-readable-forms" class="auto internal xref">Section 8</a> and <a href="#catalog-references" class="auto internal xref">Section 9</a>.<a href="#section-16-2.5.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-16-2.6">
-          <p id="section-16-2.6.1"><span class="bcp14">MUST</span> include <code>denial.evaluation_id</code> when <code>denial.request_context</code> is absent, and <span class="bcp14">SHOULD</span> include it when the PDP returned an evaluation identifier.<a href="#section-16-2.6.1" class="pilcrow">¶</a></p>
+          <p id="section-16-2.6.1"><span class="bcp14">MUST</span> include <code>denial.evaluation_id</code> when <code>denial.binding_token</code> is absent, and <span class="bcp14">SHOULD</span> include it when the PDP returned an evaluation identifier.<a href="#section-16-2.6.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-16-2.7">
           <p id="section-16-2.7.1"><span class="bcp14">SHOULD</span> include an idempotency key for Access Request submissions.<a href="#section-16-2.7.1" class="pilcrow">¶</a></p>
@@ -3168,13 +3168,13 @@ Content-Type: application/problem+json
           <p id="section-17-2.6.1"><span class="bcp14">MUST</span> include <code>request_schema_url</code> when including <code>request_catalogs_url</code>.<a href="#section-17-2.6.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-17-2.7">
-          <p id="section-17-2.7.1"><span class="bcp14">MUST</span> provide verifiable denial-binding material when returning <code>context.access_request</code>, either by including an integrity-protected <code>context.access_request.request_context</code> or by returning a stable evaluation identifier that the Access Request Service can resolve or validate.<a href="#section-17-2.7.1" class="pilcrow">¶</a></p>
+          <p id="section-17-2.7.1"><span class="bcp14">MUST</span> provide verifiable denial-binding material when returning <code>context.access_request</code>, either by including an integrity-protected <code>context.access_request.binding_token</code> or by returning a stable evaluation identifier that the Access Request Service can resolve or validate.<a href="#section-17-2.7.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-17-2.8">
           <p id="section-17-2.8.1"><span class="bcp14">SHOULD</span> return a stable evaluation identifier as <code>context.evaluation_id</code> (<a href="#evaluation-identifier" class="auto internal xref">Section 7.1</a>) that the PEP can supply as <code>denial.evaluation_id</code> when submitting an Access Request.<a href="#section-17-2.8.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-17-2.9">
-          <p id="section-17-2.9.1">When including <code>context.access_request.request_context</code>, <span class="bcp14">MUST</span> integrity-protect it using a mechanism the Access Request Service can verify and <span class="bcp14">SHOULD</span> issue it as a JWS in compact serialization.<a href="#section-17-2.9.1" class="pilcrow">¶</a></p>
+          <p id="section-17-2.9.1">When including <code>context.access_request.binding_token</code>, <span class="bcp14">MUST</span> integrity-protect it using a mechanism the Access Request Service can verify and <span class="bcp14">SHOULD</span> issue it as a JWS in compact serialization.<a href="#section-17-2.9.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-17-2.10">
           <p id="section-17-2.10.1"><span class="bcp14">MUST</span> validate approval references presented during re-evaluation.<a href="#section-17-2.10.1" class="pilcrow">¶</a></p>
@@ -3205,10 +3205,10 @@ Content-Type: application/problem+json
           <p id="section-18-2.3.1"><span class="bcp14">MUST</span> verify the denial-binding material for every requested item, applying the following rules:<a href="#section-18-2.3.1" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-18-2.3.2.1">
-              <p id="section-18-2.3.2.1.1">When <code>denial.request_context</code> is present, the service <span class="bcp14">MUST</span> verify its integrity.  When the value is a JWS, the service <span class="bcp14">MUST</span> verify the signature using a key resolved from the JWK Set advertised at the PDP's <code>jwks_uri</code> (<a href="#discovery" class="auto internal xref">Section 6</a>); JWS <code>kid</code> headers are matched against JWK <code>kid</code> parameters.<a href="#section-18-2.3.2.1.1" class="pilcrow">¶</a></p>
+              <p id="section-18-2.3.2.1.1">When <code>denial.binding_token</code> is present, the service <span class="bcp14">MUST</span> verify its integrity.  When the value is a JWS, the service <span class="bcp14">MUST</span> verify the signature using a key resolved from the JWK Set advertised at the PDP's <code>jwks_uri</code> (<a href="#discovery" class="auto internal xref">Section 6</a>); JWS <code>kid</code> headers are matched against JWK <code>kid</code> parameters.<a href="#section-18-2.3.2.1.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-18-2.3.2.2">
-              <p id="section-18-2.3.2.2.1">When <code>denial.request_context</code> is absent, the service <span class="bcp14">MUST</span> resolve or validate <code>denial.evaluation_id</code>.<a href="#section-18-2.3.2.2.1" class="pilcrow">¶</a></p>
+              <p id="section-18-2.3.2.2.1">When <code>denial.binding_token</code> is absent, the service <span class="bcp14">MUST</span> resolve or validate <code>denial.evaluation_id</code>.<a href="#section-18-2.3.2.2.1" class="pilcrow">¶</a></p>
 </li>
             <li class="normal" id="section-18-2.3.2.3">
               <p id="section-18-2.3.2.3.1">The service <span class="bcp14">MUST</span> reject submissions whose binding material cannot be verified or whose claims do not bind to the submitted denial.<a href="#section-18-2.3.2.3.1" class="pilcrow">¶</a></p>
@@ -3291,17 +3291,17 @@ Content-Type: application/problem+json
         <h3 id="name-approval-reference-substitu">
 <a href="#section-21.3" class="section-number selfRef">21.3. </a><a href="#name-approval-reference-substitu" class="section-name selfRef">Approval Reference Substitution</a>
         </h3>
-<p id="section-21.3-1">A hostile or compromised PEP could attempt to submit an <code>approval.id</code> or <code>approval.binding</code> obtained from another Access Request during re-evaluation.  An approval reference is not a bearer grant by itself.  PDPs <span class="bcp14">MUST</span> resolve or verify the approval reference and confirm that it is bound to the authenticated caller or requester, current Subject, Resource, Action, relevant Context, approval scope, and approval expiry before using it as an input to an allow decision.  Possession of a valid-looking approval identifier is insufficient to authorize access.<a href="#section-21.3-1" class="pilcrow">¶</a></p>
-<p id="section-21.3-2">When approval state is carried by reference, the PDP or Access Request Service <span class="bcp14">MUST</span> protect the backing approval record against unauthorized lookup and mutation.  When approval binding material is carried by value, for example in <code>approval.binding</code>, the PDP <span class="bcp14">MUST</span> verify integrity, issuer, audience or intended recipient, expiry, and binding before accepting it.<a href="#section-21.3-2" class="pilcrow">¶</a></p>
+<p id="section-21.3-1">A hostile or compromised PEP could attempt to submit an <code>approval.id</code> or <code>approval.state</code> obtained from another Access Request during re-evaluation.  An approval reference is not a bearer grant by itself.  PDPs <span class="bcp14">MUST</span> resolve or verify the approval reference and confirm that it is bound to the authenticated caller or requester, current Subject, Resource, Action, relevant Context, approval scope, and approval expiry before using it as an input to an allow decision.  Possession of a valid-looking approval identifier is insufficient to authorize access.<a href="#section-21.3-1" class="pilcrow">¶</a></p>
+<p id="section-21.3-2">When approval state is carried by reference, the PDP or Access Request Service <span class="bcp14">MUST</span> protect the backing approval record against unauthorized lookup and mutation.  When approval binding material is carried by value, for example in <code>approval.state</code>, the PDP <span class="bcp14">MUST</span> verify integrity, issuer, audience or intended recipient, expiry, and binding before accepting it.<a href="#section-21.3-2" class="pilcrow">¶</a></p>
 </section>
 </div>
-<div id="request-context-integrity">
+<div id="binding-token-integrity">
 <section id="section-21.4">
-        <h3 id="name-request-context-integrity">
-<a href="#section-21.4" class="section-number selfRef">21.4. </a><a href="#name-request-context-integrity" class="section-name selfRef">Request Context Integrity</a>
+        <h3 id="name-binding-token-integrity">
+<a href="#section-21.4" class="section-number selfRef">21.4. </a><a href="#name-binding-token-integrity" class="section-name selfRef">Binding Token Integrity</a>
         </h3>
-<p id="section-21.4-1">The <code>request_context</code> member round-trips PDP-issued state through the PEP to the Access Request Service.  Without integrity protection, a buggy or hostile PEP could drop, alter, or fabricate this value to influence approval routing or scope.  PDPs <span class="bcp14">MUST</span> integrity-protect <code>request_context</code> using a mechanism the Access Request Service can verify and <span class="bcp14">SHOULD</span> issue it as a JWS so the Access Request Service can prove the value was produced by the PDP and bound to the original denied evaluation.  When the payload contains information that must not be visible to the PEP, the PDP <span class="bcp14">MAY</span> use JWE in addition to integrity protection, for example by encrypting a signed payload.  This is a confused-deputy mitigation: it lets the Access Request Service confirm that the requestable-denial state was issued by the PDP and not fabricated or altered by the PEP.<a href="#section-21.4-1" class="pilcrow">¶</a></p>
-<p id="section-21.4-2">This profile does not mandate a specific JWS payload; the contents are deployment-specific.  Implementations that issue <code>request_context</code> as a JWT <span class="bcp14">SHOULD</span> include the following claims to provide sound token hygiene and confused-deputy protection:<a href="#section-21.4-2" class="pilcrow">¶</a></p>
+<p id="section-21.4-1">The <code>binding_token</code> member round-trips PDP-issued state through the PEP to the Access Request Service.  Without integrity protection, a buggy or hostile PEP could drop, alter, or fabricate this value to influence approval routing or scope.  PDPs <span class="bcp14">MUST</span> integrity-protect <code>binding_token</code> using a mechanism the Access Request Service can verify and <span class="bcp14">SHOULD</span> issue it as a JWS so the Access Request Service can prove the value was produced by the PDP and bound to the original denied evaluation.  When the payload contains information that must not be visible to the PEP, the PDP <span class="bcp14">MAY</span> use JWE in addition to integrity protection, for example by encrypting a signed payload.  This is a confused-deputy mitigation: it lets the Access Request Service confirm that the requestable-denial state was issued by the PDP and not fabricated or altered by the PEP.<a href="#section-21.4-1" class="pilcrow">¶</a></p>
+<p id="section-21.4-2">This profile does not mandate a specific JWS payload; the contents are deployment-specific.  Implementations that issue <code>binding_token</code> as a JWT <span class="bcp14">SHOULD</span> include the following claims to provide sound token hygiene and confused-deputy protection:<a href="#section-21.4-2" class="pilcrow">¶</a></p>
 <ul class="normal">
 <li class="normal" id="section-21.4-3.1">
             <p id="section-21.4-3.1.1"><code>iss</code>: PDP identifier.  Lets the Access Request Service select the correct verification key from the PDP's JWK Set (<a href="#discovery" class="auto internal xref">Section 6</a>).<a href="#section-21.4-3.1.1" class="pilcrow">¶</a></p>
@@ -3332,7 +3332,7 @@ Content-Type: application/problem+json
         </ul>
 <p id="section-21.4-4">When <code>items</code> is present in the submission (bulk), the binding claims cover the entire <code>items</code> array (for example, an <code>items</code> claim listing each Resource and Action, or a <code>binding_hash</code> computed over the full item list).<a href="#section-21.4-4" class="pilcrow">¶</a></p>
 <p id="section-21.4-5">PDPs <span class="bcp14">MAY</span> add deployment-specific claims (policy version, factors, risk score, tenant identifier) when the Access Request Service needs them for routing or audit.  When such claims must remain opaque to the PEP, the PDP wraps the signed payload in JWE encrypted to the Access Request Service.<a href="#section-21.4-5" class="pilcrow">¶</a></p>
-<p id="section-21.4-6">When <code>request_context</code> is a JWS-signed JWT using these claims, the Access Request Service, on receipt:<a href="#section-21.4-6" class="pilcrow">¶</a></p>
+<p id="section-21.4-6">When <code>binding_token</code> is a JWS-signed JWT using these claims, the Access Request Service, on receipt:<a href="#section-21.4-6" class="pilcrow">¶</a></p>
 <ol start="1" type="1" class="normal type-1" id="section-21.4-7">
 <li id="section-21.4-7.1">
             <p id="section-21.4-7.1.1">parses the JWS header and resolves the verification key from the JWK Set at the PDP's <code>jwks_uri</code>;<a href="#section-21.4-7.1.1" class="pilcrow">¶</a></p>
@@ -3350,7 +3350,7 @@ Content-Type: application/problem+json
             <p id="section-21.4-7.5.1">rejects with <code>urn:openid:authzen:access-request:error:invalid_denial_binding</code> on any failure.<a href="#section-21.4-7.5.1" class="pilcrow">¶</a></p>
 </li>
         </ol>
-<p id="section-21.4-8">When <code>request_context</code> uses another integrity-protected format, the Access Request Service <span class="bcp14">MUST</span> perform equivalent verification for issuer authenticity, audience or intended recipient, expiry when present, replay resistance when provided by the format, and binding to the submitted Subject, Resource, Action, and relevant Context.<a href="#section-21.4-8" class="pilcrow">¶</a></p>
+<p id="section-21.4-8">When <code>binding_token</code> uses another integrity-protected format, the Access Request Service <span class="bcp14">MUST</span> perform equivalent verification for issuer authenticity, audience or intended recipient, expiry when present, replay resistance when provided by the format, and binding to the submitted Subject, Resource, Action, and relevant Context.<a href="#section-21.4-8" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="approval-replay">
@@ -3503,7 +3503,7 @@ Content-Type: application/problem+json
           <dd class="break"></dd>
 <dt id="section-23.1-2.11">Description:</dt>
           <dd style="margin-left: 1.5em" id="section-23.1-2.12">
-            <p id="section-23.1-2.12.1">HTTPS URI of a JWK Set (<span>[<a href="#RFC7517" class="cite xref">RFC7517</a>]</span>) document containing the public keys used to verify signatures issued by the PDP, including but not limited to JWS-signed <code>request_context</code> values defined by this profile.<a href="#section-23.1-2.12.1" class="pilcrow">¶</a></p>
+            <p id="section-23.1-2.12.1">HTTPS URI of a JWK Set (<span>[<a href="#RFC7517" class="cite xref">RFC7517</a>]</span>) document containing the public keys used to verify signatures issued by the PDP, including but not limited to JWS-signed <code>binding_token</code> values defined by this profile.<a href="#section-23.1-2.12.1" class="pilcrow">¶</a></p>
 </dd>
           <dd class="break"></dd>
 <dt id="section-23.1-2.13">Change Controller:</dt>
@@ -3776,7 +3776,7 @@ Content-Type: application/json
     "access_request": {
       "template": "manager_approval",
       "expires_in": 600,
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+      "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
       "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
       "request_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json"
@@ -3822,7 +3822,7 @@ Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
     "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
     "evaluated_at": "2026-04-30T20:15:00Z",
     "reason": "approval_required",
-    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+    "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
     "template": "manager_approval"
   }
 }
@@ -3893,7 +3893,7 @@ Content-Type: application/json
           <h4 id="name-re-evaluation-after-approva">
 <a href="#section-24.1.6" class="section-number selfRef">24.1.6. </a><a href="#name-re-evaluation-after-approva" class="section-name selfRef">Re-evaluation After Approval</a>
           </h4>
-<p id="section-24.1.6-1">The re-evaluation request does not repeat the original <code>evaluation_id</code>.  The PDP resolves the <code>approval.id</code> (and <code>approval.binding</code>, when present) to the approved Access Request task and original denied evaluation.<a href="#section-24.1.6-1" class="pilcrow">¶</a></p>
+<p id="section-24.1.6-1">The re-evaluation request does not repeat the original <code>evaluation_id</code>.  The PDP resolves the <code>approval.id</code> (and <code>approval.state</code>, when present) to the approved Access Request task and original denied evaluation.<a href="#section-24.1.6-1" class="pilcrow">¶</a></p>
 <div class="lang-http sourcecode" id="section-24.1.6-2">
 <pre>
 POST /access/v1/evaluation HTTP/1.1
@@ -4017,7 +4017,7 @@ Content-Type: application/json
     "access_request": {
       "template": "agent_tool_class_approval",
       "expires_in": 600,
-      "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+      "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
       "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
     }
   }
@@ -4079,7 +4079,7 @@ Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
     "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
     "evaluated_at": "2026-05-12T15:00:00Z",
     "reason": "agent_authority_missing",
-    "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+    "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
     "template": "agent_tool_class_approval"
   }
 }
@@ -4140,7 +4140,7 @@ Content-Type: application/json
           <h4 id="name-completed-task-2">
 <a href="#section-24.2.6" class="section-number selfRef">24.2.6. </a><a href="#name-completed-task-2" class="section-name selfRef">Completed Task</a>
           </h4>
-<p id="section-24.2.6-1">The agent retrieves the completed task and obtains an approval reference scoped to the CRM tool class for seven days.  This example includes <code>approval.binding</code> to show a deployment where the PDP verifies integrity-protected binding material during re-evaluation rather than relying only on a server-side lookup by <code>approval.id</code>.<a href="#section-24.2.6-1" class="pilcrow">¶</a></p>
+<p id="section-24.2.6-1">The agent retrieves the completed task and obtains an approval reference scoped to the CRM tool class for seven days.  This example includes <code>approval.state</code> to show a deployment where the PDP verifies integrity-protected binding material during re-evaluation rather than relying only on a server-side lookup by <code>approval.id</code>.<a href="#section-24.2.6-1" class="pilcrow">¶</a></p>
 <div class="lang-http sourcecode" id="section-24.2.6-2">
 <pre>
 HTTP/1.1 200 OK
@@ -4157,7 +4157,7 @@ Content-Type: application/json
       "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
       "approved_at": "2026-05-12T17:30:00Z",
       "approved_until": "2026-05-19T17:30:00Z",
-      "binding": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
+      "state": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
     }
   }
 }
@@ -4171,7 +4171,7 @@ Content-Type: application/json
 <a href="#section-24.2.7" class="section-number selfRef">24.2.7. </a><a href="#name-re-evaluation-after-approval" class="section-name selfRef">Re-evaluation After Approval</a>
           </h4>
 <p id="section-24.2.7-1">The agent re-evaluates the original tool invocation; the PDP authorizes it against the approval reference.  Subsequent same-class CRM tool invocations within the approval lifetime are also authorized without a new Access Request.<a href="#section-24.2.7-1" class="pilcrow">¶</a></p>
-<p id="section-24.2.7-2">The re-evaluation request does not repeat the original <code>evaluation_id</code>.  The PDP resolves the <code>approval.id</code> (and <code>approval.binding</code>, when present) to the approved Access Request task, original denied evaluation, and approved CRM tool-class scope.<a href="#section-24.2.7-2" class="pilcrow">¶</a></p>
+<p id="section-24.2.7-2">The re-evaluation request does not repeat the original <code>evaluation_id</code>.  The PDP resolves the <code>approval.id</code> (and <code>approval.state</code>, when present) to the approved Access Request task, original denied evaluation, and approved CRM tool-class scope.<a href="#section-24.2.7-2" class="pilcrow">¶</a></p>
 <div class="lang-http sourcecode" id="section-24.2.7-3">
 <pre>
 POST /access/v1/evaluation HTTP/1.1
@@ -4204,7 +4204,7 @@ Content-Type: application/json
       "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
       "approved_at": "2026-05-12T17:30:00Z",
       "approved_until": "2026-05-19T17:30:00Z",
-      "binding": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
+      "state": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
     }
   }
 }
@@ -4469,7 +4469,7 @@ Content-Type: application/json
 <span class="break"></span><dl class="dlParallel" id="appendix-C-1">
         <dt id="appendix-C-1.1">-00</dt>
         <dd style="margin-left: 1.5em" id="appendix-C-1.2">
-          <p id="appendix-C-1.2.1">Initial version.  Defines requestable denials, the Access Request Endpoint, Task Handles, Task Status Endpoint, the Re-evaluation completion mode with <code>result.mode</code> extension point for profile-defined modes (such as token issuance), per-task callbacks, machine-readable form schemas, sibling Catalogs Document and Catalog Endpoint protocol, integrity-protected <code>request_context</code>, bulk submission with per-item progress and aggregation rules, multi-step <code>progress</code> reporting, PEP-initiated cancellation, synchronous-completion response, the Extensibility and Profiles framework with the AuthZEN Access Request Member Names registry, an Implementation Considerations appendix covering identity governance platforms, subjects/principals/actors, form and catalog translation, notification channels, and evaluators and workflow design, and PDP / PEP / Access Request Service processing rules.<a href="#appendix-C-1.2.1" class="pilcrow">¶</a></p>
+          <p id="appendix-C-1.2.1">Initial version.  Defines requestable denials, the Access Request Endpoint, Task Handles, Task Status Endpoint, the Re-evaluation completion mode with <code>result.mode</code> extension point for profile-defined modes (such as token issuance), per-task callbacks, machine-readable form schemas, sibling Catalogs Document and Catalog Endpoint protocol, integrity-protected <code>binding_token</code>, bulk submission with per-item progress and aggregation rules, multi-step <code>progress</code> reporting, PEP-initiated cancellation, synchronous-completion response, the Extensibility and Profiles framework with the AuthZEN Access Request Member Names registry, an Implementation Considerations appendix covering identity governance platforms, subjects/principals/actors, form and catalog translation, notification channels, and evaluators and workflow design, and PDP / PEP / Access Request Service processing rules.<a href="#appendix-C-1.2.1" class="pilcrow">¶</a></p>
 </dd>
       <dd class="break"></dd>
 </dl>
