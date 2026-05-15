@@ -19,6 +19,7 @@ This profile bridges the two so that:
 
 * An AuthZEN-backed Access Request Service can expose an OAuth Txn Challenge-compatible surface, letting OAuth-native callers integrate without learning AuthZEN.
 * An AuthZEN PEP can complete an Access Request by obtaining an OAuth transaction token rather than re-evaluating, when the deployment's enforcement layer consumes OAuth tokens rather than AuthZEN decisions.
+* A single signed JWT MAY serve as both `context.access_request.binding_token` and OAuth Txn Challenge's `transaction_challenge`, depending on which surface a given caller is using.  Deployments that adopt this pattern issue one artifact and surface it on two wire formats.  See "Alternative: Unified JWT for Polyglot Deployments" below.
 * Implementers building either side learn one model and can interoperate with the other.
 
 The base profile already anticipates this binding.  §10 says: "Implementations that bind approval to a specific issuance flow, such as OAuth token issuance where the issued token is itself the decision representation, MUST do so through a profile that defines a completion mode appropriate to that flow."  This proposal is that profile.
@@ -98,6 +99,28 @@ When this profile is in use, `context.access_request.binding_token` is a JWS tha
 | `act` | Actor / delegation information per RFC 8693; corresponds to `client.actor` per §B.2. |
 
 This claim shape is compatible with both the base profile's §16.3 JWT guidance and OAuth Txn Challenge's required claim set, allowing the same signed JWT to satisfy both specifications.
+
+### Alternative: Unified JWT for Polyglot Deployments
+
+A deployment that implements both this profile and OAuth Txn Challenge MAY issue a single signed JWT per denied evaluation and surface that JWT on both wire formats:
+
+* To AuthZEN-native consumers: returned as `context.access_request.binding_token` in the AuthZEN response (HTTP 200 with `decision: false`).
+* To OAuth-native consumers: returned in the `WWW-Authenticate` header of an HTTP 401 response, per OAuth Txn Challenge:
+
+      WWW-Authenticate: Bearer error="transaction_authorization_required",
+        transaction_challenge="<same JWT>"
+
+Both consumers verify the same JWT against the same JWK Set advertised at the issuer's `jwks_uri`.  Downstream submissions reuse the same JWT verbatim: an AuthZEN PEP echoes it as `denial.binding_token` in an Access Request submission; an OAuth-native caller posts it to the `transaction_authorization_endpoint` per OAuth Txn Challenge.  The JWT's `txn` claim correlates the same transaction across surfaces.
+
+To support both consumers from a single artifact:
+
+* The JWT MUST include the JOSE header `typ: txn-authz-challenge+jwt` per OAuth Txn Challenge; AuthZEN-only consumers ignore the header.
+* When the issuer and verifier differ across the two surfaces (for example, an RS playing the OAuth issuer role and a PDP playing the AuthZEN issuer role, or an AS and ARS playing different verifier roles), the JWT MAY carry an array `aud` claim per Section 4.1.3 of {{RFC7519}} listing both audiences, and each verifier accepts when its identifier is among them.  Deployments where one component plays both issuer roles, or both verifier roles, use scalar `iss` and `aud` claims.
+* The JOSE signing key MUST be discoverable via both surfaces' key-discovery mechanisms: this profile's `jwks_uri` and OAuth Txn Challenge's `txn_challenge_jwks_uri` MAY point at the same JWK Set document.
+
+A polyglot deployment chooses which surface to return on a given request by examining caller signals: the OAuth Txn Challenge `Accept-Txn-Challenge` request header, the path of the protected resource, the caller's `Accept` header, or deployment configuration.  This profile does not define a canonical surface-selection rule; deployments document the rule they apply.
+
+This pattern is recommended for deployments where the same component plays both the AuthZEN PDP and the OAuth Protected Resource roles, or where AuthZEN and OAuth callers need to interoperate against a shared backing workflow.  Deployments where AuthZEN and OAuth flows are operationally independent (different issuers, different keys, different audiences) MAY issue distinct claim-compatible JWTs per the preceding subsection rather than unifying them.
 
 ### Capability URN
 
