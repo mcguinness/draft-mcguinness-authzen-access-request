@@ -109,10 +109,11 @@ Table of Contents
      21.9.  Trusting URLs from the Requestable Denial
      21.10. Catalog Disclosure
      21.11. Task Handle Leakage
-     21.12. Callback Security
-     21.13. PEP Acting on Behalf of the Subject
-     21.14. Idempotency Key Abuse
-     21.15. Availability
+     21.12. PEP-Facing vs End-Client-Facing Surfaces
+     21.13. Callback Security
+     21.14. PEP Acting on Behalf of the Subject
+     21.15. Idempotency Key Abuse
+     21.16. Availability
    22. IANA Considerations
    23. OpenID Foundation Registry Considerations
      23.1.  AuthZEN Policy Decision Point Metadata Registry
@@ -450,15 +451,6 @@ Table of Contents
    expires_at:  OPTIONAL.  String containing an [RFC3339] timestamp.
       Indicates when the requestable denial hint expires.
 
-   expires_in:  OPTIONAL.  Number.  Lifetime in seconds of the
-      requestable denial hint from the time the Decision was produced.
-      The PEP MUST compute the hint's expiry by adding expires_in to the
-      time the Decision was produced; that production time is taken from
-      context.evaluated_at when present, otherwise from the HTTP Date
-      response header.  If neither time source is available, the PEP
-      MUST treat the hint as expired.  PDPs SHOULD use expires_at
-      instead of expires_in when precise expiry handling is required.
-
    binding_token:  OPTIONAL.  String.  Opaque context to be returned to
       the Access Request Service when submitting the access request.
       The PEP MUST NOT decode, modify, or interpret this value.  The PEP
@@ -495,9 +487,6 @@ Table of Contents
       Document describing how the PEP resolves form fields whose values
       are selected from a backing catalog.  See Section 9.
 
-   If both expires_at and expires_in are present, expires_at takes
-   precedence and the PEP MUST ignore expires_in.
-
    The Decision's reason (why the evaluation returned false) is conveyed
    by context.reason per the AuthZEN Authorization API and is echoed by
    the PEP as denial.reason when submitting an Access Request.
@@ -521,7 +510,7 @@ Table of Contents
        "access_request": {
          "endpoint": "https://pdp.example.com/access/v1/requests",
          "template": "manager_approval",
-         "expires_in": 600,
+         "expires_at": "2026-04-30T20:25:00Z",
          "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
          "form_url": "https://requests.example.com/forms/manager_approval",
          "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
@@ -900,9 +889,6 @@ Table of Contents
       The following well-known optional members are defined; additional
       members MAY be included subject to Section 15.2:
 
-      *  requested_duration: String.  ISO 8601 duration (for example,
-         PT4H or P30D) requesting time-bounded access.
-
       *  requested_until: String.  [RFC3339] timestamp requesting access
          through a specific absolute time.
 
@@ -919,9 +905,6 @@ Table of Contents
 
       *  id: OPTIONAL.  String.  Stable identifier for the calling
          application or PEP deployment.
-
-      *  instance_id: OPTIONAL.  String.  Identifier for a specific
-         running instance of the PEP.
 
       *  name: OPTIONAL.  String.  Human-readable name of the calling
          application.
@@ -944,8 +927,13 @@ Table of Contents
          where the request originated.  The following members are
          defined; implementations MAY include additional members.
 
-         -  conversation_id: OPTIONAL.  String.  Identifier of a chat or
-            agent conversation that produced the request.
+         -  session_id: OPTIONAL.  String.  Identifier of a bounded
+            interaction context that produced the request, such as a
+            chat or agent conversation, a web or mobile application
+            session, a CLI invocation, or a long-running workflow
+            thread.  This is an audit-origin identifier and is distinct
+            from any authentication or authorization session associated
+            with the caller.
 
          -  external_url: OPTIONAL.  HTTPS URI.  URL of an external
             system (ticket, document, dashboard, chat thread) that
@@ -1001,13 +989,6 @@ Table of Contents
    that are selected from a backing catalog are resolved according to
    the Catalogs Document referenced by request_catalogs_url; see
    Section 9.
-
-   If both requested_access.requested_duration and
-   requested_access.requested_until are present, the Access Request
-   Service MUST reject the submission unless the deployment defines an
-   explicit reconciliation rule.  When a deployment permits both
-   members, the approved access lifetime MUST NOT exceed the earlier
-   resulting expiry.
 
    A PEP MUST submit an Access Request only for an AuthZEN Decision with
    decision equal to false and a context.access_request object present
@@ -1065,7 +1046,7 @@ Table of Contents
        "business_justification": "Needed for customer renewal review"
      },
      "requested_access": {
-       "requested_duration": "PT4H"
+       "requested_until": "2026-05-01T00:15:00Z"
      },
      "denial": {
        "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
@@ -1103,7 +1084,7 @@ Table of Contents
        "business_justification": "Onboarding to the renewal review project"
      },
      "requested_access": {
-       "requested_duration": "P14D"
+       "requested_until": "2026-05-14T20:15:00Z"
      },
      "denial": {
        "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M2",
@@ -2411,7 +2392,48 @@ Table of Contents
    handle MUST NOT be sufficient to retrieve task status without caller
    authorization.
 
-21.12.  Callback Security
+21.12.  PEP-Facing vs End-Client-Facing Surfaces
+
+   Several members of the task response and approval result are intended
+   for PEP-to-Access-Request-Service or PEP-to-PDP machine interactions,
+   not for direct use by end clients (browsers, mobile applications,
+   agent runtime UIs, or other non-PEP callers acting on behalf of the
+   Subject).  The following are PEP-facing:
+
+   *  task.status_endpoint: the polling URL for the Access Request
+      Service.
+
+   *  task.links.cancel: the cancellation endpoint.
+
+   *  approval.id and approval.state: round-trip material the PEP places
+      at context.approval during re-evaluation.
+
+   PEPs SHOULD NOT forward these members to end clients or other non-PEP
+   callers.  Forwarding status_endpoint or links.cancel creates a direct
+   end-client-to-Access-Request-Service channel that bypasses the PEP's
+   enforcement and authorization context; forwarding approval.id or
+   approval.state allows an end client to attempt to inject the approval
+   reference into other PEPs or other evaluations.  Possession of these
+   values is not itself authorization (see Section 21.11 and the PDP
+   applicability rules in Section 12), but exposing them broadens the
+   attack surface unnecessarily.
+
+   End-client-facing surfaces are conveyed separately and are intended
+   to be human-rendered with their own authorization controls:
+
+   *  task.links.ticket: URL where the requester (Subject) can view the
+      request and its status.
+
+   *  task.links.review: URL where an approver or administrator can
+      review or act on the request.
+
+   *  task.display: localizable user-interface hints.
+
+   When a PEP renders user-facing status to an end client, it SHOULD do
+   so by rendering task.display and task.links.ticket rather than by
+   exposing the machine surfaces.
+
+21.13.  Callback Security
 
    Callback endpoints can be abused for spoofing, replay, and request
    forgery.  Callback notifications MUST be authenticated.  PEPs SHOULD
@@ -2419,7 +2441,7 @@ Table of Contents
    and state values, and treat callbacks as notifications unless they
    contain an enforceable result under this profile.
 
-21.13.  PEP Acting on Behalf of the Subject
+21.14.  PEP Acting on Behalf of the Subject
 
    A PEP submitting an Access Request typically acts on behalf of the
    Subject identified in the original AuthZEN evaluation.  The Access
@@ -2431,13 +2453,13 @@ Table of Contents
    [RFC8693] so the PEP presents a token that names the Subject as the
    on-behalf-of party.
 
-21.14.  Idempotency Key Abuse
+21.15.  Idempotency Key Abuse
 
    Idempotency keys can be used to correlate requests.  Implementations
    SHOULD scope idempotency keys to the authenticated caller and avoid
    storing them longer than necessary.
 
-21.15.  Availability
+21.16.  Availability
 
    Approval workflows can introduce latency and dependency on external
    systems.  PEPs SHOULD fail closed when task status cannot be
@@ -2517,69 +2539,61 @@ Table of Contents
 
    Initial entries registered by this specification:
 
-   +====================+==================+===========================+
-   | Name               | Extension Point  | Description               |
-   +====================+==================+===========================+
-   | requested_duration | requested_access | ISO 8601 duration         |
-   |                    |                  | requesting time-          |
-   |                    |                  | bounded access.           |
-   +--------------------+------------------+---------------------------+
-   | requested_until    | requested_access | RFC 3339 timestamp        |
-   |                    |                  | requesting access         |
-   |                    |                  | through a specific        |
-   |                    |                  | absolute time.            |
-   +--------------------+------------------+---------------------------+
-   | emergency          | requested_access | Boolean requesting an     |
-   |                    |                  | expedited or              |
-   |                    |                  | emergency-access          |
-   |                    |                  | path.                     |
-   +--------------------+------------------+---------------------------+
-   | conversation_id    | client.source    | Identifier of a chat      |
-   |                    |                  | or agent conversation     |
-   |                    |                  | that produced the         |
-   |                    |                  | request.                  |
-   +--------------------+------------------+---------------------------+
-   | external_url       | client.source    | URL of an external        |
-   |                    |                  | system that motivated     |
-   |                    |                  | the request.              |
-   +--------------------+------------------+---------------------------+
-   | integration_id     | client.source    | Identifier of an          |
-   |                    |                  | upstream integration      |
-   |                    |                  | or workflow that          |
-   |                    |                  | produced the request.     |
-   +--------------------+------------------+---------------------------+
-   | description        | Catalog Item     | Human-readable            |
-   |                    |                  | description of the        |
-   |                    |                  | catalog item.             |
-   +--------------------+------------------+---------------------------+
-   | risk_level         | Catalog Item     | Risk classification       |
-   |                    |                  | used by the               |
-   |                    |                  | deployment.               |
-   +--------------------+------------------+---------------------------+
-   | granted            | Catalog Item     | Boolean indicating        |
-   |                    |                  | the requester already     |
-   |                    |                  | has access to the         |
-   |                    |                  | item.                     |
-   +--------------------+------------------+---------------------------+
-   | owner              | Catalog Item     | Identifier or             |
-   |                    |                  | reference for the         |
-   |                    |                  | item's owner.             |
-   +--------------------+------------------+---------------------------+
-   | ticket             | task.links       | URL where the             |
-   |                    |                  | requester can view        |
-   |                    |                  | the request and its       |
-   |                    |                  | status.                   |
-   +--------------------+------------------+---------------------------+
-   | review             | task.links       | URL where an approver     |
-   |                    |                  | or administrator can      |
-   |                    |                  | review or act on the      |
-   |                    |                  | request.                  |
-   +--------------------+------------------+---------------------------+
-   | cancel             | task.links       | URL where the PEP can     |
-   |                    |                  | cancel the request.       |
-   +--------------------+------------------+---------------------------+
+    +=================+==================+===========================+
+    | Name            | Extension Point  | Description               |
+    +=================+==================+===========================+
+    | requested_until | requested_access | RFC 3339 timestamp        |
+    |                 |                  | requesting access through |
+    |                 |                  | a specific absolute time. |
+    +-----------------+------------------+---------------------------+
+    | emergency       | requested_access | Boolean requesting an     |
+    |                 |                  | expedited or emergency-   |
+    |                 |                  | access path.              |
+    +-----------------+------------------+---------------------------+
+    | session_id      | client.source    | Identifier of a bounded   |
+    |                 |                  | interaction context that  |
+    |                 |                  | produced the request      |
+    |                 |                  | (chat or agent            |
+    |                 |                  | conversation, application |
+    |                 |                  | session, CLI invocation,  |
+    |                 |                  | workflow thread).         |
+    +-----------------+------------------+---------------------------+
+    | external_url    | client.source    | URL of an external system |
+    |                 |                  | that motivated the        |
+    |                 |                  | request.                  |
+    +-----------------+------------------+---------------------------+
+    | integration_id  | client.source    | Identifier of an upstream |
+    |                 |                  | integration or workflow   |
+    |                 |                  | that produced the         |
+    |                 |                  | request.                  |
+    +-----------------+------------------+---------------------------+
+    | description     | Catalog Item     | Human-readable            |
+    |                 |                  | description of the        |
+    |                 |                  | catalog item.             |
+    +-----------------+------------------+---------------------------+
+    | risk_level      | Catalog Item     | Risk classification used  |
+    |                 |                  | by the deployment.        |
+    +-----------------+------------------+---------------------------+
+    | granted         | Catalog Item     | Boolean indicating the    |
+    |                 |                  | requester already has     |
+    |                 |                  | access to the item.       |
+    +-----------------+------------------+---------------------------+
+    | owner           | Catalog Item     | Identifier or reference   |
+    |                 |                  | for the item's owner.     |
+    +-----------------+------------------+---------------------------+
+    | ticket          | task.links       | URL where the requester   |
+    |                 |                  | can view the request and  |
+    |                 |                  | its status.               |
+    +-----------------+------------------+---------------------------+
+    | review          | task.links       | URL where an approver or  |
+    |                 |                  | administrator can review  |
+    |                 |                  | or act on the request.    |
+    +-----------------+------------------+---------------------------+
+    | cancel          | task.links       | URL where the PEP can     |
+    |                 |                  | cancel the request.       |
+    +-----------------+------------------+---------------------------+
 
-                                  Table 3
+                                 Table 3
 
    Change Controller for all initial entries: OpenID Foundation AuthZEN
    Working Group.  Specification Document for all initial entries: This
@@ -2626,7 +2640,7 @@ Table of Contents
        "reason": "approval_required",
        "access_request": {
          "template": "manager_approval",
-         "expires_in": 600,
+         "expires_at": "2026-04-30T20:25:00Z",
          "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
          "form_url": "https://requests.example.com/forms/manager_approval",
          "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
@@ -2659,7 +2673,7 @@ Table of Contents
        "business_justification": "Needed for customer renewal review"
      },
      "requested_access": {
-       "requested_duration": "PT4H"
+       "requested_until": "2026-05-01T00:15:00Z"
      },
      "denial": {
        "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
@@ -2818,7 +2832,7 @@ Table of Contents
        "reason": "agent_authority_missing",
        "access_request": {
          "template": "agent_tool_class_approval",
-         "expires_in": 600,
+         "expires_at": "2026-05-12T15:10:00Z",
          "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
          "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
        }
@@ -2829,8 +2843,8 @@ Table of Contents
 
    The agent's runtime submits a request and supplies actor and source
    members so the Access Request Service can route approval to the
-   agent's owner and record the conversation that triggered the request.
-   The agent persists the Task Handle, releases the calling thread, and
+   agent's owner and record the session that triggered the request.  The
+   agent persists the Task Handle, releases the calling thread, and
    continues other in-flight work; approval may take minutes to days,
    and execution resumes when the callback fires.
 
@@ -2856,23 +2870,22 @@ Table of Contents
        "business_justification": "Assembling Q2 renewal report for customer ACME-1042"
      },
      "requested_access": {
-       "requested_duration": "P7D"
+       "requested_until": "2026-05-19T15:00:00Z"
      },
      "client": {
        "id": "renewal_assistant",
-       "instance_id": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M",
        "actor": {
          "id": "agent_renewal_assistant_v3",
          "issuer": "https://agents.example.com",
          "type": "ai_agent"
        },
        "source": {
-         "conversation_id": "conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N"
+         "session_id": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N"
        }
      },
      "callback": {
        "endpoint": "https://agents.example.com/callbacks/access-requests",
-       "state": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M/conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
+       "state": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
        "events": ["approved", "denied", "expired"]
      },
      "denial": {
@@ -2912,7 +2925,7 @@ Table of Contents
    Content-Type: application/json
 
    {
-     "state": "agent_01HX69WJ8Q0K7P4F0V0K9D6Z7M/conv_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
+     "state": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
      "task": {
        "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
        "status": "approved",
