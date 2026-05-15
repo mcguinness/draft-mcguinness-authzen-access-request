@@ -222,10 +222,7 @@ The `access_request` object has the following members:
 : OPTIONAL.  HTTPS URI.  The endpoint to which the PEP submits the access request.  If omitted, the PEP MUST use the `access_request_endpoint` from PDP metadata ({{discovery}}).
 
 `template`:
-: OPTIONAL.  String.  An opaque template identifier that can guide the Access Request Service.  Implementations typically map `template` to a stable identifier of the approval workflow, request schema, or governance policy that applies to this denial.  The value is not a policy language and MUST NOT be interpreted by the PEP except for display or request submission.
-
-`reason`:
-: OPTIONAL.  String.  A stable, machine-readable reason code for the requestable denial.
+: OPTIONAL.  String.  An opaque template identifier that can guide the Access Request Service.  Implementations typically map `template` to a stable identifier of the approval workflow, request schema, governance policy, or categorical source code that applies to this denial.  The value is not a policy language and MUST NOT be interpreted by the PEP except for display or request submission.
 
 `expires_at`:
 : OPTIONAL.  String containing an {{RFC3339}} timestamp.  Indicates when the requestable denial hint expires.
@@ -250,7 +247,7 @@ The `access_request` object has the following members:
 
 If both `expires_at` and `expires_in` are present, `expires_at` takes precedence and the PEP MUST ignore `expires_in`.
 
-The `reason` member of the `access_request` object is independent of any `reason` member that the PDP may include directly in `context`.  The outer `context.reason` describes why the Decision was denied (echoed by the PEP as `denial.reason` when submitting an Access Request); `context.access_request.reason` describes why the denial is requestable and which approval flow applies (used by the PEP at evaluation time but not echoed in the submission).
+The Decision's reason (why the evaluation returned `false`) is conveyed by `context.reason` per the AuthZEN Authorization API and is echoed by the PEP as `denial.reason` when submitting an Access Request.
 
 The PDP MUST provide enough denial-binding material for the Access Request Service to verify that a submitted Access Request corresponds to the denied evaluation.  A requestable denial therefore MUST either include an integrity-protected `request_context`, or include `context.evaluation_id` ({{evaluation-identifier}}) that the Access Request Service can resolve or validate.  When neither binding form is available, the PDP MUST NOT include `context.access_request` in the Decision Context.
 
@@ -266,7 +263,6 @@ The following is a non-normative example:
     "access_request": {
       "endpoint": "https://pdp.example.com/access/v1/requests",
       "template": "manager_approval",
-      "reason": "manager_approval_required",
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
@@ -531,7 +527,7 @@ The `denial` object has the following members.  Each field maps directly to a si
 : OPTIONAL.  {{RFC3339}} timestamp indicating when the denial was produced, echoed from `context.evaluated_at` of the denied evaluation.
 
 `reason`:
-: OPTIONAL.  String.  Machine-readable reason code for the denial, echoed unchanged from `context.reason` of the denied evaluation.  This is the decision's reason and is distinct from any requestability hint the PDP may carry in `context.access_request.reason`.
+: OPTIONAL.  String.  Machine-readable reason code for the denial, echoed unchanged from `context.reason` of the denied evaluation.
 
 `request_context`:
 : REQUIRED when `denial.evaluation_id` is absent; otherwise OPTIONAL.  String.  Integrity-protected binding material echoed unchanged from `context.access_request.request_context` of the denied evaluation ({{requestable-denial-context}}).  The PEP MUST NOT decode, modify, or interpret this value; it returns the original PDP-issued value byte-for-byte.
@@ -1275,7 +1271,7 @@ Approval references can be replayed if not time-bounded.  Approval results MUST 
 
 ## Overbroad Approval
 
-This profile does not define an approval policy language.  Implementations MUST NOT treat the `template`, `reason`, `requested_access`, or `display` fields as sufficient authorization policy.  Actual approval scope and enforcement semantics are determined by the PDP and Access Request Service.
+This profile does not define an approval policy language.  Implementations MUST NOT treat the `template`, `requested_access`, or `display` fields as sufficient authorization policy.  Actual approval scope and enforcement semantics are determined by the PDP and Access Request Service.
 
 ## Approver Eligibility and Separation of Duties {#approver-eligibility}
 
@@ -1459,7 +1455,6 @@ Content-Type: application/json
     "reason": "approval_required",
     "access_request": {
       "template": "manager_approval",
-      "reason": "manager_approval_required",
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
       "form_url": "https://requests.example.com/forms/manager_approval",
@@ -1658,7 +1653,6 @@ Content-Type: application/json
     "reason": "agent_authority_missing",
     "access_request": {
       "template": "agent_tool_class_approval",
-      "reason": "agent_class_approval_required",
       "expires_in": 600,
       "request_context": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
       "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"

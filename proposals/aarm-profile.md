@@ -54,7 +54,7 @@ Registers the following well-known values for `context.access_request.template` 
 | `step_up` | Request triggered by AARM's STEP_UP decision class (direct high-risk action). |
 | `defer_escalation` | Request triggered by AARM's DEFER escalation (unresolved policy deferral requiring human judgment). |
 
-These map to AARM's `ApprovalRequest.source` field.  This proposal places them on `template` rather than `context.access_request.reason` because `template` is echoed in the submission shape introduced by the base profile's flat `denial` object, while `context.access_request.reason` is consumed only by the PEP at evaluation time and is not echoed.
+These map to AARM's `ApprovalRequest.source` field.  This proposal places them on `template` so the Access Request Service can read them directly from `denial.template` in the submission and use them for workflow routing.
 
 ### Context augmentations
 
@@ -115,8 +115,8 @@ A base-profile-only PEP that submits an Access Request without AARM-specific ext
 
 ## Open Questions
 
-- **Risk-level placement.**  Belongs in `context`, `requested_access`, or as a `context.access_request.reason` value?  This proposal puts it in `context` to match how AARM models it (a property of the action under evaluation, not of the requester's ask).  Alternative: structure it as a reason code under `context.access_request.reason`.
-- **Source on `template` vs `reason`.**  This proposal registers `step_up` and `defer_escalation` as `context.access_request.template` values because `template` is echoed in the submission as `denial.template` and is what the Access Request Service reads for routing.  An alternative places them on `context.access_request.reason` for conceptual cleanliness (source-as-reason), but the ARS would then need to extract source from the JWS `request_context` payload or look it up by `evaluation_id` since `context.access_request.reason` is not echoed in the submission.  Confirm `template` is the right carrier, or define an explicit `source` augmentation in the submission's `context`.
+- **Risk-level placement.**  Belongs in `context` or `requested_access`?  This proposal puts it in `context` to match how AARM models it (a property of the action under evaluation, not of the requester's ask).
+- **Source carrier choice.**  This proposal registers `step_up` and `defer_escalation` as `context.access_request.template` values so the Access Request Service can read them directly from `denial.template` in the submission.  An alternative defines a dedicated `source` augmentation in the submission's `context`, separating routing-key semantics from source-code semantics.  Confirm `template` is the right carrier, or define an explicit `source` augmentation.
 - **Configured approvers.**  AARM's `ApprovalRequest` includes a configured-approvers list.  The base profile's privacy considerations argue against exposing approver identities to the PEP.  This proposal does not register a field for configured approvers; the Access Request Service handles approver selection internally.  Confirm this is acceptable for AARM use cases.
 - **SessionContext.**  AARM's SessionContext (accumulated session history) is rich and deployment-specific.  This proposal suggests carrying it through `client.source.external_url` or `client.source.conversation_id` for audit, rather than embedding the full session.  Confirm whether AARM needs a structured `session_context` augmentation.
 - **`policy_confidence` semantics.**  Whether the score is advisory (informational to the approver or re-evaluator) or normative input to the Access Request Service workflow.  This proposal treats it as advisory; AARM may require otherwise.
