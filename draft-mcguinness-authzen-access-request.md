@@ -930,15 +930,30 @@ For a task containing an `items` array ({{access-request-response}}), each appro
 
 The `result.mode` value is `reevaluate`.  The result MUST include an `approval` member.  The `approval` object identifies the approval that completed the Access Request task and has the following members:
 
-* `id`: REQUIRED.  String.  Stable identifier of the approval.
+* `id`: REQUIRED.  String.  Stable, opaque, and unguessable identifier of the approval.  The value MUST contain sufficient entropy to prevent practical guessing and MUST NOT encode semantics that a PEP is expected to parse.
 * `approved_at`: OPTIONAL.  {{RFC3339}} timestamp indicating when the approval completed.
 * `approved_until`: REQUIRED.  {{RFC3339}} timestamp indicating the latest time through which the approval remains valid.  The PEP MUST NOT use the approval for re-evaluation after this timestamp.
 
-The `approval` object MAY additionally include a `state` member.  `state` is an opaque object populated by the Access Request Service or PDP, carrying whatever the PDP needs at re-evaluation time (for example, a signed reference, an extended lookup token, or deployment-specific state).  The PEP MUST NOT modify or interpret the contents of `approval.state`.
+The `approval` object MAY additionally include a `binding` member.  `binding` is an opaque value populated by the Access Request Service or PDP, carrying proof or verifier state the PDP needs at re-evaluation time (for example, a signed reference, an extended lookup token, or deployment-specific state).  The PEP MUST NOT modify or interpret the contents of `approval.binding`.
 
-The PEP MUST include the `approval` object unchanged at `context.approval` inside the AuthZEN re-evaluation request.  The PDP receives the same `approval` shape it produced (id, timestamps, and any `state`) and uses it to identify and verify the approval.
+The `evaluation_id` of the original denied evaluation is denial-binding material for the Access Request submission; it is not the authorization handle used during re-evaluation.  During re-evaluation, the chain back to the approved Access Request and original denial is represented by the `approval` object.  The PDP MUST be able to resolve or verify `approval.id`, `approval.binding`, or both, and bind the approval to the Access Request task, the original denied evaluation when recorded, the approved Subject, Resource, Action, relevant Context, approval scope, and approval expiry.
+
+The PDP MUST NOT authorize a re-evaluation solely because the request contains a known `approval.id`.  The PDP MUST verify that the approval reference presented in `context.approval` is applicable to the authenticated caller or requester, current Subject, Resource, Action, relevant Context, approval scope, and approval expiry.  A swapped, replayed, expired, or otherwise non-applicable approval reference MUST be ignored or rejected, and the PDP MUST evaluate the request as not approved by that reference.
+
+An approval reference has two deployment patterns:
+
+* Lookup: the PDP resolves `approval.id` in trusted server-side state.
+* Bound reference: the PDP verifies `approval.binding`, which carries integrity-protected proof or verifier state.
+
+Deployments MAY use both patterns together.  In all cases, the PDP MUST verify the approval against trusted state or integrity-protected binding material; neither `approval.id` nor `approval.binding` is a bearer grant by itself.
+
+The approval record or verifiable binding material MUST contain, or allow the PDP to determine, at least the approval identifier, Access Request task identifier, original denied evaluation identifier when available, approved Subject, approved Resource and Action or approval scope, requester and client binding, approval status, `approved_at` when available, `approved_until`, and any revocation or cancellation state.
+
+The PEP MUST include the `approval` object unchanged at `context.approval` inside the AuthZEN re-evaluation request.  The PDP receives the same `approval` shape it produced (id, timestamps, and any `binding`) and uses it to identify and verify the approval.
 
 The PDP MUST evaluate the new request using current policy and the approval reference.  The PDP MAY still deny access if policy, subject, resource, action, context, approval lifetime, or risk state no longer permits access.
+
+The PDP MUST check current approval status during re-evaluation, including whether the approval has been revoked, cancelled, superseded, or otherwise invalidated before `approved_until`.  The `approved_until` timestamp is a PEP-side maximum reuse and enforcement bound; it does not prevent the PDP from denying earlier because of revocation, cancellation, policy change, risk change, or other current state.
 
 When the re-evaluation response indicates an approval expiry (typically as `context.approval.approved_until`), the PEP MUST NOT enforce access past that timestamp.  PEPs that issue downstream credentials on the basis of the approved evaluation (for example, an OAuth Authorization Server issuing access tokens) MUST bound the lifetime of those credentials by the earlier of the approval expiry in the Approval Result and any approval expiry returned by the PDP during re-evaluation.
 
@@ -1093,7 +1108,7 @@ Additional members beyond those defined in this document MAY appear only at the 
 * `task.display`: user-interface hints attached to a Task Handle.
 * `task.links`: link relations to related URLs.
 * `result` and the additions defined under each `result.mode`.
-* `approval.state` in a Re-evaluation Mode result: opaque profile-specific or deployment-specific state carried through the PEP to the PDP at re-evaluation time.
+* `approval.binding` in a Re-evaluation Mode result: opaque profile-specific or deployment-specific verifier state carried through the PEP to the PDP at re-evaluation time.
 
 This specification also defines extensibility for enumerated values:
 
@@ -1111,7 +1126,7 @@ A member name or value added at an extension point MUST be one of the following:
 2. An absolute URI (HTTPS or URN) when the member is profile-specific and not appropriate for the registry.  Profiles SHOULD use a stable URI under the profile's change controller.
 3. A reverse-DNS-prefixed identifier (for example, `vendor.example.com/foo`) when the member is private to a single deployment and not intended for cross-implementation use.
 
-The contents of `approval.state` are opaque to this specification and are not subject to the member naming requirements above unless a profile or deployment explicitly defines structure within `approval.state`.
+The contents of `approval.binding` are opaque to this specification and are not subject to the member naming requirements above unless a profile or deployment explicitly defines structure within `approval.binding`.
 
 ## Forward Compatibility
 
@@ -1218,6 +1233,12 @@ The presence of `context.access_request` does not weaken the AuthZEN decision.  
 ## Confused Deputy and Request Substitution
 
 An attacker could attempt to obtain approval for one resource and apply it to another.  Implementations MUST bind Access Requests and approval results to the Subject, Resource, Action, Context, task, and requester.  PDPs MUST validate this binding during re-evaluation.
+
+## Approval Reference Substitution
+
+A hostile or compromised PEP could attempt to submit an `approval.id` or `approval.binding` obtained from another Access Request during re-evaluation.  An approval reference is not a bearer grant by itself.  PDPs MUST resolve or verify the approval reference and confirm that it is bound to the authenticated caller or requester, current Subject, Resource, Action, relevant Context, approval scope, and approval expiry before using it as an input to an allow decision.  Possession of a valid-looking approval identifier is insufficient to authorize access.
+
+When approval state is carried by reference, the PDP or Access Request Service MUST protect the backing approval record against unauthorized lookup and mutation.  When approval binding material is carried by value, for example in `approval.binding`, the PDP MUST verify integrity, issuer, audience or intended recipient, expiry, and binding before accepting it.
 
 ## Request Context Integrity
 
@@ -1534,6 +1555,8 @@ Content-Type: application/json
 
 ### Re-evaluation After Approval
 
+The re-evaluation request does not repeat the original `evaluation_id`.  The PDP resolves the `approval.id` (and `approval.binding`, when present) to the approved Access Request task and original denied evaluation.
+
 ~~~ http
 POST /access/v1/evaluation HTTP/1.1
 Host: pdp.example.com
@@ -1739,7 +1762,7 @@ Content-Type: application/json
 
 ### Completed Task
 
-The agent retrieves the completed task and obtains an approval reference scoped to the CRM tool class for seven days.
+The agent retrieves the completed task and obtains an approval reference scoped to the CRM tool class for seven days.  This example includes `approval.binding` to show a deployment where the PDP verifies integrity-protected binding material during re-evaluation rather than relying only on a server-side lookup by `approval.id`.
 
 ~~~ http
 HTTP/1.1 200 OK
@@ -1755,7 +1778,8 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
       "approved_at": "2026-05-12T17:30:00Z",
-      "approved_until": "2026-05-19T17:30:00Z"
+      "approved_until": "2026-05-19T17:30:00Z",
+      "binding": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
     }
   }
 }
@@ -1764,6 +1788,8 @@ Content-Type: application/json
 ### Re-evaluation After Approval
 
 The agent re-evaluates the original tool invocation; the PDP authorizes it against the approval reference.  Subsequent same-class CRM tool invocations within the approval lifetime are also authorized without a new Access Request.
+
+The re-evaluation request does not repeat the original `evaluation_id`.  The PDP resolves the `approval.id` (and `approval.binding`, when present) to the approved Access Request task, original denied evaluation, and approved CRM tool-class scope.
 
 ~~~ http
 POST /access/v1/evaluation HTTP/1.1
@@ -1795,7 +1821,8 @@ Content-Type: application/json
     "approval": {
       "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
       "approved_at": "2026-05-12T17:30:00Z",
-      "approved_until": "2026-05-19T17:30:00Z"
+      "approved_until": "2026-05-19T17:30:00Z",
+      "binding": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
     }
   }
 }
