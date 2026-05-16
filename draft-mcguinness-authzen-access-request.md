@@ -506,6 +506,7 @@ The request body is a JSON object with the following members:
     * `id`: REQUIRED.  String.  Stable identifier for the actor.
     * `issuer`: OPTIONAL.  String.  Issuer, authority, tenant, or identity provider for the actor identifier.
     * `type`: OPTIONAL.  String.  Actor category, such as `user`, `service`, `workload`, or `ai_agent`.
+    * `act`: OPTIONAL.  Object.  Nested actor representing the next link in a delegation chain, following the conventions in {{?I-D.mcguinness-oauth-actor-profile}}.  Each `act` carries `sub` and `iss` (corresponding to `id` and `issuer` in the immediate actor) and optionally `sub_profile`; nesting represents the chain from the immediate actor outward toward the Subject.  See {{delegation}}.
   * `source`: OPTIONAL.  Object.  Audit-trail context describing where the request originated.  The following members are defined; implementations MAY include additional members.
     * `session_id`: OPTIONAL.  String.  Identifier of a bounded interaction context that produced the request, such as a chat or agent conversation, a web or mobile application session, a CLI invocation, or a long-running workflow thread.  This is an audit-origin identifier and is distinct from any authentication or authorization session associated with the caller.
     * `external_url`: OPTIONAL.  HTTPS URI.  URL of an external system (ticket, document, dashboard, chat thread) that motivated the request.
@@ -1205,6 +1206,26 @@ Refresh of a calling identity's underlying token does not invalidate Task Handle
 
 A task status response MUST NOT disclose approval details, approver identities, policy identifiers, or resource metadata to a caller that is not authorized to receive them.
 
+## Delegation and On-Behalf-Of {#delegation}
+
+A PEP submitting an Access Request frequently acts on behalf of one or more upstream principals.  Common patterns include a SaaS application acting on behalf of an end user, an OAuth Authorization Server acting on behalf of a client and an end user, an agent runtime acting on behalf of an agent which acts on behalf of an end user, and a Security Token Service acting on behalf of an upstream caller.  The protocol surface for these patterns is the AuthZEN `subject` (carrying the principal) together with `client.actor` (carrying the immediate actor and, optionally, an `act` chain reaching back toward the Subject).
+
+This profile does not define a new Subject shape for actor delegation.  Implementations SHOULD follow the conventions defined in {{?I-D.mcguinness-oauth-actor-profile}}, which standardizes an `act` claim representing the immediate actor with required `sub` and `iss` members and a RECOMMENDED `sub_profile` member (taking values such as `ai_agent`, `service`, or `user`).  Nested `act` objects represent multi-hop delegation chains.  The canonical actor identifier is the (`iss`, `sub`) pair regardless of which carrier expresses it.
+
+Under this profile:
+
+* The AuthZEN `subject` carries the principal on whose behalf the operation is performed.
+* `client.actor` (defined in {{access-request-submission}}) carries the immediate actor and MAY include a nested `act` claim that walks the delegation chain from the immediate actor outward toward the Subject.
+* A PEP that captures actor information in the original AuthZEN evaluation's `subject` (for example, via `subject.properties.act`) MAY preserve it in the submission's `subject` or normalize it to `client.actor`; the actor identity itself MUST NOT be dropped during reshaping.
+
+The Access Request Service MUST authenticate the PEP using the deployment's chosen mechanism (typically an OAuth 2.0 bearer token, mutual TLS certificate, or signed assertion).  When the submission claims an actor or actor chain in `client.actor`, the Access Request Service MUST verify that the authenticated caller's credential authorizes the entire claimed chain, not only the immediate actor.  Mechanisms commonly used to provide such authorization include {{RFC8693}} OAuth 2.0 Token Exchange (where the access token names the Subject as the on-behalf-of party and the chain via `act` claims), signed assertions from a trusted issuer, or deployment-specific authentication policies.  The Access Request Service MUST reject submissions whose claimed chain cannot be verified against the caller's credential or against trusted issuers identified in the deployment.
+
+The Access Request Service MUST NOT treat `client.actor` content that has not been independently verified as authorization input; unverified content MAY be retained as audit metadata only.
+
+Approval routing at the Access Request Service MAY consider any identity in the chain (for example, routing approval to the principal's owner, the agent's deployment owner, or a delegated approver).  This profile does not constrain routing policy; it only requires that the necessary identities be representable in the submission and verifiable by the Access Request Service before routing decisions are taken.
+
+Cross-implementation interoperability for delegated flows depends on adoption of a common actor convention.  Deployments and profiles that depend on a specific actor convention SHOULD document the Subject shape, the actor convention used, and the credential format the Access Request Service accepts as proof of the chain.
+
 # Privacy Considerations {#privacy-considerations}
 
 Access Requests may contain sensitive information, including user identifiers, resource identifiers, business justifications, approval chains, and policy reasons.  Implementations SHOULD minimize the amount of information returned to the PEP and displayed to the end user.
@@ -1328,7 +1349,7 @@ Callback endpoints can be abused for spoofing, replay, and request forgery.  Cal
 
 ### PEP Acting on Behalf of the Subject
 
-A PEP submitting an Access Request typically acts on behalf of the Subject identified in the original AuthZEN evaluation.  The Access Request Service MUST verify that the authenticated caller is authorized to act for that Subject for that Resource and Action, including that the caller is a recognized PEP and that the Subject has consented or been delegated to where required.  Deployments requiring explicit delegation MAY use OAuth 2.0 Token Exchange {{RFC8693}} so the PEP presents a token that names the Subject as the on-behalf-of party.
+A PEP submitting an Access Request typically acts on behalf of the Subject identified in the original AuthZEN evaluation, and may act on behalf of a longer delegation chain.  The verification model the Access Request Service applies, the credential the PEP presents, and the wire representation of the delegation chain are defined in {{delegation}}.  An Access Request Service that accepts unverified actor claims weakens the trust model of the entire flow; submissions whose claimed chain cannot be verified MUST be rejected.
 
 ### Idempotency Key Abuse
 
@@ -1874,18 +1895,6 @@ Many implementations sit on top of an existing identity-governance, ITSM, or app
 
 Re-evaluation Mode aligns directly with this pattern: provisioning changes platform state, and a subsequent AuthZEN evaluation reflects that state.  Implementations mapping their richer task lifecycle states onto the canonical statuses defined in this profile SHOULD follow the guidance in {{status-mapping}}.
 
-## Subjects, Principals, and Actors
-
-For deployments where an autonomous actor (an AI agent, service, or workload) submits Access Requests on behalf of a human or organizational principal, the AuthZEN Subject needs to convey both identities so the PDP and Access Request Service can apply policy and route approvals on either.
-
-This profile does not define a Subject shape for actor delegation.  Implementations SHOULD follow the conventions defined in {{?I-D.mcguinness-oauth-actor-profile}}, which standardizes an `act` claim representing the immediate actor with required `act.sub` and `act.iss` members and a RECOMMENDED `sub_profile` member (taking values such as `ai_agent`, `service`, or `user`).  Nested `act` objects represent delegation chains.  Under this profile, an Access Request submission's `subject` carries the principal, and the actor is conveyed as an `act` claim within the subject or as the equivalent `client.actor` member defined in this profile; the canonical actor identifier is the (`act.iss`, `act.sub`) pair regardless of which carrier is used.
-
-A PEP that captures an actor identity in the original AuthZEN evaluation's `subject` (for example, via `subject.properties.act`) MAY preserve the actor in the submission's `subject` or normalize it to `client.actor`.  The base profile's PEP preservation rule ({{pep-processing-rules}}) requires that the principal identity, Resource, Action, and relevant Context be preserved; the actor representation MAY be reshaped between the AuthZEN request and the Access Request submission to use whichever carrier the deployment standardizes on.
-
-Approval routing at the Access Request Service may consider both identities (the principal's owner and the actor's deployment).  This profile does not define routing policy; it only requires that the necessary identities be representable in the submission.
-
-Cross-implementation interoperability for agent flows depends on adoption of a common actor convention.  Implementations using a different convention can interoperate within a single deployment but may not interoperate across deployments that handle agent identity differently.  Deployments and profiles that depend on agent-versus-principal distinction SHOULD document the Subject shape and actor convention they use as part of their profile or implementation guide; the agent driver use cases described in this profile's Introduction assume a common convention is in place.
-
 ## Form and Catalog Translation
 
 Most existing platforms have proprietary form description languages with field types beyond JSON Schema's native vocabulary, and proprietary catalog APIs with vendor-specific request and response shapes.  Implementations translate to the JSON Schema referenced by `request_schema_url` and to the Catalogs Document and Catalog Endpoint protocol defined in {{catalog-references}}.  Translation may be lossy for vendor-specific widgets and metadata; richer rendering details belong behind `form_url`, while the JSON Schema and Catalogs Document provide enough information for an autonomous PEP.  Deployments that expose tools or catalogs to autonomous agents through an agent protocol can additionally surface catalogs through that protocol; see {{catalog-agent-protocol}}.
@@ -1924,6 +1933,63 @@ Common workflow patterns that absorb volume include:
 * Pre-approval or standing grants established out of band (for example, when an agent is provisioned), so the caller never reaches a denial that requires interactive approval.
 
 This profile defines the substrate; it does not define approval workflow.  The Access Request Service is responsible for implementing the evaluator policy and the workflow primitives that route submissions appropriately.  The protocol's bulk submission, idempotency, synchronous-completion response, and approval-expiry semantics provide the inputs an Access Request Service needs to apply these patterns.
+
+# Design Rationale {#design-rationale}
+
+This appendix records non-obvious design choices and the reasoning behind them.  It is non-normative.  Where the spec elsewhere defines a normative rule, that rule governs; this appendix only explains why the rule takes the shape it does.
+
+## Why a profile of AuthZEN, rather than a standalone specification?
+
+The AuthZEN Authorization API defines the allow/deny decision surface that protected systems already integrate with.  Building a separate request-and-approval protocol would duplicate AuthZEN's evaluation model and split the authorization ecosystem.  As an AuthZEN profile, this specification reuses AuthZEN's Subject, Resource, Action, Context, and Decision concepts; introduces a single new object (`context.access_request`) on the response side; and reuses AuthZEN's evaluation endpoint for the re-evaluation step.  A PDP that already speaks AuthZEN gains this profile by emitting one additional object on denials and accepting one additional context member on re-evaluation requests.
+
+## Why is Re-evaluation Mode the only base completion mode?
+
+The PDP is the authoritative point at enforcement time.  Returning an AuthZEN decision (rather than a token or any other directly-enforceable artifact) ensures that current policy, subject status, risk state, revocation, and approval expiry are all evaluated again at the point of use, not frozen at approval time.  Approval workflows often take minutes to days; conditions can change.  Profiles that bind approval to a specific issuance flow (such as OAuth token issuance, where the issued token is itself the decision representation) define their own completion mode through the `result.mode` extension point ({{completion-semantics}}); the base profile deliberately keeps that surface profile-shaped.
+
+## Why does the approval round-trip through the PEP rather than direct PDP-to-Access-Request-Service communication?
+
+The Access Request Service and PDP may be the same component, components in the same deployment, or independent services.  Routing the approval reference through the PEP makes the protocol topology-agnostic: the PEP carries `result.approval` from the Access Request Service to the PDP through a normal AuthZEN evaluation, with no requirement for back-channel communication or shared state.  Deployments where the PDP and Access Request Service share state benefit because the PDP can resolve `approval.id` directly; deployments where they are independent benefit because integrity-protected `approval.state` lets the PDP verify the approval without trusting the Access Request Service's API.
+
+## Why one Access Request Endpoint per deployment, rather than per-resource or per-tenant?
+
+A reader familiar with REST conventions might expect resource-scoped endpoints (for example, `/resources/{id}/access-requests`) or tenant-scoped endpoints in multi-tenant SaaS.  A single endpoint per deployment, identified by `access_request_endpoint` in PDP metadata, simplifies discovery: one metadata lookup, one stable call site, no URL templating in PEP code.  Routing decisions (workflow class, tenant, resource family) happen inside the request payload via `template`, the submitted Subject/Resource/Action, and other context members, rather than via URL structure.  Intermediate enforcers (an OAuth Authorization Server or other gateway acting as PEP) MAY proxy the endpoint and present a different URL to their own callers while preserving the protocol surface.
+
+## Why are there two binding patterns (`evaluation_id` and `binding_token`)?
+
+Different deployment topologies have different trust models:
+
+* In a same-service or trusted deployment, the Access Request Service can look up the denied evaluation by `evaluation_id` in shared or accessible state.  No cryptographic verification is needed at the boundary.
+* In a deployment where the Access Request Service is independent of the PDP, the Access Request Service cannot trust the PEP's claim that a denial happened.  A PDP-signed `binding_token` lets the Access Request Service verify the denial cryptographically without a back-channel.
+
+Supporting both patterns lets the same wire format work across topologies without forcing every deployment to operate signing infrastructure or shared state.
+
+## Why does the submission's `denial` object carry only key fields, not the full AuthZEN Decision?
+
+A reader expecting an audit-style echo of the denied Decision might wonder why the submission carries `evaluation_id`, `evaluated_at`, `reason`, `binding_token`, and `template` rather than the entire `{decision, context}` object.  Two reasons.  First, the binding material the Access Request Service consumes (`evaluation_id` and `binding_token`) provides stronger evidence of the denial than a verbatim JSON echo could, since binding material is signed or server-resolvable and an echo would be PEP-supplied.  Second, the other fields of `context.access_request` (`endpoint`, `display`, `form_url`, etc.) are evaluation-time PEP guidance, not data the Access Request Service consumes at submission time.  Carrying only what the Access Request Service uses keeps the wire surface small.
+
+## Why does the `denial` object support both a top-level and per-item form for bulk submissions?
+
+A reader looking at the bulk submission shape sees a top-level `denial` object alongside per-item `denial` members inside `items[]` and might wonder why both exist.  Real bulk submissions come in two shapes.  In the first, a single batch evaluation produces one denial that covers multiple (Resource, Action) pairs; the top-level `denial` carries one set of binding material whose JWS payload or `evaluation_id` claims encompass the whole bundle.  In the second, multiple separate evaluations produce distinct denials that the PEP bundles into one submission; each item carries its own per-item `denial` with binding material specific to that item.  Supporting both shapes lets the wire format absorb both batch-evaluation and bundled-from-separate-evaluations patterns without forcing the PEP to either issue separate Access Requests (losing the bulk benefit) or fabricate a synthetic bundle binding (compromising binding integrity).
+
+## Why is `approval.state` distinct from `binding_token` when both are opaque round-trip slots?
+
+The two slots play different protocol roles with different constraint regimes.  `binding_token` is PDP-issued and Access-Request-Service-verified; it MUST be integrity-protected, typically as a JWS, with the §16 token-hygiene claim recommendations.  `approval.state` is Access-Request-Service-issued (or PDP-issued via the Access Request Service) and PDP-verified; it is opaque and format-flexible, allowing a signed token, a lookup reference, or deployment-specific state.  The different names signal the asymmetric constraint regimes; a unified name would over-promise that the two slots play the same role.
+
+## Why are timestamps always absolute, never relative durations?
+
+Absolute RFC 3339 timestamps appear at every time-bounded value in the spec: `task.expires_at`, `approved_until`, `approved_at`, `evaluated_at`, `context.access_request.expires_at`, `requested_access.requested_until`.  Some specifications use relative durations (`expires_in`, OAuth-style) alongside absolute timestamps; this profile uses absolute timestamps throughout because two forms for the same concept create reconciliation logic at every consumer and a precedence rule at the wire.  Clock skew between hosts is addressed by tolerance guidance in {{impl-considerations}}.
+
+## Why is `template` an opaque free-form string rather than a constrained enumeration?
+
+Workflow categorization is deployment-specific.  An IGA platform's workflow names, an ITSM ticket-class identifier, an AI-supervisor source code, and a custom governance system's policy identifier all play the same role.  Constraining `template` to an enumeration would either pick winners or grow indefinitely; leaving it opaque lets profiles register their own well-known values without revising the base.  The §16 Overbroad Approval rule ensures `template` is treated as routing input, not as authorization policy.
+
+## Why does the spec deliberately not define a workflow engine, approval policy language, or user interface?
+
+These exist in many incompatible forms across IGA, ITSM, governance, chat-approval, and custom platforms.  Standardizing them in this profile would either pick a single vendor model or define a surface so broad it carries no semantic value.  The protocol layer between authorization enforcement and whatever workflow runs underneath is the interoperable seam; everything below it is implementation choice.  This positioning is what lets deployments adopt the profile alongside existing approval infrastructure without rewriting the workflow.
+
+## Why is `result.mode` extensible at all, given the base defines only one mode?
+
+The base profile is opinionated about PDP-authoritative-at-enforcement (Re-evaluation Mode), but real deployments include token-issuance flows (OAuth, OAuth Transaction Authorization Challenge), credential-issuance flows, and direct-decision flows where the Access Request Service's intent is consumed without a re-evaluation step.  Defining a base extension point lets profiles bind to those flows without changing the base wire shape, and lets the base spec remain stable as profile work evolves.
 
 # Acknowledgements
 
