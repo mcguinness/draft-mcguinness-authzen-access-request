@@ -282,6 +282,8 @@ A PDP returns `evaluation_id` as a member of the AuthZEN Decision Context: `cont
 
 A PDP that returns `context.access_request` without an integrity-protected `binding_token` MUST include `evaluation_id` so the Access Request Service has verifiable denial-binding material.
 
+Profiles that bridge to specifications using a transaction-binding identifier (for example, a token-issuance profile whose underlying specification carries a separate transaction identifier claim) MAY use `evaluation_id` directly as that identifier when its uniqueness, stability, and binding-window properties match the consuming specification's requirements.
+
 A PDP MAY return `evaluated_at` as a member of the AuthZEN Decision Context: `context.evaluated_at`, an {{RFC3339}} timestamp indicating when the Decision was produced.  The PEP echoes the captured timestamp as `denial.evaluated_at` when submitting an Access Request.
 
 # Machine-Readable Forms {#machine-readable-forms}
@@ -1234,7 +1236,7 @@ The `binding_token` member round-trips PDP-issued state through the PEP to the A
 This profile does not mandate a specific JWS payload; the contents are deployment-specific.  Implementations that issue `binding_token` as a JWT SHOULD include the following claims to provide sound token hygiene and confused-deputy protection:
 
 * `iss`: PDP identifier.  Lets the Access Request Service select the correct verification key from the PDP's JWK Set ({{discovery}}).
-* `aud`: Access Request Service identifier.  Prevents replay of a token issued for one Access Request Service against another.
+* `aud`: Access Request Service identifier, or an array of identifiers including the Access Request Service.  Array audiences support polyglot deployments that issue a single JWT consumed by multiple verifiers; the Access Request Service accepts the JWT when its identifier is among the listed audiences.  Prevents replay of a token issued for one Access Request Service against another.
 * `iat`, `exp`: issued-at and expiry.  Expiry SHOULD be short (typically minutes, aligned with the requestable-denial hint lifetime).
 * `jti`: unique token identifier.  The Access Request Service SHOULD track recently-seen `jti` values to detect replay of an otherwise valid token.
 * Binding claims that identify the original denied evaluation.  Either:
@@ -1255,6 +1257,8 @@ When `binding_token` is a JWS-signed JWT using these claims, the Access Request 
 5. rejects with `urn:openid:authzen:access-request:error:invalid_denial_binding` on any failure.
 
 When `binding_token` uses another integrity-protected format, the Access Request Service MUST perform equivalent verification for issuer authenticity, audience or intended recipient, expiry when present, replay resistance when provided by the format, and binding to the submitted Subject, Resource, Action, and relevant Context.
+
+A single signed JWT MAY simultaneously satisfy this profile's claim recommendations and the requirements of another profile or specification that uses the same JWT, provided the union of required claims is present and consistent.  This enables polyglot deployments that issue one artifact and surface it on multiple wire formats (for example, as `context.access_request.binding_token` in an AuthZEN response and as a profile-defined token elsewhere).  Verifiers process only the claims they understand and tolerate additional profile-specific claims without rejecting the JWT.
 
 ## Approval Replay
 
