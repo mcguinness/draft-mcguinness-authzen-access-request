@@ -636,7 +636,7 @@ When the Access Request Service is able to resolve the request synchronously (fo
 The `task` object has the following members:
 
 `id`:
-: REQUIRED.  Opaque task identifier.  The PEP MUST NOT parse or infer semantics from this value.
+: REQUIRED.  Stable, opaque, and unguessable task identifier.  The value MUST contain sufficient entropy to prevent practical guessing and MUST NOT encode semantics that a PEP is expected to parse.
 
 `status`:
 : REQUIRED.  Current task status.  Values are defined in {{task-status}}.
@@ -832,6 +832,8 @@ Implementations SHOULD document the mapping they apply so that PEP behavior rema
 
 ## Pending Task Response
 
+A response with `task.status: pending` echoes the Task Handle returned at submission ({{access-request-response}}).  Subsequent polls return the same response shape with status, progress, and link members updated as the task advances; when the task reaches a terminal status, the response form is governed by {{completed-task-response}}.
+
 Non-normative example:
 
 ~~~ http
@@ -915,9 +917,7 @@ Most existing approval, IGA, and ITSM systems map naturally onto Re-evaluation M
 
 For a task containing an `items` array ({{access-request-response}}), each approved item MUST include a per-item `result` that is independently enforceable according to its own `result.mode`.
 
-## Re-evaluation Mode
-
-The `result.mode` value is `reevaluate`.  The result MUST include an `approval` member.  The `approval` object identifies the approval that completed the Access Request task and has the following members:
+When `result.mode` is `reevaluate`, the result MUST include an `approval` member.  The `approval` object identifies the approval that completed the Access Request task and has the following members:
 
 * `id`: REQUIRED.  String.  Stable, opaque, and unguessable identifier of the approval.  The value MUST contain sufficient entropy to prevent practical guessing and MUST NOT encode semantics that a PEP is expected to parse.
 * `approved_at`: OPTIONAL.  {{RFC3339}} timestamp indicating when the approval completed.
@@ -1119,7 +1119,7 @@ The contents of `approval.state` are opaque to this specification and are not su
 
 ## Forward Compatibility
 
-An implementation receiving a member or value it does not recognize at an extension point MUST ignore it and MUST NOT fail processing on the basis of the unrecognized name.  An implementation MAY surface unrecognized members in audit records or pass them through unchanged when echoing wire content (for example, in callbacks).
+An implementation receiving a member or value it does not recognize at an extension point MUST ignore it and MUST NOT fail processing on the basis of the unrecognized name.  This default does not override fail-safe rules defined elsewhere in this profile, such as the PEP rule in {{pep-processing-rules}} that treats unknown `result.mode` values as not approved rather than as ignorable.  An implementation MAY surface unrecognized members in audit records or pass them through unchanged when echoing wire content (for example, in callbacks).
 
 ## Profiles
 
@@ -1215,21 +1215,23 @@ Approval records SHOULD be retained only as long as required by business, securi
 
 # Security Considerations
 
-## Denial Remains Denial
+## Decision and Binding Integrity
+
+### Denial Remains Denial
 
 The presence of `context.access_request` does not weaken the AuthZEN decision.  A PEP MUST NOT grant access based on a requestable denial.  Access is permitted only after an approved completion result is enforced according to this profile.
 
-## Confused Deputy and Request Substitution
+### Confused Deputy and Request Substitution
 
 An attacker could attempt to obtain approval for one resource and apply it to another.  Implementations MUST bind Access Requests and approval results to the Subject, Resource, Action, Context, task, and requester.  PDPs MUST validate this binding during re-evaluation.
 
-## Approval Reference Substitution
+### Approval Reference Substitution
 
 A hostile or compromised PEP could attempt to submit an `approval.id` or `approval.state` obtained from another Access Request during re-evaluation.  An approval reference is not a bearer grant by itself.  PDPs MUST resolve or verify the approval reference and confirm that it is bound to the authenticated caller or requester, current Subject, Resource, Action, relevant Context, approval scope, and approval expiry before using it as an input to an allow decision.  Possession of a valid-looking approval identifier is insufficient to authorize access.
 
 When approval state is carried by reference, the PDP or Access Request Service MUST protect the backing approval record against unauthorized lookup and mutation.  When approval binding material is carried by value, for example in `approval.state`, the PDP MUST verify integrity, issuer, audience or intended recipient, expiry, and binding before accepting it.
 
-## Binding Token Integrity
+### Binding Token Integrity
 
 The `binding_token` member round-trips PDP-issued state through the PEP to the Access Request Service.  Without integrity protection, a buggy or hostile PEP could drop, alter, or fabricate this value to influence approval routing or scope.  PDPs MUST integrity-protect `binding_token` using a mechanism the Access Request Service can verify and SHOULD issue it as a JWS so the Access Request Service can prove the value was produced by the PDP and bound to the original denied evaluation.  When the payload contains information that must not be visible to the PEP, the PDP MAY use JWE in addition to integrity protection, for example by encrypting a signed payload.  This is a confused-deputy mitigation: it lets the Access Request Service confirm that the requestable-denial state was issued by the PDP and not fabricated or altered by the PEP.
 
@@ -1260,29 +1262,33 @@ When `binding_token` uses another integrity-protected format, the Access Request
 
 A single signed JWT MAY simultaneously satisfy this profile's claim recommendations and the requirements of another profile or specification that uses the same JWT, provided the union of required claims is present and consistent.  This enables polyglot deployments that issue one artifact and surface it on multiple wire formats (for example, as `context.access_request.binding_token` in an AuthZEN response and as a profile-defined token elsewhere).  Verifiers process only the claims they understand and tolerate additional profile-specific claims without rejecting the JWT.
 
-## Approval Replay
+### Approval Replay
 
 Approval references can be replayed if not time-bounded.  Approval results MUST expire.  Re-evaluation Mode SHOULD bind approval references to the original request tuple.  Profiles of this specification that define token-based completion modes are responsible for defining the token's audience restriction, lifetime, and binding to the approved request.
 
-## Overbroad Approval
+## Policy and Approver Hygiene
+
+### Overbroad Approval
 
 This profile does not define an approval policy language.  Implementations MUST NOT treat the `template`, `requested_access`, or `display` fields as sufficient authorization policy.  Actual approval scope and enforcement semantics are determined by the PDP and Access Request Service.
 
-## Approver Eligibility and Separation of Duties {#approver-eligibility}
+### Approver Eligibility and Separation of Duties {#approver-eligibility}
 
 Approval workflows can violate enterprise access policy if an approver is not eligible to approve the requested access.  Access Request Services MUST evaluate approver eligibility before returning `approved`, including self-approval restrictions, delegated approver authority, separation-of-duties constraints, ownership rules, and conflict-of-interest policy.  A workflow step completed by an ineligible approver MUST NOT be treated as successful approval unless local policy explicitly allows that exception and records it for audit.
 
-## Emergency Access
+### Emergency Access
 
 The `requested_access.emergency` member is a request signal, not an authorization override.  Implementations that support emergency or break-glass access SHOULD require a business justification, apply the shortest practical approval or access lifetime, notify appropriate owners or security personnel, and require post-use review.  Emergency requests and approvals SHOULD be retained and auditable according to the deployment's security and compliance policy.
 
-## Trusting URLs from the Requestable Denial
+## Information Disclosure
+
+### Trusting URLs from the Requestable Denial
 
 The `endpoint`, `form_url`, `request_schema_url`, `request_catalogs_url`, and the catalog `endpoint` values inside a Catalogs Document are all delivered to the PEP inside a denial response or document fetched on the basis of that response.  A compromised or misconfigured PDP, or an Access Request Service compelled by one, could direct the PEP at attacker-controlled hosts to harvest justifications, render hostile UI, substitute schemas and catalogs, or perform credential phishing against the requester.
 
 PEPs SHOULD verify that these URLs resolve to hosts trusted under the deployment, typically by requiring the same origin as the Access Request Endpoint advertised in PDP metadata or by maintaining an explicit allowlist of trusted Access Request Service hosts.  PEPs MUST NOT submit credentials to a host that is not trusted to receive them.
 
-## Catalog Disclosure
+### Catalog Disclosure
 
 Catalog Endpoints ({{catalog-references}}) can leak sensitive information about applications, entitlements, organizational structure, or finance master data if not properly authorized.  An attacker who can call a Catalog Endpoint without scoping or authorization can enumerate sensitive identifiers, infer access policy, or harvest catalog metadata.
 
@@ -1292,11 +1298,11 @@ Mitigations:
 * Catalog Endpoints SHOULD apply rate limits and abuse detection commensurate with the sensitivity of the catalog they expose.
 * PEPs SHOULD prefer searching with `search_param` over bulk enumeration.
 
-## Task Handle Leakage {#task-handle-leakage}
+### Task Handle Leakage {#task-handle-leakage}
 
 Task handles can reveal workflow state or be used to poll for sensitive information.  Task handles MUST be opaque, unguessable, and protected by authentication and authorization checks.  A leaked task handle MUST NOT be sufficient to retrieve task status without caller authorization.
 
-## PEP-Facing vs End-Client-Facing Surfaces
+### PEP-Facing vs End-Client-Facing Surfaces
 
 Several members of the task response and approval result are intended for PEP-to-Access-Request-Service or PEP-to-PDP machine interactions, not for direct use by end clients (browsers, mobile applications, agent runtime UIs, or other non-PEP callers acting on behalf of the Subject).  The following are PEP-facing:
 
@@ -1314,19 +1320,21 @@ End-client-facing surfaces are conveyed separately and are intended to be human-
 
 When a PEP renders user-facing status to an end client, it SHOULD do so by rendering `task.display` and `task.links.ticket` rather than by exposing the machine surfaces.
 
-## Callback Security
+## Operational and Integration
+
+### Callback Security
 
 Callback endpoints can be abused for spoofing, replay, and request forgery.  Callback notifications MUST be authenticated.  PEPs SHOULD verify callback origin, bind callbacks to expected task identifiers and state values, and treat callbacks as notifications unless they contain an enforceable result under this profile.
 
-## PEP Acting on Behalf of the Subject
+### PEP Acting on Behalf of the Subject
 
 A PEP submitting an Access Request typically acts on behalf of the Subject identified in the original AuthZEN evaluation.  The Access Request Service MUST verify that the authenticated caller is authorized to act for that Subject for that Resource and Action, including that the caller is a recognized PEP and that the Subject has consented or been delegated to where required.  Deployments requiring explicit delegation MAY use OAuth 2.0 Token Exchange {{RFC8693}} so the PEP presents a token that names the Subject as the on-behalf-of party.
 
-## Idempotency Key Abuse
+### Idempotency Key Abuse
 
 Idempotency keys can be used to correlate requests.  Implementations SHOULD scope idempotency keys to the authenticated caller and avoid storing them longer than necessary.
 
-## Availability
+### Availability
 
 Approval workflows can introduce latency and dependency on external systems.  PEPs SHOULD fail closed when task status cannot be determined.  Access Request Services SHOULD apply rate limits and abuse detection to request submission and polling endpoints.
 
@@ -1422,6 +1430,8 @@ Initial entries registered by this specification:
 | `cancel` | `task.links` | URL where the PEP can cancel the request. |
 
 Change Controller for all initial entries: OpenID Foundation AuthZEN Working Group.  Specification Document for all initial entries: This document.
+
+--- back
 
 # Examples
 
@@ -1849,8 +1859,6 @@ Content-Type: application/json
   }
 }
 ~~~
-
---- back
 
 # Implementation Considerations {#impl-considerations}
 
