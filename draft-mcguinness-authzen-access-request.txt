@@ -4,8 +4,8 @@
 
 Network Working Group                                      K. McGuinness
 Internet-Draft                                               Independent
-Intended status: Standards Track                             15 May 2026
-Expires: 16 November 2026
+Intended status: Standards Track                             16 May 2026
+Expires: 17 November 2026
 
 
               AuthZEN Access Request and Approval Profile
@@ -39,7 +39,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on 16 November 2026.
+   This Internet-Draft will expire on 17 November 2026.
 
 Copyright Notice
 
@@ -545,6 +545,13 @@ Table of Contents
    A PDP that returns context.access_request without an integrity-
    protected binding_token MUST include evaluation_id so the Access
    Request Service has verifiable denial-binding material.
+
+   Profiles that bridge to specifications using a transaction-binding
+   identifier (for example, a token-issuance profile whose underlying
+   specification carries a separate transaction identifier claim) MAY
+   use evaluation_id directly as that identifier when its uniqueness,
+   stability, and binding-window properties match the consuming
+   specification's requirements.
 
    A PDP MAY return evaluated_at as a member of the AuthZEN Decision
    Context: context.evaluated_at, an [RFC3339] timestamp indicating when
@@ -2248,7 +2255,11 @@ Table of Contents
    *  iss: PDP identifier.  Lets the Access Request Service select the
       correct verification key from the PDP's JWK Set (Section 6).
 
-   *  aud: Access Request Service identifier.  Prevents replay of a
+   *  aud: Access Request Service identifier, or an array of identifiers
+      including the Access Request Service.  Array audiences support
+      polyglot deployments that issue a single JWT consumed by multiple
+      verifiers; the Access Request Service accepts the JWT when its
+      identifier is among the listed audiences.  Prevents replay of a
       token issued for one Access Request Service against another.
 
    *  iat, exp: issued-at and expiry.  Expiry SHOULD be short (typically
@@ -2305,6 +2316,16 @@ Table of Contents
    issuer authenticity, audience or intended recipient, expiry when
    present, replay resistance when provided by the format, and binding
    to the submitted Subject, Resource, Action, and relevant Context.
+
+   A single signed JWT MAY simultaneously satisfy this profile's claim
+   recommendations and the requirements of another profile or
+   specification that uses the same JWT, provided the union of required
+   claims is present and consistent.  This enables polyglot deployments
+   that issue one artifact and surface it on multiple wire formats (for
+   example, as context.access_request.binding_token in an AuthZEN
+   response and as a profile-defined token elsewhere).  Verifiers
+   process only the claims they understand and tolerate additional
+   profile-specific claims without rejecting the JWT.
 
 21.5.  Approval Replay
 
