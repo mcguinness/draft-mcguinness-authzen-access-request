@@ -84,7 +84,6 @@ Table of Contents
      11.3.  Completed Task Response
      11.4.  Cancellation
    12. Completion Semantics
-     12.1.  Re-evaluation Mode
    13. Callback Completion
    14. Error Responses
    15. Extensibility and Profiles
@@ -98,57 +97,61 @@ Table of Contents
    19. Authorization and Authentication
    20. Privacy Considerations
    21. Security Considerations
-     21.1.  Denial Remains Denial
-     21.2.  Confused Deputy and Request Substitution
-     21.3.  Approval Reference Substitution
-     21.4.  Binding Token Integrity
-     21.5.  Approval Replay
-     21.6.  Overbroad Approval
-     21.7.  Approver Eligibility and Separation of Duties
-     21.8.  Emergency Access
-     21.9.  Trusting URLs from the Requestable Denial
-     21.10. Catalog Disclosure
-     21.11. Task Handle Leakage
-     21.12. PEP-Facing vs End-Client-Facing Surfaces
-     21.13. Callback Security
-     21.14. PEP Acting on Behalf of the Subject
-     21.15. Idempotency Key Abuse
-     21.16. Availability
+     21.1.  Decision and Binding Integrity
+       21.1.1.  Denial Remains Denial
+       21.1.2.  Confused Deputy and Request Substitution
+       21.1.3.  Approval Reference Substitution
+       21.1.4.  Binding Token Integrity
+       21.1.5.  Approval Replay
+     21.2.  Policy and Approver Hygiene
+       21.2.1.  Overbroad Approval
+       21.2.2.  Approver Eligibility and Separation of Duties
+       21.2.3.  Emergency Access
+     21.3.  Information Disclosure
+       21.3.1.  Trusting URLs from the Requestable Denial
+       21.3.2.  Catalog Disclosure
+       21.3.3.  Task Handle Leakage
+       21.3.4.  PEP-Facing vs End-Client-Facing Surfaces
+     21.4.  Operational and Integration
+       21.4.1.  Callback Security
+       21.4.2.  PEP Acting on Behalf of the Subject
+       21.4.3.  Idempotency Key Abuse
+       21.4.4.  Availability
    22. IANA Considerations
    23. OpenID Foundation Registry Considerations
      23.1.  AuthZEN Policy Decision Point Metadata Registry
      23.2.  AuthZEN Policy Decision Point Capabilities Registry
      23.3.  AuthZEN Access Request Member Names Registry
-   24. Examples
-     24.1.  End-to-End Manager Approval
-       24.1.1.  Initial Evaluation Request
-       24.1.2.  Requestable Denial
-       24.1.3.  Submitting the Access Request
-       24.1.4.  Task Handle
-       24.1.5.  Completed Task
-       24.1.6.  Re-evaluation After Approval
-       24.1.7.  Final Decision
-     24.2.  End-to-End Agent Tool Discovery
-       24.2.1.  Initial Evaluation Request
-       24.2.2.  Requestable Denial
-       24.2.3.  Submitting the Access Request
-       24.2.4.  Task Handle
-       24.2.5.  Approval Callback
-       24.2.6.  Completed Task
-       24.2.7.  Re-evaluation After Approval
-       24.2.8.  Final Decision
-   25. References
-     25.1.  Normative References
-     25.2.  Informative References
-   Appendix A.  Implementation Considerations
-     A.1.  Identity Governance and Approval Platforms
-     A.2.  Subjects, Principals, and Actors
-     A.3.  Form and Catalog Translation
-     A.4.  Notification Channels
-     A.5.  Time and Clock Skew
-     A.6.  Evaluators and Workflow Design
-   Appendix B.  Acknowledgements
-   Appendix C.  Document History
+   24. References
+     24.1.  Normative References
+     24.2.  Informative References
+   Appendix A.  Examples
+     A.1.  End-to-End Manager Approval
+       A.1.1.  Initial Evaluation Request
+       A.1.2.  Requestable Denial
+       A.1.3.  Submitting the Access Request
+       A.1.4.  Task Handle
+       A.1.5.  Completed Task
+       A.1.6.  Re-evaluation After Approval
+       A.1.7.  Final Decision
+     A.2.  End-to-End Agent Tool Discovery
+       A.2.1.  Initial Evaluation Request
+       A.2.2.  Requestable Denial
+       A.2.3.  Submitting the Access Request
+       A.2.4.  Task Handle
+       A.2.5.  Approval Callback
+       A.2.6.  Completed Task
+       A.2.7.  Re-evaluation After Approval
+       A.2.8.  Final Decision
+   Appendix B.  Implementation Considerations
+     B.1.  Identity Governance and Approval Platforms
+     B.2.  Subjects, Principals, and Actors
+     B.3.  Form and Catalog Translation
+     B.4.  Notification Channels
+     B.5.  Time and Clock Skew
+     B.6.  Evaluators and Workflow Design
+   Appendix C.  Acknowledgements
+   Appendix D.  Document History
    Author's Address
 
 1.  Introduction
@@ -1131,8 +1134,10 @@ Table of Contents
 
    The task object has the following members:
 
-   id:  REQUIRED.  Opaque task identifier.  The PEP MUST NOT parse or
-      infer semantics from this value.
+   id:  REQUIRED.  Stable, opaque, and unguessable task identifier.  The
+      value MUST contain sufficient entropy to prevent practical
+      guessing and MUST NOT encode semantics that a PEP is expected to
+      parse.
 
    status:  REQUIRED.  Current task status.  Values are defined in
       Section 11.1.
@@ -1437,6 +1442,12 @@ Table of Contents
 
 11.2.  Pending Task Response
 
+   A response with task.status: pending echoes the Task Handle returned
+   at submission (Section 10.2).  Subsequent polls return the same
+   response shape with status, progress, and link members updated as the
+   task advances; when the task reaches a terminal status, the response
+   form is governed by Section 11.3.
+
    Non-normative example:
 
    HTTP/1.1 200 OK
@@ -1575,18 +1586,16 @@ Table of Contents
 
    Most existing approval, IGA, and ITSM systems map naturally onto Re-
    evaluation Mode: approval changes state in a backing system, and a
-   subsequent AuthZEN evaluation reflects that state.  See Appendix A
+   subsequent AuthZEN evaluation reflects that state.  See Appendix B
    for deployment patterns that adopt this mapping.
 
    For a task containing an items array (Section 10.2), each approved
    item MUST include a per-item result that is independently enforceable
    according to its own result.mode.
 
-12.1.  Re-evaluation Mode
-
-   The result.mode value is reevaluate.  The result MUST include an
-   approval member.  The approval object identifies the approval that
-   completed the Access Request task and has the following members:
+   When result.mode is reevaluate, the result MUST include an approval
+   member.  The approval object identifies the approval that completed
+   the Access Request task and has the following members:
 
    *  id: REQUIRED.  String.  Stable, opaque, and unguessable identifier
       of the approval.  The value MUST contain sufficient entropy to
@@ -1954,7 +1963,10 @@ Table of Contents
 
    An implementation receiving a member or value it does not recognize
    at an extension point MUST ignore it and MUST NOT fail processing on
-   the basis of the unrecognized name.  An implementation MAY surface
+   the basis of the unrecognized name.  This default does not override
+   fail-safe rules defined elsewhere in this profile, such as the PEP
+   rule in Section 16 that treats unknown result.mode values as not
+   approved rather than as ignorable.  An implementation MAY surface
    unrecognized members in audit records or pass them through unchanged
    when echoing wire content (for example, in callbacks).
 
@@ -2198,21 +2210,23 @@ Table of Contents
 
 21.  Security Considerations
 
-21.1.  Denial Remains Denial
+21.1.  Decision and Binding Integrity
+
+21.1.1.  Denial Remains Denial
 
    The presence of context.access_request does not weaken the AuthZEN
    decision.  A PEP MUST NOT grant access based on a requestable denial.
    Access is permitted only after an approved completion result is
    enforced according to this profile.
 
-21.2.  Confused Deputy and Request Substitution
+21.1.2.  Confused Deputy and Request Substitution
 
    An attacker could attempt to obtain approval for one resource and
    apply it to another.  Implementations MUST bind Access Requests and
    approval results to the Subject, Resource, Action, Context, task, and
    requester.  PDPs MUST validate this binding during re-evaluation.
 
-21.3.  Approval Reference Substitution
+21.1.3.  Approval Reference Substitution
 
    A hostile or compromised PEP could attempt to submit an approval.id
    or approval.state obtained from another Access Request during re-
@@ -2231,7 +2245,7 @@ Table of Contents
    integrity, issuer, audience or intended recipient, expiry, and
    binding before accepting it.
 
-21.4.  Binding Token Integrity
+21.1.4.  Binding Token Integrity
 
    The binding_token member round-trips PDP-issued state through the PEP
    to the Access Request Service.  Without integrity protection, a buggy
@@ -2327,7 +2341,7 @@ Table of Contents
    process only the claims they understand and tolerate additional
    profile-specific claims without rejecting the JWT.
 
-21.5.  Approval Replay
+21.1.5.  Approval Replay
 
    Approval references can be replayed if not time-bounded.  Approval
    results MUST expire.  Re-evaluation Mode SHOULD bind approval
@@ -2336,7 +2350,9 @@ Table of Contents
    responsible for defining the token's audience restriction, lifetime,
    and binding to the approved request.
 
-21.6.  Overbroad Approval
+21.2.  Policy and Approver Hygiene
+
+21.2.1.  Overbroad Approval
 
    This profile does not define an approval policy language.
    Implementations MUST NOT treat the template, requested_access, or
@@ -2344,7 +2360,7 @@ Table of Contents
    scope and enforcement semantics are determined by the PDP and Access
    Request Service.
 
-21.7.  Approver Eligibility and Separation of Duties
+21.2.2.  Approver Eligibility and Separation of Duties
 
    Approval workflows can violate enterprise access policy if an
    approver is not eligible to approve the requested access.  Access
@@ -2356,7 +2372,7 @@ Table of Contents
    local policy explicitly allows that exception and records it for
    audit.
 
-21.8.  Emergency Access
+21.2.3.  Emergency Access
 
    The requested_access.emergency member is a request signal, not an
    authorization override.  Implementations that support emergency or
@@ -2366,7 +2382,9 @@ Table of Contents
    requests and approvals SHOULD be retained and auditable according to
    the deployment's security and compliance policy.
 
-21.9.  Trusting URLs from the Requestable Denial
+21.3.  Information Disclosure
+
+21.3.1.  Trusting URLs from the Requestable Denial
 
    The endpoint, form_url, request_schema_url, request_catalogs_url, and
    the catalog endpoint values inside a Catalogs Document are all
@@ -2384,7 +2402,7 @@ Table of Contents
    MUST NOT submit credentials to a host that is not trusted to receive
    them.
 
-21.10.  Catalog Disclosure
+21.3.2.  Catalog Disclosure
 
    Catalog Endpoints (Section 9) can leak sensitive information about
    applications, entitlements, organizational structure, or finance
@@ -2405,7 +2423,7 @@ Table of Contents
    *  PEPs SHOULD prefer searching with search_param over bulk
       enumeration.
 
-21.11.  Task Handle Leakage
+21.3.3.  Task Handle Leakage
 
    Task handles can reveal workflow state or be used to poll for
    sensitive information.  Task handles MUST be opaque, unguessable, and
@@ -2413,7 +2431,7 @@ Table of Contents
    handle MUST NOT be sufficient to retrieve task status without caller
    authorization.
 
-21.12.  PEP-Facing vs End-Client-Facing Surfaces
+21.3.4.  PEP-Facing vs End-Client-Facing Surfaces
 
    Several members of the task response and approval result are intended
    for PEP-to-Access-Request-Service or PEP-to-PDP machine interactions,
@@ -2435,7 +2453,7 @@ Table of Contents
    enforcement and authorization context; forwarding approval.id or
    approval.state allows an end client to attempt to inject the approval
    reference into other PEPs or other evaluations.  Possession of these
-   values is not itself authorization (see Section 21.11 and the PDP
+   values is not itself authorization (see Section 21.3.3 and the PDP
    applicability rules in Section 12), but exposing them broadens the
    attack surface unnecessarily.
 
@@ -2454,7 +2472,9 @@ Table of Contents
    so by rendering task.display and task.links.ticket rather than by
    exposing the machine surfaces.
 
-21.13.  Callback Security
+21.4.  Operational and Integration
+
+21.4.1.  Callback Security
 
    Callback endpoints can be abused for spoofing, replay, and request
    forgery.  Callback notifications MUST be authenticated.  PEPs SHOULD
@@ -2462,7 +2482,7 @@ Table of Contents
    and state values, and treat callbacks as notifications unless they
    contain an enforceable result under this profile.
 
-21.14.  PEP Acting on Behalf of the Subject
+21.4.2.  PEP Acting on Behalf of the Subject
 
    A PEP submitting an Access Request typically acts on behalf of the
    Subject identified in the original AuthZEN evaluation.  The Access
@@ -2474,13 +2494,13 @@ Table of Contents
    [RFC8693] so the PEP presents a token that names the Subject as the
    on-behalf-of party.
 
-21.15.  Idempotency Key Abuse
+21.4.3.  Idempotency Key Abuse
 
    Idempotency keys can be used to correlate requests.  Implementations
    SHOULD scope idempotency keys to the authenticated caller and avoid
    storing them longer than necessary.
 
-21.16.  Availability
+21.4.4.  Availability
 
    Approval workflows can introduce latency and dependency on external
    systems.  PEPs SHOULD fail closed when task status cannot be
@@ -2620,432 +2640,9 @@ Table of Contents
    Working Group.  Specification Document for all initial entries: This
    document.
 
-24.  Examples
+24.  References
 
-24.1.  End-to-End Manager Approval
-
-24.1.1.  Initial Evaluation Request
-
-   POST /access/v1/evaluation HTTP/1.1
-   Host: pdp.example.com
-   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
-   Content-Type: application/json
-
-   {
-     "subject": {
-       "type": "user",
-       "id": "alice@example.com"
-     },
-     "resource": {
-       "type": "document",
-       "id": "q4-plan"
-     },
-     "action": {
-       "name": "can_read"
-     },
-     "context": {
-       "time": "2026-04-30T20:15:00Z"
-     }
-   }
-
-24.1.2.  Requestable Denial
-
-   HTTP/1.1 200 OK
-   Content-Type: application/json
-
-   {
-     "decision": false,
-     "context": {
-       "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
-       "evaluated_at": "2026-04-30T20:15:00Z",
-       "reason": "approval_required",
-       "access_request": {
-         "template": "manager_approval",
-         "expires_at": "2026-04-30T20:25:00Z",
-         "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
-         "form_url": "https://requests.example.com/forms/manager_approval",
-         "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
-         "request_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json"
-       }
-     }
-   }
-
-24.1.3.  Submitting the Access Request
-
-   POST /access/v1/requests HTTP/1.1
-   Host: pdp.example.com
-   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
-   Content-Type: application/json
-   Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
-
-   {
-     "subject": {
-       "type": "user",
-       "id": "alice@example.com"
-     },
-     "resource": {
-       "type": "document",
-       "id": "q4-plan"
-     },
-     "action": {
-       "name": "can_read"
-     },
-     "context": {
-       "business_justification": "Needed for customer renewal review"
-     },
-     "requested_access": {
-       "requested_until": "2026-05-01T00:15:00Z"
-     },
-     "denial": {
-       "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
-       "evaluated_at": "2026-04-30T20:15:00Z",
-       "reason": "approval_required",
-       "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
-       "template": "manager_approval"
-     }
-   }
-
-24.1.4.  Task Handle
-
-   HTTP/1.1 202 Accepted
-   Content-Type: application/json
-   Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4
-
-   {
-     "task": {
-       "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-       "status": "pending",
-       "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-       "expires_at": "2026-04-30T23:00:00Z",
-       "links": {
-         "cancel": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4/cancel"
-       },
-       "display": {
-         "title": "Access request submitted",
-         "description": "Your manager has been asked to approve access."
-       }
-     }
-   }
-
-24.1.5.  Completed Task
-
-   HTTP/1.1 200 OK
-   Content-Type: application/json
-
-   {
-     "task": {
-       "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
-       "status": "approved"
-     },
-     "result": {
-       "mode": "reevaluate",
-       "approval": {
-         "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
-         "approved_at": "2026-04-30T20:42:00Z",
-         "approved_until": "2026-05-01T00:42:00Z"
-       }
-     }
-   }
-
-24.1.6.  Re-evaluation After Approval
-
-   The re-evaluation request does not repeat the original evaluation_id.
-   The PDP resolves the approval.id (and approval.state, when present)
-   to the approved Access Request task and original denied evaluation.
-
-   POST /access/v1/evaluation HTTP/1.1
-   Host: pdp.example.com
-   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
-   Content-Type: application/json
-
-   {
-     "subject": {
-       "type": "user",
-       "id": "alice@example.com"
-     },
-     "resource": {
-       "type": "document",
-       "id": "q4-plan"
-     },
-     "action": {
-       "name": "can_read"
-     },
-     "context": {
-       "time": "2026-04-30T20:43:00Z",
-       "approval": {
-         "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
-         "approved_at": "2026-04-30T20:42:00Z",
-         "approved_until": "2026-05-01T00:42:00Z"
-       }
-     }
-   }
-
-24.1.7.  Final Decision
-
-   HTTP/1.1 200 OK
-   Content-Type: application/json
-
-   {
-     "decision": true,
-     "context": {
-       "approval": {
-         "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
-         "approved_until": "2026-05-01T00:42:00Z"
-       }
-     }
-   }
-
-24.2.  End-to-End Agent Tool Discovery
-
-   This non-normative example shows an AI agent acting on behalf of a
-   user that, mid-task, requires authority to invoke a previously
-   undeclared downstream tool.  A broad-scope approval grants authority
-   for a class of subsequent same-class invocations, so the agent does
-   not produce a new Access Request for each related call.
-
-24.2.1.  Initial Evaluation Request
-
-   The agent attempts to invoke a CRM search tool while assembling a
-   renewal report.
-
-   POST /access/v1/evaluation HTTP/1.1
-   Host: pdp.example.com
-   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
-   Content-Type: application/json
-
-   {
-     "subject": {
-       "type": "user",
-       "id": "alice@example.com",
-       "properties": {
-         "act": {
-           "iss": "https://agents.example.com",
-           "sub": "agent_renewal_assistant_v3",
-           "sub_profile": "ai_agent"
-         }
-       }
-     },
-     "resource": {
-       "type": "tool",
-       "id": "crm.search_accounts"
-     },
-     "action": {
-       "name": "invoke"
-     },
-     "context": {
-       "time": "2026-05-12T15:00:00Z"
-     }
-   }
-
-24.2.2.  Requestable Denial
-
-   The PDP returns a denial requesting broad-scope approval for the
-   agent to call CRM tools.
-
-   HTTP/1.1 200 OK
-   Content-Type: application/json
-
-   {
-     "decision": false,
-     "context": {
-       "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
-       "evaluated_at": "2026-05-12T15:00:00Z",
-       "reason": "agent_authority_missing",
-       "access_request": {
-         "template": "agent_tool_class_approval",
-         "expires_at": "2026-05-12T15:10:00Z",
-         "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
-         "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
-       }
-     }
-   }
-
-24.2.3.  Submitting the Access Request
-
-   The agent's runtime submits a request and supplies actor and source
-   members so the Access Request Service can route approval to the
-   agent's owner and record the session that triggered the request.  The
-   agent persists the Task Handle, releases the calling thread, and
-   continues other in-flight work; approval may take minutes to days,
-   and execution resumes when the callback fires.
-
-   POST /access/v1/requests HTTP/1.1
-   Host: pdp.example.com
-   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
-   Content-Type: application/json
-   Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
-
-   {
-     "subject": {
-       "type": "user",
-       "id": "alice@example.com"
-     },
-     "resource": {
-       "type": "tool",
-       "id": "crm.search_accounts"
-     },
-     "action": {
-       "name": "invoke"
-     },
-     "context": {
-       "business_justification": "Assembling Q2 renewal report for customer ACME-1042"
-     },
-     "requested_access": {
-       "requested_until": "2026-05-19T15:00:00Z"
-     },
-     "client": {
-       "id": "renewal_assistant",
-       "actor": {
-         "id": "agent_renewal_assistant_v3",
-         "issuer": "https://agents.example.com",
-         "type": "ai_agent"
-       },
-       "source": {
-         "session_id": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N"
-       }
-     },
-     "callback": {
-       "endpoint": "https://agents.example.com/callbacks/access-requests",
-       "state": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
-       "events": ["approved", "denied", "expired"]
-     },
-     "denial": {
-       "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
-       "evaluated_at": "2026-05-12T15:00:00Z",
-       "reason": "agent_authority_missing",
-       "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
-       "template": "agent_tool_class_approval"
-     }
-   }
-
-24.2.4.  Task Handle
-
-   HTTP/1.1 202 Accepted
-   Content-Type: application/json
-   Location: https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7
-
-   {
-     "task": {
-       "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
-       "status": "pending",
-       "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
-       "expires_at": "2026-05-20T00:00:00Z"
-     }
-   }
-
-24.2.5.  Approval Callback
-
-   Hours later, after the agent's owner approves the request, the Access
-   Request Service notifies the agent's callback endpoint.  The callback
-   is notification-only; the agent retrieves the Task Status Endpoint
-   before enforcing access.
-
-   POST /callbacks/access-requests HTTP/1.1
-   Host: agents.example.com
-   Authorization: Bearer mF_9.B5f-4.1JqM
-   Content-Type: application/json
-
-   {
-     "state": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
-     "task": {
-       "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
-       "status": "approved",
-       "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7"
-     }
-   }
-
-24.2.6.  Completed Task
-
-   The agent retrieves the completed task and obtains an approval
-   reference scoped to the CRM tool class for seven days.  This example
-   includes approval.state to show a deployment where the PDP verifies
-   integrity-protected binding material during re-evaluation rather than
-   relying only on a server-side lookup by approval.id.
-
-   HTTP/1.1 200 OK
-   Content-Type: application/json
-
-   {
-     "task": {
-       "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
-       "status": "approved"
-     },
-     "result": {
-       "mode": "reevaluate",
-       "approval": {
-         "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
-         "approved_at": "2026-05-12T17:30:00Z",
-         "approved_until": "2026-05-19T17:30:00Z",
-         "state": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
-       }
-     }
-   }
-
-24.2.7.  Re-evaluation After Approval
-
-   The agent re-evaluates the original tool invocation; the PDP
-   authorizes it against the approval reference.  Subsequent same-class
-   CRM tool invocations within the approval lifetime are also authorized
-   without a new Access Request.
-
-   The re-evaluation request does not repeat the original evaluation_id.
-   The PDP resolves the approval.id (and approval.state, when present)
-   to the approved Access Request task, original denied evaluation, and
-   approved CRM tool-class scope.
-
-   POST /access/v1/evaluation HTTP/1.1
-   Host: pdp.example.com
-   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
-   Content-Type: application/json
-
-   {
-     "subject": {
-       "type": "user",
-       "id": "alice@example.com",
-       "properties": {
-         "act": {
-           "iss": "https://agents.example.com",
-           "sub": "agent_renewal_assistant_v3",
-           "sub_profile": "ai_agent"
-         }
-       }
-     },
-     "resource": {
-       "type": "tool",
-       "id": "crm.search_accounts"
-     },
-     "action": {
-       "name": "invoke"
-     },
-     "context": {
-       "time": "2026-05-12T17:31:00Z",
-       "approval": {
-         "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
-         "approved_at": "2026-05-12T17:30:00Z",
-         "approved_until": "2026-05-19T17:30:00Z",
-         "state": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
-       }
-     }
-   }
-
-24.2.8.  Final Decision
-
-   HTTP/1.1 200 OK
-   Content-Type: application/json
-
-   {
-     "decision": true,
-     "context": {
-       "approval": {
-         "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
-         "approved_until": "2026-05-19T17:30:00Z"
-       }
-     }
-   }
-
-25.  References
-
-25.1.  Normative References
+24.1.  Normative References
 
    [AuthZEN]  Gazitt, O., Brossard, D., and A. Tulshibagwale,
               "Authorization API 1.0", 29 April 2026,
@@ -3130,7 +2727,7 @@ Table of Contents
               for HTTP APIs", RFC 9457, DOI 10.17487/RFC9457, July 2023,
               <https://www.rfc-editor.org/rfc/rfc9457>.
 
-25.2.  Informative References
+24.2.  Informative References
 
    [I-D.mcguinness-oauth-actor-profile]
               McGuinness, K., "OAuth Actor Profile for Delegation", Work
@@ -3148,12 +2745,435 @@ Table of Contents
               Version 3.0", January 2013, <https://docs.oasis-
               open.org/xacml/3.0/xacml-3.0-core-spec-os-en.html>.
 
-Appendix A.  Implementation Considerations
+Appendix A.  Examples
+
+A.1.  End-to-End Manager Approval
+
+A.1.1.  Initial Evaluation Request
+
+   POST /access/v1/evaluation HTTP/1.1
+   Host: pdp.example.com
+   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+   Content-Type: application/json
+
+   {
+     "subject": {
+       "type": "user",
+       "id": "alice@example.com"
+     },
+     "resource": {
+       "type": "document",
+       "id": "q4-plan"
+     },
+     "action": {
+       "name": "can_read"
+     },
+     "context": {
+       "time": "2026-04-30T20:15:00Z"
+     }
+   }
+
+A.1.2.  Requestable Denial
+
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+
+   {
+     "decision": false,
+     "context": {
+       "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+       "evaluated_at": "2026-04-30T20:15:00Z",
+       "reason": "approval_required",
+       "access_request": {
+         "template": "manager_approval",
+         "expires_at": "2026-04-30T20:25:00Z",
+         "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+         "form_url": "https://requests.example.com/forms/manager_approval",
+         "request_schema_url": "https://requests.example.com/schemas/manager_approval.json",
+         "request_catalogs_url": "https://requests.example.com/catalogs/manager_approval.json"
+       }
+     }
+   }
+
+A.1.3.  Submitting the Access Request
+
+   POST /access/v1/requests HTTP/1.1
+   Host: pdp.example.com
+   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+   Content-Type: application/json
+   Idempotency-Key: 7b8d0f0d-65a1-4af1-9fd3-a684f08a5d13
+
+   {
+     "subject": {
+       "type": "user",
+       "id": "alice@example.com"
+     },
+     "resource": {
+       "type": "document",
+       "id": "q4-plan"
+     },
+     "action": {
+       "name": "can_read"
+     },
+     "context": {
+       "business_justification": "Needed for customer renewal review"
+     },
+     "requested_access": {
+       "requested_until": "2026-05-01T00:15:00Z"
+     },
+     "denial": {
+       "evaluation_id": "eval_01HX4Y2P8BQ4Y3F0V0K9D6Z7M1",
+       "evaluated_at": "2026-04-30T20:15:00Z",
+       "reason": "approval_required",
+       "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNFkyUDhCUTRZM0YwVjBLOUQ2WjdNMSJ9.bXBfc2lnbmF0dXJl",
+       "template": "manager_approval"
+     }
+   }
+
+A.1.4.  Task Handle
+
+   HTTP/1.1 202 Accepted
+   Content-Type: application/json
+   Location: https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4
+
+   {
+     "task": {
+       "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+       "status": "pending",
+       "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+       "expires_at": "2026-04-30T23:00:00Z",
+       "links": {
+         "cancel": "https://pdp.example.com/access/v1/requests/arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4/cancel"
+       },
+       "display": {
+         "title": "Access request submitted",
+         "description": "Your manager has been asked to approve access."
+       }
+     }
+   }
+
+A.1.5.  Completed Task
+
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+
+   {
+     "task": {
+       "id": "arq_01HX4Y3AJZ7Y56W2F9H8Q8C1V4",
+       "status": "approved"
+     },
+     "result": {
+       "mode": "reevaluate",
+       "approval": {
+         "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+         "approved_at": "2026-04-30T20:42:00Z",
+         "approved_until": "2026-05-01T00:42:00Z"
+       }
+     }
+   }
+
+A.1.6.  Re-evaluation After Approval
+
+   The re-evaluation request does not repeat the original evaluation_id.
+   The PDP resolves the approval.id (and approval.state, when present)
+   to the approved Access Request task and original denied evaluation.
+
+   POST /access/v1/evaluation HTTP/1.1
+   Host: pdp.example.com
+   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+   Content-Type: application/json
+
+   {
+     "subject": {
+       "type": "user",
+       "id": "alice@example.com"
+     },
+     "resource": {
+       "type": "document",
+       "id": "q4-plan"
+     },
+     "action": {
+       "name": "can_read"
+     },
+     "context": {
+       "time": "2026-04-30T20:43:00Z",
+       "approval": {
+         "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+         "approved_at": "2026-04-30T20:42:00Z",
+         "approved_until": "2026-05-01T00:42:00Z"
+       }
+     }
+   }
+
+A.1.7.  Final Decision
+
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+
+   {
+     "decision": true,
+     "context": {
+       "approval": {
+         "id": "apr_01HX4Y8E2NE3Y2X7P0K4JE6WVH",
+         "approved_until": "2026-05-01T00:42:00Z"
+       }
+     }
+   }
+
+A.2.  End-to-End Agent Tool Discovery
+
+   This non-normative example shows an AI agent acting on behalf of a
+   user that, mid-task, requires authority to invoke a previously
+   undeclared downstream tool.  A broad-scope approval grants authority
+   for a class of subsequent same-class invocations, so the agent does
+   not produce a new Access Request for each related call.
+
+A.2.1.  Initial Evaluation Request
+
+   The agent attempts to invoke a CRM search tool while assembling a
+   renewal report.
+
+   POST /access/v1/evaluation HTTP/1.1
+   Host: pdp.example.com
+   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+   Content-Type: application/json
+
+   {
+     "subject": {
+       "type": "user",
+       "id": "alice@example.com",
+       "properties": {
+         "act": {
+           "iss": "https://agents.example.com",
+           "sub": "agent_renewal_assistant_v3",
+           "sub_profile": "ai_agent"
+         }
+       }
+     },
+     "resource": {
+       "type": "tool",
+       "id": "crm.search_accounts"
+     },
+     "action": {
+       "name": "invoke"
+     },
+     "context": {
+       "time": "2026-05-12T15:00:00Z"
+     }
+   }
+
+A.2.2.  Requestable Denial
+
+   The PDP returns a denial requesting broad-scope approval for the
+   agent to call CRM tools.
+
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+
+   {
+     "decision": false,
+     "context": {
+       "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
+       "evaluated_at": "2026-05-12T15:00:00Z",
+       "reason": "agent_authority_missing",
+       "access_request": {
+         "template": "agent_tool_class_approval",
+         "expires_at": "2026-05-12T15:10:00Z",
+         "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+         "request_schema_url": "https://requests.example.com/schemas/agent_tool_class_approval.json"
+       }
+     }
+   }
+
+A.2.3.  Submitting the Access Request
+
+   The agent's runtime submits a request and supplies actor and source
+   members so the Access Request Service can route approval to the
+   agent's owner and record the session that triggered the request.  The
+   agent persists the Task Handle, releases the calling thread, and
+   continues other in-flight work; approval may take minutes to days,
+   and execution resumes when the callback fires.
+
+   POST /access/v1/requests HTTP/1.1
+   Host: pdp.example.com
+   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+   Content-Type: application/json
+   Idempotency-Key: 9c1f5d12-2a18-4cba-8a5e-e0e8e2b6b5c7
+
+   {
+     "subject": {
+       "type": "user",
+       "id": "alice@example.com"
+     },
+     "resource": {
+       "type": "tool",
+       "id": "crm.search_accounts"
+     },
+     "action": {
+       "name": "invoke"
+     },
+     "context": {
+       "business_justification": "Assembling Q2 renewal report for customer ACME-1042"
+     },
+     "requested_access": {
+       "requested_until": "2026-05-19T15:00:00Z"
+     },
+     "client": {
+       "id": "renewal_assistant",
+       "actor": {
+         "id": "agent_renewal_assistant_v3",
+         "issuer": "https://agents.example.com",
+         "type": "ai_agent"
+       },
+       "source": {
+         "session_id": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N"
+       }
+     },
+     "callback": {
+       "endpoint": "https://agents.example.com/callbacks/access-requests",
+       "state": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
+       "events": ["approved", "denied", "expired"]
+     },
+     "denial": {
+       "evaluation_id": "eval_01HX6A9D2M7N0F4G3K2T9P1B8X",
+       "evaluated_at": "2026-05-12T15:00:00Z",
+       "reason": "agent_authority_missing",
+       "binding_token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJldmFsdWF0aW9uX2lkIjoiZXZhbF8wMUhYNkE5RDJNN04wRjRHM0syVDlQMUI4WCIsImNsYXNzIjoiY3JtX3Rvb2xzIn0.aGFzaA",
+       "template": "agent_tool_class_approval"
+     }
+   }
+
+A.2.4.  Task Handle
+
+   HTTP/1.1 202 Accepted
+   Content-Type: application/json
+   Location: https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7
+
+   {
+     "task": {
+       "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
+       "status": "pending",
+       "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
+       "expires_at": "2026-05-20T00:00:00Z"
+     }
+   }
+
+A.2.5.  Approval Callback
+
+   Hours later, after the agent's owner approves the request, the Access
+   Request Service notifies the agent's callback endpoint.  The callback
+   is notification-only; the agent retrieves the Task Status Endpoint
+   before enforcing access.
+
+   POST /callbacks/access-requests HTTP/1.1
+   Host: agents.example.com
+   Authorization: Bearer mF_9.B5f-4.1JqM
+   Content-Type: application/json
+
+   {
+     "state": "session_01HX69WJ8Q0K7P4F0V0K9D6Z7N",
+     "task": {
+       "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
+       "status": "approved",
+       "status_endpoint": "https://pdp.example.com/access/v1/requests/arq_01HX6AAB3J7Y56W2F9H8Q8C1V7"
+     }
+   }
+
+A.2.6.  Completed Task
+
+   The agent retrieves the completed task and obtains an approval
+   reference scoped to the CRM tool class for seven days.  This example
+   includes approval.state to show a deployment where the PDP verifies
+   integrity-protected binding material during re-evaluation rather than
+   relying only on a server-side lookup by approval.id.
+
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+
+   {
+     "task": {
+       "id": "arq_01HX6AAB3J7Y56W2F9H8Q8C1V7",
+       "status": "approved"
+     },
+     "result": {
+       "mode": "reevaluate",
+       "approval": {
+         "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
+         "approved_at": "2026-05-12T17:30:00Z",
+         "approved_until": "2026-05-19T17:30:00Z",
+         "state": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
+       }
+     }
+   }
+
+A.2.7.  Re-evaluation After Approval
+
+   The agent re-evaluates the original tool invocation; the PDP
+   authorizes it against the approval reference.  Subsequent same-class
+   CRM tool invocations within the approval lifetime are also authorized
+   without a new Access Request.
+
+   The re-evaluation request does not repeat the original evaluation_id.
+   The PDP resolves the approval.id (and approval.state, when present)
+   to the approved Access Request task, original denied evaluation, and
+   approved CRM tool-class scope.
+
+   POST /access/v1/evaluation HTTP/1.1
+   Host: pdp.example.com
+   Authorization: Bearer 2YotnFZFEjr1zCsicMWpAA
+   Content-Type: application/json
+
+   {
+     "subject": {
+       "type": "user",
+       "id": "alice@example.com",
+       "properties": {
+         "act": {
+           "iss": "https://agents.example.com",
+           "sub": "agent_renewal_assistant_v3",
+           "sub_profile": "ai_agent"
+         }
+       }
+     },
+     "resource": {
+       "type": "tool",
+       "id": "crm.search_accounts"
+     },
+     "action": {
+       "name": "invoke"
+     },
+     "context": {
+       "time": "2026-05-12T17:31:00Z",
+       "approval": {
+         "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
+         "approved_at": "2026-05-12T17:30:00Z",
+         "approved_until": "2026-05-19T17:30:00Z",
+         "state": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBkcC0xIn0.eyJhcHByb3ZhbF9pZCI6ImFwcl8wMUhYNkJDRUY4SzNaMlg3UDBLNEpFNldWSyIsInNjb3BlIjoiY3JtX3Rvb2xzIiwiZXhwIjoxNzc5MjEwMDAwfQ.c2lnbmF0dXJl"
+       }
+     }
+   }
+
+A.2.8.  Final Decision
+
+   HTTP/1.1 200 OK
+   Content-Type: application/json
+
+   {
+     "decision": true,
+     "context": {
+       "approval": {
+         "id": "apr_01HX6BCEF8K3Z2X7P0K4JE6WVK",
+         "approved_until": "2026-05-19T17:30:00Z"
+       }
+     }
+   }
+
+Appendix B.  Implementation Considerations
 
    This appendix describes common deployment patterns and is non-
    normative.
 
-A.1.  Identity Governance and Approval Platforms
+B.1.  Identity Governance and Approval Platforms
 
    Many implementations sit on top of an existing identity-governance,
    ITSM, or approval platform that already has catalogs, policy engines,
@@ -3181,7 +3201,7 @@ A.1.  Identity Governance and Approval Platforms
    states onto the canonical statuses defined in this profile SHOULD
    follow the guidance in Section 11.1.2.
 
-A.2.  Subjects, Principals, and Actors
+B.2.  Subjects, Principals, and Actors
 
    For deployments where an autonomous actor (an AI agent, service, or
    workload) submits Access Requests on behalf of a human or
@@ -3225,7 +3245,7 @@ A.2.  Subjects, Principals, and Actors
    the agent driver use cases described in this profile's Introduction
    assume a common convention is in place.
 
-A.3.  Form and Catalog Translation
+B.3.  Form and Catalog Translation
 
    Most existing platforms have proprietary form description languages
    with field types beyond JSON Schema's native vocabulary, and
@@ -3239,7 +3259,7 @@ A.3.  Form and Catalog Translation
    catalogs to autonomous agents through an agent protocol can
    additionally surface catalogs through that protocol; see Section 9.6.
 
-A.4.  Notification Channels
+B.4.  Notification Channels
 
    Implementations frequently already have webhook subscriptions or
    other deployment-level event channels.  Per-task callbacks
@@ -3247,7 +3267,7 @@ A.4.  Notification Channels
    webhook infrastructure or event-streaming bindings defined by
    companion specifications for completion notification.
 
-A.5.  Time and Clock Skew
+B.5.  Time and Clock Skew
 
    This profile uses [RFC3339] timestamps in multiple places:
    context.evaluated_at, context.access_request.expires_at,
@@ -3272,7 +3292,7 @@ A.5.  Time and Clock Skew
    (for example, regulatory or audit constraints) MAY define a tighter
    tolerance and document it as part of their deployment profile.
 
-A.6.  Evaluators and Workflow Design
+B.6.  Evaluators and Workflow Design
 
    The Access Request Service determines what kind of evaluator
    processes a given submission.  Evaluators commonly include:
@@ -3301,8 +3321,9 @@ A.6.  Evaluators and Workflow Design
    by any mixture.  The protocol's synchronous-completion response,
    callback notification, and re-evaluation semantics apply uniformly
    across evaluator types.  The approver-eligibility, self-approval, and
-   separation-of-duties requirements of Section 21.7 apply to whichever
-   entity completes a workflow step, whether human or automated.
+   separation-of-duties requirements of Section 21.2.2 apply to
+   whichever entity completes a workflow step, whether human or
+   automated.
 
    When the calling population includes high-volume PEPs (gateways
    aggregating many users, OAuth Authorization Servers serving fleets of
@@ -3340,12 +3361,12 @@ A.6.  Evaluators and Workflow Design
    semantics provide the inputs an Access Request Service needs to apply
    these patterns.
 
-Appendix B.  Acknowledgements
+Appendix C.  Acknowledgements
 
    The author thanks the OpenID AuthZEN Working Group for discussion and
    review.
 
-Appendix C.  Document History
+Appendix D.  Document History
 
    -00  Initial version.  Defines requestable denials, the Access
       Request Endpoint, Task Handles, Task Status Endpoint, the Re-
