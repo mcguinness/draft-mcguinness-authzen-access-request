@@ -104,6 +104,8 @@ This profile defines that protocol layer: a narrow, interoperable mechanism for 
 
 This specification intentionally does not define a workflow engine, approval policy language, ticketing system, entitlement catalog, or user interface.  Those capabilities are the responsibility of the PDP or Access Request Service.  The purpose of this profile is to standardize the handoff between authorization enforcement and the workflow that resolves a denial, so that any PEP, autonomous or user-facing, can route denials through a uniform interface to whatever evaluator the deployment uses, human or automated.
 
+This profile resolves missing authority, not missing information.  A denied evaluation that could be completed with attributes or context the caller already holds is a matter of supplying those inputs; partial evaluation, where the PDP returns the residual conditions a caller can satisfy locally, addresses that case.  A requestable denial is different: the authority does not yet exist at evaluation time, and is created by an asynchronous governance process, often a human approver.  No information the PEP can supply would satisfy such a denial; a workflow must produce new authority first.  The two mechanisms are orthogonal and can be used together.
+
 # Requirements Notation and Conventions
 
 {::boilerplate bcp14-tagged}
@@ -115,6 +117,7 @@ The terms Policy Decision Point (PDP), Policy Enforcement Point (PEP), Subject, 
 This profile has the following design goals:
 
 * Preserve the AuthZEN allow/deny decision model.
+* Preserve AuthZEN's stateless evaluation model: the PDP retains no decision state between the denial and the re-evaluation, and the durable request and approval state lives in the Access Request Service role.
 * Provide an interoperable interface for any PEP to route denied access to a centralized governance evaluator, whether that evaluator is human (an owner, approver, or delegate), automated (a policy engine, risk engine, or rule-based evaluator), or a combination of the two.
 * Support high-volume autonomous callers by combining a uniform per-denial submission shape with Access Request Service workflow patterns that absorb load (broad-scope approvals, auto-approval, pre-approval, bulk approval).
 * Make requestability explicit and machine-readable so autonomous PEPs can construct a conformant submission without human intervention at submission time.
@@ -275,6 +278,8 @@ The following is a non-normative example:
 ## Evaluation Identifier {#evaluation-identifier}
 
 This profile defines `evaluation_id` as a first-class identifier for an AuthZEN evaluation, used by the Access Request Service to bind a submitted Access Request to the denied evaluation it remediates ({{access-request-submission}}).
+
+`evaluation_id` is also the audit thread that links a later re-evaluation back to the initial denied attempt that prompted the Access Request.  Re-evaluation is keyed by the `approval` object rather than by `evaluation_id` ({{completion-semantics}}); nonetheless, the Access Request Service SHOULD retain the original `evaluation_id` in the approval record so the full sequence (denied evaluation, Access Request, approval, and re-evaluation) can be reconstructed for audit.
 
 A PDP returns `evaluation_id` as a member of the AuthZEN Decision Context: `context.evaluation_id`, a string.  The PEP echoes the captured identifier as `denial.evaluation_id` when submitting an Access Request.
 
@@ -911,6 +916,8 @@ PEPs that need to abandon an outstanding request without using this endpoint MAY
 # Completion Semantics {#completion-semantics}
 
 This profile defines a single completion mode, identified by `result.mode`: `reevaluate`.  The mode instructs the PEP to perform a new AuthZEN Access Evaluation after approval, so the PDP remains authoritative at enforcement time.
+
+Re-evaluation does not require the PDP to retain decision state from the original denial.  The PDP treats the approval as an input attribute: the PEP carries the `approval` object into the new Access Evaluation at `context.approval`, and the PDP reads it the way it reads any other backing attribute, such as a role, group membership, or risk signal.  The new evaluation runs against current policy and current state; it is not a resumption of the earlier evaluation.  Whether the re-evaluation must reach the same PDP is a property of the binding topology, not of this profile: an integrity-protected `approval.state` can be verified by any PDP that holds the issuer's verification key, while an `approval.id` resolved against server-side state requires a PDP that shares that state.
 
 Profiles of this specification MAY define additional completion modes through the `result.mode` extension point ({{extensibility}}).  Implementations that bind approval to a specific issuance flow, such as OAuth token issuance where the issued token is itself the decision representation, MUST do so through a profile that defines a completion mode appropriate to that flow; the base profile does not define such a mode.  A PEP that receives an unknown `result.mode` value MUST treat the task as not approved and MUST NOT permit access on the basis of that result.
 
