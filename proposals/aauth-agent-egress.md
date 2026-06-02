@@ -32,10 +32,11 @@ It does **not** define:
 | Mission | The approved task and its authority envelope, versioned by `constraints_hash`. |
 | Person Server (PS) | Where a human proposes and approves a Mission, and approves later broadening, using the resource's R3 `display` text.  Reached as the captive+json `user-portal-url`. |
 | Authorization Server (AS) | Fetches and verifies a destination's R3 document, evaluates the Mission against the requested operations, and issues Mission-bound auth tokens carrying `r3_granted` and `r3_conditional`.  Performs per-call evaluation for conditional operations. |
-| Egress proxy | The R3 enforcement point at the agent's outbound boundary, and the Captive Portal API server.  Matches each outbound call against the token's grants and signals blocks via captive+json. |
+| Egress proxy | The R3 enforcement point at the agent's outbound boundary, and the Captive Portal API server.  Matches each outbound call against the token's grants; on a block or a conditional call it issues a resource token capturing the call and signals it via captive+json or `AAuth-Requirement`. |
 | Destination resource | Publishes an R3 document describing its operations.  For non-AAuth destinations, the egress proxy or its AS derives the R3 document from the destination's API description. |
 | Mission-bound auth token (`AAuth-Mission`) | The credential the agent carries.  It carries `r3_granted`, `r3_conditional`, `r3_uri`, and `r3_s256`. |
-| Agent | Sends an authorization request with `r3_operations`, carries the opaque `r3_s256` hash, makes calls, and handles `AAuth-Requirement` challenges and captive signals. |
+| Resource token | A token the egress proxy issues as the resource boundary, capturing a blocked or conditional call: D's `r3_uri` and `r3_s256`, the attempted operation, and its parameters.  Opaque to the agent, which relays it to the AS.  The AAuth analogue of the captive-portal egress profile's `binding_token`. |
+| Agent | Makes calls; on a block or conditional challenge, relays the proxy-issued resource token to its AS in an authorization request naming the `r3_operations` it needs; carries the opaque `r3_s256` hash and never reads the R3 document. |
 
 ## Egress authority as Rich Resource Requests
 
@@ -76,12 +77,12 @@ The flow has three phases: a blocked operation is signaled (RFC 8908), the agent
     | 3 GET captive+json |                    |                   |                  |
     |------------------->|                    |                   |                  |
     | 4 captive:true,    |                    |                   |                  |
-    |  access-request    |                    |                   |                  |
-    |  (AS, Mission,     |                    |                   |                  |
-    |   r3_operations,   |                    |                   |                  |
-    |   user-portal-url) |                    |                   |                  |
+    |  resource-token    |                    |                   |                  |
+    |  (r3_uri, r3_s256, |                    |                   |                  |
+    |  op, parameters)   |                    |                   |                  |
+    |  user-portal-url   |                    |                   |                  |
     |<-------------------|                    |                   |                  |
-    | 5 authz request: r3_operations + Mission ref               |                  |
+    | 5 authz request: resource-token + r3_operations            |                  |
     |---------------------------------------->|                   |                  |
     |                    |       6 fetch + verify R3 doc (r3_s256)|                  |
     |                    |          -------------------------------------------->    |
@@ -111,9 +112,9 @@ Step by step:
 1. The agent attempts operation `op` on destination D through the proxy, presenting its Mission-bound auth token.
 2. The proxy identifies D's grants in the token (by `r3_uri` and `r3_s256`) and finds `op` in neither `r3_granted` nor `r3_conditional`.  It blocks and signals with HTTP 511, referencing a per-denial Captive Portal API URL.
 3. The agent issues a GET to that URL with `Accept: application/captive+json`.
-4. The proxy returns `captive: true` and an `access-request` member: the AS authorization endpoint, the Mission reference, the requested `r3_operations` (`vocabulary` and `operations`) for D, D's `r3_uri` and `r3_s256`, and the Person Server as `user-portal-url`.
-5. The agent issues an AAuth authorization request to the AS with those `r3_operations`, the Mission reference, and the current `constraints_hash`.
-6. The AS fetches D's R3 document at `r3_uri` (AS-only, HTTP Message Signature), verifies `r3_s256`, and evaluates the Mission against the requested operations, recording the hash for audit.
+4. The proxy returns `captive: true` and a `resource-token`: an opaque token the proxy issues as the resource boundary, capturing the blocked call (D's `r3_uri` and `r3_s256`, the attempted operation, and its parameters), plus the Person Server as `user-portal-url`.  The proxy MAY instead deliver the same resource token via R3's native `AAuth-Requirement` response.
+5. The agent presents the resource token to its Authorization Server in an AAuth authorization request, naming the `r3_operations` it needs together with its Mission reference and current `constraints_hash`.  The agent does not read the resource token.
+6. The AS verifies the resource token (issued by the proxy it trusts), fetches D's R3 document at the `r3_uri` the token carries (AS-only, HTTP Message Signature), verifies `r3_s256`, and evaluates the Mission against the requested operations, recording the hash for audit.
 7. Where a human must approve, the AS routes the request to the Person Server.
 8. The human approves at the Person Server against D's R3 `display` text (`summary`, `implications`, `data_accessed`, `irreversible`).  Approval updates the Mission authority, producing a new `constraints_hash`.
 9. The AS issues a refreshed Mission-bound auth token whose `r3_granted` and `r3_conditional` now include the approved operations.
@@ -121,7 +122,7 @@ Step by step:
 11. The proxy finds `op` in `r3_granted` and forwards the call to D, returning the response.  If `op` is in `r3_conditional`, the per-call sub-flow below runs first.
 12. Optionally, the agent re-queries the Captive Portal API and observes `captive: false`, with `seconds-remaining` reflecting the token lifetime.
 
-**Conditional (`r3_conditional`) per-call sub-flow.**  When `op` matches `r3_conditional`, the proxy does not forward immediately.  It returns an `AAuth-Requirement` carrying a resource token with the actual call parameters; the agent round-trips to the AS; the AS evaluates the concrete parameters against the Mission and issues a per-call auth token (or denies); the agent retries and the proxy forwards on success.
+**Conditional (`r3_conditional`) per-call sub-flow.**  When `op` matches `r3_conditional`, the proxy does not forward immediately.  It returns an `AAuth-Requirement` carrying a resource token with the actual call parameters; the agent round-trips to the AS; the AS evaluates the concrete parameters against the Mission and issues a per-call auth token (or denies); the agent retries and the proxy forwards on success.  This is the same resource-token mechanism as the block path (step 4); only the outcome differs (a per-call decision rather than a Mission broadening), and the block path MAY carry the token in captive+json while the conditional path uses `AAuth-Requirement`.
 
 **Proxy-brokered variant.**  Instead of returning HTTP 511 or `AAuth-Requirement` to the agent, the proxy MAY drive the broadening or the per-call decision against the AS itself and present a single result to the agent, for runtimes that do not implement the captive or `AAuth-Requirement` handshakes.
 
@@ -129,12 +130,12 @@ Step by step:
 
 ## Signaling with the Captive Portal API
 
-The block signal in step 2 reuses the RFC 8908 Captive Portal API rather than a new AAuth-specific channel.  RFC 8908 was designed for "you are restricted, here is the human path to get unblocked," which is precisely the egress-proxy to Person-Server interaction.  The egress proxy acts as a Captive Portal API server, returning `captive: true` with an AAuth broadening descriptor:
+The block signal in step 2 reuses the RFC 8908 Captive Portal API rather than a new AAuth-specific channel.  RFC 8908 was designed for "you are restricted, here is the human path to get unblocked," which is precisely the egress-proxy to Person-Server interaction.  The egress proxy acts as a Captive Portal API server, returning `captive: true` with a proxy-issued resource token (the same artifact R3 carries in an `AAuth-Requirement`, here delivered in captive+json):
 
 | RFC 8908 element | AAuth meaning |
 |---|---|
 | `captive: true` (per-denial captive API URL) | This call to destination D is blocked; authority must be broadened |
-| `access-request` member | AAuth broadening descriptor: the AS authorization endpoint, the Mission reference, the requested `r3_operations` for D, and D's `r3_uri` / `r3_s256` |
+| `resource-token` member | An opaque proxy-issued resource token capturing the blocked call (`r3_uri`, `r3_s256`, attempted operation, parameters), which the agent relays to its AS; the AAuth analogue of the captive-portal egress profile's `binding_token` |
 | `user-portal-url` | The Person Server human-consent page |
 | `seconds-remaining` | The Mission-bound token's lifetime |
 | `can-extend-session` | Whether the agent may re-broaden before expiry |
@@ -164,6 +165,7 @@ Operation-level scoping is inherent (which operations, in which vocabulary).  Fi
 
 - **The token is a bearer of authority.**  Mission-bound egress tokens SHOULD be sender-constrained (DPoP-style proof-of-possession or mutual TLS) and short-lived, and bound to the agent identity, so a stolen token cannot be replayed by another actor.
 - **The agent holds only an opaque hash.**  Because the agent carries `r3_s256` and never the R3 document, prompt injection cannot manipulate the authorization semantics through the agent; the AS does the semantic work server-side.
+- **Signed blocked-call context.**  The resource token is issued and signed by the egress proxy as the resource boundary, and the AS verifies it.  So the operation and parameters the AS authorizes are the proxy's observed call, not values an agent asserts in a captive response it relays.  This is the AAuth analogue of the captive-portal egress profile's `binding_token` confused-deputy mitigation.
 - **R3 documents are AS-only.**  The resource serves the R3 document only to a request signed by its AS (HTTP Message Signature), so a compromised agent or proxy cannot substitute a forged operation set.
 - **Per-call validation catches in-envelope misuse.**  Routing parameter-sensitive and irreversible operations to `r3_conditional` means the AS sees the concrete call at enforcement time, narrowing the window in which a drifting or hijacked agent can misuse an operation it is nominally allowed.
 - **Curated consent.**  The Person Server approves against the resource-authored R3 `display` text, not agent-supplied prose; agent rationale in a broadening request is untrusted and MUST be sanitized before display.  The captive+json `user-portal-url` and other URLs are untrusted input to an autonomous agent and MUST NOT be auto-navigated or fed to a model as instructions.
@@ -175,7 +177,7 @@ Operation-level scoping is inherent (which operations, in which vocabulary).  Fi
 
 - **R3 derivation for non-AAuth destinations.**  Should the proxy's OpenAPI/MCP/gRPC to R3 derivation be standardized (so two proxies derive the same `operations` and `r3_s256` for the same destination), or left to deployment?
 - **Who issues `AAuth-Requirement` at the egress hop.**  For a non-AAuth destination the proxy stands in for the resource in the conditional handshake; this stand-in role and its token formats need definition.
-- **Broadening descriptor vocabulary.**  Should the captive+json `access-request` member and the AAuth authorization request share one registered descriptor (Mission reference plus `r3_operations`) so any proxy and AS interoperate?
+- **Resource-token contents and carrier.**  What a proxy-issued resource token captures for a blocked egress (the attempted operation, its parameters, and a host or connection fallback for opaque egress), and whether the captive+json and `AAuth-Requirement` carriers convey an identical token, need definition.
 - **Sender-constraining.**  Should proof-of-possession (DPoP or mutual TLS) be mandatory for Mission-bound egress tokens rather than recommended?
 - **Raw and CONNECT egress.**  R3 vocabularies are API-operation oriented.  For opaque TLS tunnels or non-HTTP egress where the proxy cannot see operations, the grant degrades to host or connection level; how that coarser grant and its captive signal are expressed is open.
 
