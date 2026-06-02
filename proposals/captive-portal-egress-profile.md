@@ -57,7 +57,7 @@ The agent-driven flow is primary; a proxy-brokered variant is noted at the end.
 2.  The proxy, acting as PEP, evaluates the egress with the AuthZEN Access Evaluation API.  The PDP returns `decision: false` with a requestable denial (`context.access_request`), where the AuthZEN Resource is D.
 3.  The proxy holds the connection in a captive state for D and signals the agent: it returns HTTP 511 (the Discovery section) referencing a Captive Portal API URL distinct to this denial, or the agent already discovered the API per RFC 8910.
 4.  The agent issues an HTTP `GET` to the Captive Portal API URL with `Accept: application/captive+json` and receives a response with `captive: true` and an `access-request` member carrying the requestable denial for D (the `access-request` member registration below).
-5.  The agent submits a base-profile Access Request to the Access Request Endpoint, authenticating per the base profile, and receives a Task Handle.  It awaits completion by polling or callback.
+5.  The agent submits a binding-only base-profile Access Request to the Access Request Endpoint (the denial-binding material from the `access-request` member), authenticating per the base profile, and receives a Task Handle.  The Access Request Service reconstructs the denied Subject, Resource, and Action from the binding material.  The agent awaits completion by polling or callback.
 6.  On approval, the agent retries egress to D.  The proxy re-evaluates the egress through the AuthZEN Access Evaluation API (Re-evaluation Mode); if the approval applies and current policy permits, the PDP returns `decision: true` and the proxy lifts the captive state for D.
 7.  The agent re-queries the Captive Portal API (per Section 5 of RFC 8908) and observes `captive: false` with `seconds-remaining` derived from the approval's `approved_until`.  Egress to D now flows.
 8.  When `approved_until` passes, the proxy returns D to the captive state, and the agent may request again.
@@ -71,14 +71,12 @@ Because the agent reaches the proxy over the egress connection itself rather tha
 Registers a new member of the RFC 8908 Captive Portal API response object:
 
 `access-request`:
-: Object.  Present when `captive` is `true` because the destination is blocked but requestable.  Carries what the agent needs to submit a base-profile Access Request for the blocked destination.  It has the following members:
+: Object.  Present when `captive` is `true` because the destination is blocked but requestable.  Carries the denial-binding material the agent needs to submit a base-profile Access Request for the blocked destination.  It has the following members:
 
-  * `subject`: REQUIRED.  The AuthZEN Subject for the denied egress.
-  * `resource`: REQUIRED.  The AuthZEN Resource for the blocked destination (for example, `{"type": "egress", "id": "https://api.partner.example"}`).
-  * `action`: REQUIRED.  The AuthZEN Action for the egress (for example, `{"name": "connect"}`).
-  * `context`: REQUIRED.  The denied evaluation's AuthZEN Context, including the base profile's `access_request` object and its denial-binding material (`evaluation_id` or an integrity-protected `binding_token`) and `reason`.
+  * `context`: REQUIRED.  The denied evaluation's AuthZEN Context, including the base profile's `access_request` object, its denial-binding material (`evaluation_id` or an integrity-protected `binding_token`), and `reason`.
+  * `subject`, `resource`, `action`: OPTIONAL.  The denied Subject, Resource, and Action.  The proxy omits them when the Access Request Service can reconstruct the tuple from the binding material (a `binding_token` carrying inline binding claims, or a resolvable `evaluation_id`), and includes them when only a hashed binding (`binding_hash`) is available, so the agent can submit them for the Access Request Service to recompute and compare the hash.
 
-The agent uses these values to assemble a base-profile Access Request submission (the Access Request Submission section of the base profile): the captive+json `subject`, `resource`, and `action` become the submission's `subject`, `resource`, and `action`; `context.access_request.endpoint` is the submission target; and the denial-binding material is echoed in the submission's `denial` object.
+The agent submits a base-profile Access Request to `context.access_request.endpoint`, echoing the binding material into the submission's `denial` object (the Access Request Submission section of the base profile).  When the binding material is reconstructable, this is a **binding-only** submission: the agent omits Subject, Resource, and Action, and the Access Request Service reconstructs the denied Subject, Resource, Action, and authorization-relevant Context from the binding material (the `binding_token`'s inline binding claims, or a server-side resolution of `evaluation_id`).  When only a hashed binding is available, the agent also submits the Subject, Resource, and Action conveyed above, because the Access Request Service cannot reconstruct them from a one-way hash and instead recomputes the hash over the submitted tuple to verify it.  The binding-only mode relies on the base profile permitting those members to be omitted when reconstructable binding material is present; see the Relationship to the Base Profile section.
 
 The outer Captive Portal API keys are hyphenated (`access-request`, matching `user-portal-url`), while the embedded base-profile object retains its snake_case members (`access_request`, `binding_token`); this mismatch is deliberate so each layer keeps its native convention.  Clients that do not recognize the `access-request` member ignore it, per normal JSON extension practice.
 
@@ -95,9 +93,6 @@ Non-normative captive+json example:
   "captive": true,
   "user-portal-url": "https://proxy.example.com/portal/req_01J8Z3",
   "access-request": {
-    "subject": { "type": "agent", "id": "agent_renewal_assistant_v3" },
-    "resource": { "type": "egress", "id": "https://api.partner.example" },
-    "action": { "name": "connect" },
     "context": {
       "evaluation_id": "eval_01K2Q4DP3K",
       "reason": "egress_not_allowed",
@@ -164,11 +159,14 @@ A base-profile-only deployment that does not expose a Captive Portal API remains
 - **Captivity granularity.**  This profile scopes the Captive Portal API interaction to one destination via a per-denial API URL.  Is a per-destination URL the right model, or should captive+json carry a list of pending egress denials, or should `captive` be redefined as "captive with respect to this destination"?
 - **HTTPS egress without TLS termination.**  Without MITM, the proxy cannot inject 511 inside a tunneled TLS stream.  Should this profile recommend `CONNECT`-response signaling, an agent-runtime-configured API URL, or a network-layer (RFC 8910) provisioning as the canonical path for opaque HTTPS egress?
 - **Carrying the approval to the proxy.**  Server-side approval resolution is the default; should this profile define a standard header by which an agent presents `context.approval` to the proxy for the bound-reference topology?
+- **Binding-only submission.**  This profile has the agent submit only denial-binding material and the Access Request Service reconstruct Subject, Resource, and Action.  The base profile currently requires those members; should it (or a base-profile extension) permit a binding-only submission when reconstructable binding material is present, and how should the hashed-binding case (where reconstruction is impossible) be signaled so the agent knows it must include the tuple?
 - **Subject and action vocabulary.**  Should `resource.type: "egress"` and `action.name: "connect"` be registered as interoperable values, or left deployment-defined?
 
 ## Relationship to the Base Profile
 
-This proposal is a strict extension: it adds one Captive Portal API response member and one capability URN, and maps egress concepts onto existing AuthZEN Subject, Resource, and Action and the base profile's request, approval, and re-evaluation flow.  It introduces no new approval mechanism, no new completion mode, and no new media type.  A base-profile Access Request submitted from a captive+json `access-request` member is an ordinary submission; the Access Request Service need not know it originated from a Captive Portal API interaction.
+This proposal adds one Captive Portal API response member and one capability URN, and maps egress concepts onto existing AuthZEN Subject, Resource, and Action and the base profile's request, approval, and re-evaluation flow.  It introduces no new approval mechanism, no new completion mode, and no new media type.
+
+It does rely on one base-profile affordance: a **binding-only Access Request**, in which the submitting PEP omits Subject, Resource, and Action and the Access Request Service reconstructs them from verifiable, reconstructable binding material (a `binding_token` with inline binding claims, or a resolvable `evaluation_id`).  The base profile currently requires those members in the submission; this profile recommends the base profile permit their omission when such binding material is present, since here the party that evaluated the egress (the proxy) and the party that submits the Access Request (the agent) are different, and the agent does not hold the canonical denied tuple.  When only a hashed binding is available, reconstruction is impossible and the agent submits the tuple as in the base profile.  Apart from that affordance, a base-profile Access Request submitted from a captive+json `access-request` member is an ordinary submission; the Access Request Service need not know it originated from a Captive Portal API interaction.
 
 ## References
 
