@@ -15,10 +15,10 @@ AAuth already supplies the pieces.  A Mission is the approved task and its autho
 This proposal defines:
 
 - An egress-governance model in which the egress proxy enforces a Mission-bound auth token's R3 grants locally.
-- Use of R3 as the egress authority vocabulary: operation-level grants (`r3_granted`) and per-call validated grants (`r3_conditional`).
+- Use of R3 as the egress authority vocabulary at the granularity the proxy can observe: an HTTP method-and-URL vocabulary by default, host or connection level for opaque tunnels, and API-operation vocabularies only in API-gateway mode.  Grants are carried (`r3_granted`) or per-call validated (`r3_conditional`).
 - The blocked-operation, broaden, resume protocol flow expressed in AAuth Mission and R3 terms.
 - Reuse of the RFC 8908 Captive Portal API as the block-and-request signaling layer.
-- How the egress proxy fronts non-AAuth destinations by deriving an R3 document from the destination's API description.
+- How the egress proxy fronts destinations: an HTTP method-and-URL R3 document by default, and an API-operation R3 document only when the proxy runs as an API gateway (terminates TLS and holds the destination's API description).
 
 It does **not** define:
 
@@ -33,20 +33,30 @@ It does **not** define:
 | Person Server (PS) | Where a human proposes and approves a Mission, and approves later broadening, using the resource's R3 `display` text.  Reached as the captive+json `user-portal-url`. |
 | Authorization Server (AS) | Fetches and verifies a destination's R3 document, evaluates the Mission against the requested operations, and issues Mission-bound auth tokens carrying `r3_granted` and `r3_conditional`.  Performs per-call evaluation for conditional operations. |
 | Egress proxy | The R3 enforcement point at the agent's outbound boundary, and the Captive Portal API server.  Matches each outbound call against the token's grants; on a block or a conditional call it issues a resource token capturing the call and signals it via captive+json or `AAuth-Requirement`. |
-| Destination resource | Publishes an R3 document describing its operations.  For non-AAuth destinations, the egress proxy or its AS derives the R3 document from the destination's API description. |
+| Destination resource | An AAuth-native destination publishes an R3 document.  For other destinations the egress proxy (or its AS) supplies the R3 document at the granularity it can observe: an HTTP method-and-URL document by default, an API-operation document only in API-gateway mode. |
 | Mission-bound auth token (`AAuth-Mission`) | The credential the agent carries.  It carries `r3_granted`, `r3_conditional`, `r3_uri`, and `r3_s256`. |
 | Resource token | A token the egress proxy issues as the resource boundary, capturing a blocked or conditional call: D's `r3_uri` and `r3_s256`, the attempted operation, and its parameters.  Opaque to the agent, which relays it to the AS.  The AAuth analogue of the captive-portal egress profile's `binding_token`. |
 | Agent | Makes calls; on a block or conditional challenge, relays the proxy-issued resource token to its AS in an authorization request naming the `r3_operations` it needs; carries the opaque `r3_s256` hash and never reads the R3 document. |
 
 ## Egress authority as Rich Resource Requests
 
-R3 supplies the vocabulary for both the request and the grant, so the egress envelope is operation-level rather than host-level.
+R3 supplies the vocabulary for both the request and the grant.  But an egress proxy is not an API gateway: it fronts many destinations and can enforce only at the granularity it can observe, so its R3 vocabulary is set by what it sees on the wire, not by the destination's API semantics:
 
-- A destination publishes an **R3 document**: a `vocabulary` URN (for example `urn:aauth:vocabulary:openapi`), an `operations` array in that vocabulary (OpenAPI `operationId`, MCP tool name, gRPC method, and so on), and a `display` section (`summary`, `implications`, `data_accessed`, `irreversible`).  It is discovered through the destination's `/.well-known/aauth-resource.json` (`r3_vocabularies`).
+| Proxy visibility | R3 vocabulary | Example operation |
+|---|---|---|
+| Opaque TLS tunnel (`CONNECT`) | host or connection | `CONNECT api.partner.example:443` |
+| Cleartext, or TLS-terminating proxy | HTTP: method and URL pattern | `{"method": "GET", "url": "https://api.partner.example/invoices/*"}` |
+| TLS-terminating and API-aware (proxy run as an API gateway) | API operation (OpenAPI `operationId`, MCP tool, gRPC method) | `invoice.read` |
+
+The **HTTP method-and-URL vocabulary is the baseline** for an egress proxy; this proposal assumes an `urn:aauth:vocabulary:http` whose `operations` are method-plus-URL-pattern entries (its registration is deferred to R3).  The richer API-operation vocabularies (`urn:aauth:vocabulary:openapi` and the others R3 defines) apply only in the top tier, where the proxy effectively acts as an API gateway for the destination.  Below the baseline, the grant degrades to host or connection level for traffic the proxy cannot inspect.
+
+Within whichever vocabulary applies:
+
+- The **R3 document** carries a `vocabulary` URN, an `operations` array in that vocabulary, and a `display` section (`summary`, `implications`, `data_accessed`, `irreversible`), discovered through `/.well-known/aauth-resource.json` (`r3_vocabularies`).  An AAuth-native destination publishes it; otherwise the egress proxy supplies it (see Fronting destinations).
 - The **AS**, not the agent, fetches the document (AS-only access, authenticated with an HTTP Message Signature), verifies its `r3_s256` hash, evaluates the requested operations against the Mission, and MAY narrow the grant.
 - The agent's **Mission-bound auth token** carries `r3_granted` (operations served immediately) and `r3_conditional` (operations authorized in principle but requiring per-call validation), plus `r3_uri` and `r3_s256`.  The agent carries only the opaque hash and never reads the document.
 
-The egress allowlist is therefore the destination's own API description, evaluated against the Mission, rather than a hand-maintained host list.
+The egress allowlist is therefore expressed in the proxy's observable vocabulary, HTTP method and URL by default, evaluated against the Mission, rather than a hand-maintained host list.
 
 ## Where the decision lives
 
@@ -145,21 +155,22 @@ The block signal in step 2 reuses the RFC 8908 Captive Portal API rather than a 
 Three caveats apply:
 
 - **Per-destination strain.**  RFC 8908's `captive` is a network-wide boolean; egress is per-destination.  The proxy hands the agent a captive API URL that is distinct per denial, so each captive+json describes one blocked egress.
-- **Granularity mismatch.**  RFC 8908 signals at destination level, but R3 grants at operation level.  `captive: true` therefore means "this call to D is blocked, broaden these `r3_operations`"; it cannot express "captive for op X on D but not op Y."  The per-denial URL scoping absorbs this.
+- **Granularity mismatch.**  RFC 8908 signals at destination level, but the grant is finer (HTTP method and URL, or an API operation in API-gateway mode).  `captive: true` therefore means "this call to D is blocked, broaden these `r3_operations`"; it cannot express "captive for op X on D but not op Y."  The per-denial URL scoping absorbs this.
 - **Reaching the captive API.**  The agent cannot always reach the captive API over the connection being blocked; HTTP 511 at the proxy hop, RFC 8910, or a runtime-configured URL bootstraps it.
 
-## Fronting non-AAuth destinations
+## Fronting destinations
 
-Most egress destinations are third parties that do not speak AAuth.  The egress boundary still works:
+Most egress destinations are third parties that do not speak AAuth.  The egress boundary still works, at the granularity the proxy can observe:
 
-- The egress proxy, or its AS, **derives an R3 document** from the destination's published API description (its OpenAPI document, MCP tool list, or gRPC service definition), assigns it an `r3_uri` and `r3_s256`, and enforces the agent's Mission-bound token against it.  The destination is unchanged and unaware.  This gives operation-level control over third-party APIs.
-- For an **AAuth-native destination**, R3 is enforced end to end at the resource; the egress proxy is a second gate or a pass-through.
+- **By default**, the egress proxy (or its AS) supplies an HTTP method-and-URL R3 document for the destination (host plus path patterns), assigns it an `r3_uri` and `r3_s256`, and enforces the agent's Mission-bound token against it.  The destination is unchanged and unaware.
+- **In API-gateway mode**, when the proxy terminates TLS and holds the destination's API description (its OpenAPI document, MCP tool list, or gRPC service definition), it instead supplies an API-operation R3 document, giving operation-level control over third-party APIs.
+- **For an AAuth-native destination**, R3 is enforced end to end at the resource; the egress proxy is a second gate or a pass-through.
 
-In the non-AAuth case the proxy also stands in for the resource in the `r3_conditional` handshake: it issues the `AAuth-Requirement` on the destination's behalf and relays the concrete parameters to the AS.
+In the non-AAuth cases the proxy also stands in for the resource in the `r3_conditional` handshake: it issues the `AAuth-Requirement` on the destination's behalf and relays the concrete parameters to the AS.
 
 ## Bounded egress authority
 
-Operation-level scoping is inherent (which operations, in which vocabulary).  Finer bounds come from the two tiers and the Mission: `r3_conditional` carries parameter-level limits the AS evaluates per call (monetary caps, record sets, rate); duration and call counts come from token lifetime and Mission constraints; irreversible effects (R3 `display.irreversible`) map to `r3_conditional` or a release gate.
+Scoping is at the proxy's vocabulary granularity (HTTP method and URL by default, API operations in API-gateway mode).  Finer bounds come from the two tiers and the Mission: `r3_conditional` carries parameter-level limits the AS evaluates per call (monetary caps, record sets, rate); duration and call counts come from token lifetime and Mission constraints; irreversible effects (R3 `display.irreversible`) map to `r3_conditional` or a release gate.
 
 ## Security considerations
 
@@ -175,11 +186,11 @@ Operation-level scoping is inherent (which operations, in which vocabulary).  Fi
 
 ## Open Questions
 
-- **R3 derivation for non-AAuth destinations.**  Should the proxy's OpenAPI/MCP/gRPC to R3 derivation be standardized (so two proxies derive the same `operations` and `r3_s256` for the same destination), or left to deployment?
+- **HTTP vocabulary and R3 derivation.**  Should the HTTP method-and-URL egress vocabulary (`urn:aauth:vocabulary:http`) be registered with R3, and, for API-gateway mode, should the OpenAPI/MCP/gRPC to R3 derivation be standardized so two proxies derive the same `operations` and `r3_s256` for a destination?
 - **Who issues `AAuth-Requirement` at the egress hop.**  For a non-AAuth destination the proxy stands in for the resource in the conditional handshake; this stand-in role and its token formats need definition.
 - **Resource-token contents and carrier.**  What a proxy-issued resource token captures for a blocked egress (the attempted operation, its parameters, and a host or connection fallback for opaque egress), and whether the captive+json and `AAuth-Requirement` carriers convey an identical token, need definition.
 - **Sender-constraining.**  Should proof-of-possession (DPoP or mutual TLS) be mandatory for Mission-bound egress tokens rather than recommended?
-- **Raw and CONNECT egress.**  R3 vocabularies are API-operation oriented.  For opaque TLS tunnels or non-HTTP egress where the proxy cannot see operations, the grant degrades to host or connection level; how that coarser grant and its captive signal are expressed is open.
+- **Host and connection tier.**  For opaque TLS tunnels and non-HTTP egress the grant degrades to host or connection level (the bottom tier above); how that coarsest grant is expressed in R3 and signaled in captive+json needs definition.
 
 ## References
 
